@@ -1,0 +1,237 @@
+.tabbar {
+  height: 44px;
+  display: flex;
+  align-items: flex-end;
+  background: var(--sidebar);
+  border-bottom: 1px solid var(--border);
+  padding: 0;
+  gap: 0;
+}
+
+.tabbar__tabs {
+  flex: 1;
+  display: flex;
+  align-items: flex-end;
+  gap: 1px;
+  overflow-x: auto;
+  min-width: 0;
+  padding: 0 4px;
+  scrollbar-width: none;
+
+  &::-webkit-scrollbar {
+    display: none;
+  }
+}
+
+.tabbar__tab {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 14px;
+  height: 36px;
+  border-radius: var(--radius-sm) var(--radius-sm) 0 0;
+  cursor: pointer;
+  font-size: 12px;
+  color: var(--text-sec);
+  transition: all 0.15s;
+  white-space: nowrap;
+  border: 1px solid transparent;
+  border-bottom: none;
+  position: relative;
+  user-select: none;
+  flex-shrink: 0;
+
+  &:hover {
+    background: rgba(255, 255, 255, 0.6);
+    color: var(--text);
+  }
+
+  &--active {
+    background: var(--surface);
+    color: var(--text);
+    font-weight: 500;
+    border-color: var(--border);
+
+    &::after {
+      content: '';
+      position: absolute;
+      bottom: -1px;
+      left: 0;
+      right: 0;
+      height: 1px;
+      background: var(--surface);
+    }
+  }
+}
+
+.tabbar__tab-name {
+  cursor: default;
+  user-select: none;
+}
+
+.tabbar__tab-rename {
+  border: none;
+  outline: none;
+  background: transparent;
+  padding: 0;
+  margin: 0;
+  font-size: 12px;
+  font-family: inherit;
+  color: inherit;
+  line-height: inherit;
+  min-width: 48px;
+  max-width: 200px;
+  display: inline-block;
+  vertical-align: baseline;
+
+  &::selection {
+    background: var(--accent-bg);
+  }
+}
+
+.tabbar__tab--renaming {
+  cursor: default;
+  background: var(--surface) !important;
+  border-color: var(--border) !important;
+
+  &::after {
+    content: '';
+    position: absolute;
+    bottom: -1px;
+    left: 0;
+    right: 0;
+    height: 1px;
+    background: var(--surface);
+  }
+}
+
+.tabbar__tab-icon {
+  width: 14px;
+  height: 14px;
+  display: flex;
+  align-items: center;
+
+  svg {
+    width: 14px;
+    height: 14px;
+  }
+}
+
+.tabbar__tab-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--accent);
+  flex-shrink: 0;
+}
+
+.tabbar__tab-close {
+  width: 18px;
+  height: 18px;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  transition: all 0.15s;
+  color: var(--text-sec);
+
+  svg {
+    width: 12px;
+    height: 12px;
+  }
+
+  .tabbar__tab:hover &,
+  .tabbar__tab--active & {
+    opacity: 1;
+  }
+
+  &:hover {
+    background: var(--active);
+    color: var(--error);
+  }
+}
+
+.tabbar__new-tab {
+  flex-shrink: 0;
+  width: 28px;
+  height: 28px;
+  border-radius: var(--radius-sm);
+  border: none;
+  background: none;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-sec);
+  transition: opacity 0.15s, transform 0.15s, background 0.15s;
+  margin: 0 2px;
+  align-self: center;
+  opacity: 0;
+  transform: translateX(-4px);
+
+  svg {
+    width: 14px;
+    height: 14px;
+  }
+
+  &:hover {
+    background: var(--hover);
+    color: var(--text);
+  }
+
+  .tabbar:hover & {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+.tabbar__actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 0 4px;
+  height: 36px;
+  flex-shrink: 0;
+
+  &--left {
+    padding-right: 0;
+  }
+
+  button {
+    width: 28px;
+    height: 28px;
+    border-radius: var(--radius-sm);
+    border: none;
+    background: none;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--text-sec);
+    transition: all 0.15s;
+
+    svg {
+      width: 16px;
+      height: 16px;
+    }
+
+    &:hover {
+      background: var(--hover);
+      color: var(--text);
+    }
+  }
+}
+
+.tabbar__action-btn {
+  &--active {
+    background: var(--accent-bg) !important;
+    color: var(--accent) !important;
+  }
+
+  &:disabled {
+    opacity: 0.3;
+    cursor: not-allowed;
+    pointer-events: none;
+  }
+}

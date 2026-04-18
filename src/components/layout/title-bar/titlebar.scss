@@ -1,0 +1,79 @@
+.titlebar {
+  height: 48px;
+  display: flex;
+  align-items: center;
+  padding: 0 12px;
+  border-bottom: 1px solid var(--border);
+  background: var(--sidebar);
+  gap: 8px;
+}
+
+.titlebar__drag {
+  flex: 1;
+  height: 100%;
+  -webkit-app-region: drag;
+}
+
+.titlebar__btn {
+  width: 36px;
+  height: 36px;
+  border-radius: var(--radius-sm);
+  border: none;
+  background: none;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-sec);
+  transition: all 0.15s;
+  -webkit-app-region: no-drag;
+
+  svg {
+    width: 18px;
+    height: 18px;
+  }
+
+  &:hover {
+    background: var(--hover);
+    color: var(--text);
+  }
+
+  &--close:hover {
+    color: var(--error);
+  }
+}
+
+.titlebar__search {
+  flex: 0 1 380px;
+  height: 36px;
+  border-radius: 18px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 16px;
+  cursor: pointer;
+  color: var(--text-dim);
+  font-size: 13px;
+  transition: all 0.2s;
+  -webkit-app-region: no-drag;
+
+  svg {
+    width: 16px;
+    height: 16px;
+    color: var(--text-sec);
+    flex-shrink: 0;
+  }
+
+  &:hover {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px var(--accent-bg);
+  }
+}
+
+.titlebar__actions {
+  display: flex;
+  gap: 4px;
+  -webkit-app-region: no-drag;
+}

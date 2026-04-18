@@ -1,0 +1,127 @@
+/* Bottom-center fixed toolbar — uses position:fixed to escape overflow:hidden parents */
+.ft {
+  position: fixed;
+  bottom: 48px; /* above the footer bar */
+  left: 50%;
+  transform: translateX(-50%) translateY(12px);
+  z-index: 500;
+  display: flex;
+  align-items: center;
+  gap: 0;
+  background: var(--surface);
+  border: 1px solid var(--border-light);
+  border-radius: 16px;
+  padding: 0;
+  height: 36px;
+  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.12), 0 1px 4px rgba(0, 0, 0, 0.06);
+  user-select: none;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.18s ease, transform 0.18s ease;
+
+  &--show {
+    opacity: 1;
+    pointer-events: auto;
+    transform: translateX(-50%) translateY(0);
+  }
+}
+
+.ft__grip {
+  width: 24px;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-dim);
+  flex-shrink: 0;
+  cursor: default;
+}
+
+.ft__sep {
+  width: 1px;
+  height: 16px;
+  background: var(--border);
+  margin: 0;
+  flex-shrink: 0;
+}
+
+.ft__btn {
+  width: 36px;
+  height: 36px;
+  border-radius: 0;
+  border: none;
+  background: none;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-sec);
+  transition: all 0.12s;
+  font-family: var(--font-app);
+  flex-shrink: 0;
+  position: relative;
+
+  svg {
+    width: 16px;
+    height: 16px;
+  }
+
+  &:hover {
+    background: var(--hover);
+    color: var(--text);
+  }
+
+  &--active {
+    background: var(--accent-light);
+    color: var(--accent);
+  }
+
+  &--collapse {
+    border-radius: 0 16px 16px 0;
+  }
+}
+
+.ft__heading-group {
+  position: relative;
+}
+
+.ft__heading-panel {
+  position: absolute;
+  bottom: 40px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: var(--surface);
+  border: 1px solid var(--border-light);
+  border-radius: 12px;
+  box-shadow: var(--shadow-lg);
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 4px;
+  padding: 8px;
+  min-width: 112px;
+  z-index: 110;
+}
+
+.ft__heading-opt {
+  width: 32px;
+  height: 32px;
+  border-radius: var(--radius-sm);
+  border: none;
+  background: none;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-sec);
+  transition: all 0.12s;
+  font-family: var(--font-app);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  &:hover {
+    background: var(--hover);
+    color: var(--text);
+  }
+}
