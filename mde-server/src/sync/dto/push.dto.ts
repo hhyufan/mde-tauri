@@ -2,6 +2,7 @@ import {
   IsArray,
   IsBoolean,
   IsInt,
+  IsObject,
   IsOptional,
   IsString,
   Min,
@@ -14,8 +15,9 @@ import { Type } from 'class-transformer';
  * (`POST /sync/file`) and the legacy batch push (`POST /sync/push`).
  */
 export class PushFileDto {
+  @IsOptional()
   @IsString()
-  fileId: string;
+  fileId?: string;
 
   @IsOptional()
   @IsString()
@@ -52,6 +54,13 @@ export class PushFileDto {
   @IsString()
   checksum: string;
 
+  @IsInt()
+  @Min(0)
+  baseRev: number;
+
+  @IsString()
+  mutationId: string;
+
   /**
    * Stable per-device identifier of the pushing client. Used together with
    * `devicePath` to register where this device keeps the file locally.
@@ -68,6 +77,69 @@ export class PushFileDto {
   @IsOptional()
   @IsString()
   devicePath?: string;
+}
+
+export class BindPathDto {
+  @IsString()
+  deviceId: string;
+
+  @IsString()
+  devicePath: string;
+
+  @IsOptional()
+  @IsString()
+  mutationId?: string;
+}
+
+export class DeleteFileDto {
+  @IsInt()
+  @Min(0)
+  baseRev: number;
+
+  @IsString()
+  mutationId: string;
+}
+
+export class UpdateConfigDto {
+  @IsOptional()
+  @IsString()
+  theme?: string;
+
+  @IsOptional()
+  @IsString()
+  language?: string;
+
+  @IsOptional()
+  @IsInt()
+  fontSize?: number;
+
+  @IsOptional()
+  @IsInt()
+  tabSize?: number;
+
+  @IsOptional()
+  @IsBoolean()
+  wordWrap?: boolean;
+
+  @IsOptional()
+  @IsBoolean()
+  lineNumbers?: boolean;
+
+  @IsOptional()
+  @IsBoolean()
+  autoSave?: boolean;
+
+  @IsOptional()
+  @IsString()
+  workspacePath?: string;
+
+  @IsOptional()
+  @IsObject()
+  editorState?: Record<string, any>;
+
+  @IsOptional()
+  @IsInt()
+  protocolVersion?: number;
 }
 
 export class PushDto {

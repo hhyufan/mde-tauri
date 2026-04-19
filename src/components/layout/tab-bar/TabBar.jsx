@@ -1,4 +1,4 @@
-import { useRef, useCallback, useState } from 'react';
+import { useRef, useCallback, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import useEditorStore from '@store/useEditorStore';
 import useConfigStore from '@store/useConfigStore';
@@ -22,9 +22,21 @@ const EXT_COLORS = {
 
 function TabBar() {
   const { t } = useTranslation();
-  const { tabs, activeTabId, setActiveTab, closeTab, createUntitledTab, renameTab, updateTabPath, viewMode, toggleSplit, toolbarVisible, toggleToolbar, sidebarVisible, setSidebarView, toggleSidebar } = useEditorStore();
+  const tabs = useEditorStore((s) => s.tabRenderList);
+  const activeTabId = useEditorStore((s) => s.activeTabId);
+  const setActiveTab = useEditorStore((s) => s.setActiveTab);
+  const closeTab = useEditorStore((s) => s.closeTab);
+  const createUntitledTab = useEditorStore((s) => s.createUntitledTab);
+  const renameTab = useEditorStore((s) => s.renameTab);
+  const updateTabPath = useEditorStore((s) => s.updateTabPath);
+  const viewMode = useEditorStore((s) => s.viewMode);
+  const toggleSplit = useEditorStore((s) => s.toggleSplit);
+  const toolbarVisible = useEditorStore((s) => s.toolbarVisible);
+  const toggleToolbar = useEditorStore((s) => s.toggleToolbar);
+  const sidebarVisible = useEditorStore((s) => s.sidebarVisible);
+  const setSidebarView = useEditorStore((s) => s.setSidebarView);
+  const toggleSidebar = useEditorStore((s) => s.toggleSidebar);
   const notify = useNotificationStore((s) => s.notify);
-  const activeTab = useEditorStore((s) => s.getActiveTab());
   const autoSave = useConfigStore((s) => s.autoSave);
   const bookmarkedPaths = useFileStore((s) => s.bookmarkedPaths);
   const toggleBookmark = useFileStore((s) => s.toggleBookmark);
@@ -36,6 +48,10 @@ function TabBar() {
   const [renamingTabId, setRenamingTabId] = useState(null);
   const [renameValue, setRenameValue] = useState('');
   const renameInputRef = useRef(null);
+  const activeTab = useMemo(
+    () => tabs.find((item) => item.id === activeTabId) || null,
+    [tabs, activeTabId],
+  );
 
   const getTextWidth = useCallback((text) => {
     const canvas = document.createElement('canvas');
@@ -74,6 +90,7 @@ function TabBar() {
       if (result?.success !== false) {
         const actualPath = result?.file_path || newPath;
         updateTabPath(tab.id, actualPath, trimmed);
+        await syncEngine.rebindLocalPath(tab.path, actualPath, trimmed);
         if (currentDir) loadDirectory(currentDir);
       } else {
         notify('error', 'Rename failed', result?.message || '');
@@ -99,19 +116,13 @@ function TabBar() {
 
   const handleBookmark = useCallback(() => {
     if (!activeTab?.path) return;
-    const wasBookmarked = bookmarkedPaths.includes(activeTab.path);
     toggleBookmark(activeTab.path);
     // Ensure the file is in the recent list so it appears in the sidebar
     addRecentFile({ path: activeTab.path, name: activeTab.name, ext: activeTab.ext });
     // Open sidebar and navigate to Recent tab to show the bookmarked file
     if (!sidebarVisible) toggleSidebar();
     setSidebarView('recent');
-    // Bookmarking a file is what enrolls it in cloud sync — push it now
-    // so the user sees the cloud copy without waiting for the next full sync.
-    if (!wasBookmarked) {
-      syncEngine.pushSingle(activeTab.path, activeTab.content, activeTab.encoding, 'bookmark');
-    }
-  }, [activeTab, toggleBookmark, addRecentFile, sidebarVisible, toggleSidebar, setSidebarView, bookmarkedPaths]);
+  }, [activeTab, toggleBookmark, addRecentFile, sidebarVisible, toggleSidebar, setSidebarView]);
 
   return (
     <div className="tabbar">

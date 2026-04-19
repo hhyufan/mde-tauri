@@ -36,6 +36,37 @@ function FolderIcon({ open }) {
   );
 }
 
+function buildBreadcrumbPath(currentDir, index) {
+  if (!currentDir) return '';
+  const normalized = currentDir.replace(/[\\/]+$/, '');
+  const parts = normalized.split(/[\\/]/).filter(Boolean);
+  if (parts.length === 0) return '';
+
+  const isWindowsDrive = /^[A-Z]:$/i.test(parts[0]);
+  if (isWindowsDrive) {
+    if (index <= 0) return `${parts[0]}\\`;
+    return `${parts[0]}\\${parts.slice(1, index + 1).join('\\')}`;
+  }
+
+  return `/${parts.slice(0, index + 1).join('/')}`;
+}
+
+function getParentDir(currentDir) {
+  if (!currentDir) return '';
+  const normalized = currentDir.replace(/[\\/]+$/, '');
+  const parts = normalized.split(/[\\/]/).filter(Boolean);
+  if (parts.length <= 1) return '';
+
+  const isWindowsDrive = /^[A-Z]:$/i.test(parts[0]);
+  if (isWindowsDrive) {
+    if (parts.length === 2) return `${parts[0]}\\`;
+    return `${parts[0]}\\${parts.slice(1, -1).join('\\')}`;
+  }
+
+  const next = `/${parts.slice(0, -1).join('/')}`;
+  return next || '/';
+}
+
 function FileTree() {
   const { t } = useTranslation();
   const files = useFileStore((s) => s.files);
@@ -66,11 +97,8 @@ function FileTree() {
 
   const goUp = useCallback(() => {
     if (!currentDir) return;
-    const parts = currentDir.replace(/[\\/]+$/, '').split(/[\\/]/);
-    if (parts.length > 1) {
-      parts.pop();
-      loadDirectory(parts.join('\\') || parts.join('/'));
-    }
+    const parentDir = getParentDir(currentDir);
+    if (parentDir) loadDirectory(parentDir);
   }, [currentDir, loadDirectory]);
 
   const breadcrumbParts = currentDir ? currentDir.split(/[\\/]/).filter(Boolean) : [];
@@ -111,7 +139,7 @@ function FileTree() {
         <svg className="file-tree__breadcrumb-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="2" y="3" width="20" height="14" rx="2" /><path d="M8 21h8M12 17v4" /></svg>
         {breadcrumbParts.length > 3 ? (
           <>
-            <span className="file-tree__breadcrumb-part" onClick={() => loadDirectory(breadcrumbParts[0])}>{breadcrumbParts[0]}</span>
+            <span className="file-tree__breadcrumb-part" onClick={() => loadDirectory(buildBreadcrumbPath(currentDir, 0))}>{breadcrumbParts[0]}</span>
             <svg className="file-tree__breadcrumb-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="9 18 15 12 9 6" /></svg>
             <span className="file-tree__breadcrumb-part">...</span>
             <svg className="file-tree__breadcrumb-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="9 18 15 12 9 6" /></svg>
@@ -121,7 +149,7 @@ function FileTree() {
           breadcrumbParts.map((part, i) => (
             <span key={i} style={{ display: 'contents' }}>
               {i > 0 && <svg className="file-tree__breadcrumb-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="9 18 15 12 9 6" /></svg>}
-              <span className="file-tree__breadcrumb-part" onClick={() => loadDirectory(breadcrumbParts.slice(0, i + 1).join('\\'))}>{part}</span>
+              <span className="file-tree__breadcrumb-part" onClick={() => loadDirectory(buildBreadcrumbPath(currentDir, i))}>{part}</span>
             </span>
           ))
         )}

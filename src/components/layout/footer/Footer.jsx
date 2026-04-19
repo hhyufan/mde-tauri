@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { createPortal } from 'react-dom';
 import { useTranslation } from 'react-i18next';
 import useEditorStore from '@store/useEditorStore';
@@ -75,10 +75,15 @@ function DropdownPortal({ anchorRef, open, children, onClose }) {
 function Footer() {
   const { t } = useTranslation();
   const { toggleSidebar, viewMode, toggleEditPreview } = useEditorStore();
-  const activeTab = useEditorStore((s) => s.getActiveTab());
+  const tabs = useEditorStore((s) => s.tabRenderList);
+  const activeTabId = useEditorStore((s) => s.activeTabId);
   const cursorPosition = useEditorStore((s) => s.cursorPosition);
   const characterCount = useEditorStore((s) => s.characterCount);
   const { openFileFromPath } = useFileManager();
+  const activeTab = useMemo(
+    () => tabs.find((item) => item.id === activeTabId) || null,
+    [tabs, activeTabId],
+  );
 
   const isMarkdown = activeTab ? MARKDOWN_EXT.test(activeTab.ext) : false;
   const showModeToggle = isMarkdown && viewMode !== 'split';

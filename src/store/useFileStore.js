@@ -53,6 +53,25 @@ const useFileStore = create(
 
       clearRecentFiles: () => set({ recentFiles: [] }),
 
+      removeRecentFile: (path) =>
+        set((state) => ({
+          recentFiles: state.recentFiles.filter((f) => f.path !== path),
+        })),
+
+      replaceRecentFilePath: (oldPath, newPath, name = '') =>
+        set((state) => ({
+          recentFiles: state.recentFiles.map((f) =>
+            f.path === oldPath
+              ? {
+                  ...f,
+                  path: newPath,
+                  name: name || f.name,
+                  ext: (name || f.name || '').split('.').pop() || f.ext,
+                }
+              : f
+          ),
+        })),
+
       toggleBookmark: (path) =>
         set((state) => {
           const exists = state.bookmarkedPaths.includes(path);
@@ -66,6 +85,27 @@ const useFileStore = create(
       isBookmarked: (path) => {
         return useFileStore.getState().bookmarkedPaths.includes(path);
       },
+
+      replaceBookmarkPath: (oldPath, newPath) =>
+        set((state) => ({
+          bookmarkedPaths: state.bookmarkedPaths.map((p) =>
+            p === oldPath ? newPath : p
+          ),
+        })),
+
+      removeCloudBookmarks: () =>
+        set((state) => ({
+          bookmarkedPaths: state.bookmarkedPaths.filter(
+            (p) => typeof p !== 'string' || !p.startsWith('cloud://'),
+          ),
+        })),
+
+      resetSyncUiState: () =>
+        set((state) => ({
+          bookmarkedPaths: state.bookmarkedPaths.filter(
+            (p) => typeof p !== 'string' || !p.startsWith('cloud://'),
+          ),
+        })),
 
       setSortBy: (sortBy) => set({ sortBy }),
       setSortOrder: (order) => set({ sortOrder: order }),

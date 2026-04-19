@@ -197,9 +197,12 @@ function SettingsModal({ open, onClose }) {
                   label={t('settings.cloud.serverUrl')}
                   desc={t('settings.cloud.serverUrlDesc')}
                 >
-                  <span style={{ color: 'var(--text-dim)', fontSize: 12, userSelect: 'text' }}>
-                    https://www.miaogu.xyz
-                  </span>
+                  <input
+                    type="text"
+                    value={config.serverUrl}
+                    onChange={(e) => handleChange('serverUrl', e.target.value)}
+                    placeholder="https://www.miaogu.xyz"
+                  />
                 </SettingRow>
                 <SettingRow
                   label={t('settings.cloud.syncEnabled')}

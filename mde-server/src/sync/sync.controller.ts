@@ -3,15 +3,23 @@ import {
   Controller,
   Delete,
   Get,
-  Param,
   Post,
+  Param,
+  Query,
   Put,
   Request,
   UseGuards,
 } from '@nestjs/common';
 import { SyncService } from './sync.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
-import { PullDto, PushDto, PushFileDto } from './dto';
+import {
+  BindPathDto,
+  DeleteFileDto,
+  PullDto,
+  PushDto,
+  PushFileDto,
+  UpdateConfigDto,
+} from './dto';
 
 @UseGuards(JwtAuthGuard)
 @Controller('sync')
@@ -23,10 +31,15 @@ export class SyncController {
     return this.syncService.getManifest(req.user.userId);
   }
 
-  /** Per-file upsert. Recommended for new clients. */
-  @Post('file')
-  pushFile(@Request() req, @Body() dto: PushFileDto) {
-    return this.syncService.pushFile(req.user.userId, dto);
+  @Get('changes')
+  getChanges(@Request() req, @Query('since') since?: string) {
+    return this.syncService.getChanges(req.user.userId, since);
+  }
+
+  /** Per-file upsert. Preferred for versioned sync clients. */
+  @Put('file/:fileId')
+  pushFile(@Request() req, @Param('fileId') fileId: string, @Body() dto: PushFileDto) {
+    return this.syncService.pushFile(req.user.userId, fileId, dto);
   }
 
   /** Per-file pull. */
@@ -35,10 +48,20 @@ export class SyncController {
     return this.syncService.pullFile(req.user.userId, fileId);
   }
 
-  /** Per-file delete (soft). */
+  @Post('bindings/:fileId')
+  bindPath(@Request() req, @Param('fileId') fileId: string, @Body() dto: BindPathDto) {
+    return this.syncService.bindPath(req.user.userId, fileId, dto);
+  }
+
+  /** Per-file delete (tombstone). */
   @Delete('file/:fileId')
-  deleteFile(@Request() req, @Param('fileId') fileId: string) {
-    return this.syncService.deleteFile(req.user.userId, fileId);
+  deleteFile(@Request() req, @Param('fileId') fileId: string, @Body() dto: DeleteFileDto) {
+    return this.syncService.deleteFile(req.user.userId, fileId, dto);
+  }
+
+  @Post('reset')
+  resetState(@Request() req) {
+    return this.syncService.resetState(req.user.userId);
   }
 
   /** Legacy batch endpoints — kept for backward compat. */
@@ -63,7 +86,7 @@ export class SyncController {
   }
 
   @Put('config')
-  updateConfig(@Request() req, @Body() body: Record<string, any>) {
+  updateConfig(@Request() req, @Body() body: UpdateConfigDto) {
     return this.syncService.updateConfig(req.user.userId, body);
   }
 }

@@ -54,6 +54,18 @@ export class SyncDocument extends Document {
   @Prop({ required: true })
   checksum: string;
 
+  @Prop({ default: '' })
+  contentHash: string;
+
+  @Prop({ default: 0 })
+  rev: number;
+
+  @Prop({ default: false })
+  deleted: boolean;
+
+  @Prop({ default: '' })
+  lastMutationId: string;
+
   /**
    * Per-device local file path map: `{ [deviceId]: absoluteLocalPath }`.
    *
@@ -64,7 +76,7 @@ export class SyncDocument extends Document {
    * document and must `Save As` on first save to register their path.
    */
   @Prop({ type: Object, default: {} })
-  devicePaths: Record<string, string>;
+  deviceBindings: Record<string, string>;
 
   @Prop({ default: null })
   deletedAt: Date;

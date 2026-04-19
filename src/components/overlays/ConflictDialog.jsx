@@ -11,7 +11,7 @@ function ConflictDialog({ open, conflicts, onResolve, onClose }) {
     <div className="conflict-overlay" onClick={onClose}>
       <div className="conflict-dialog" onClick={(e) => e.stopPropagation()}>
         <h2>{t('sync.conflict.title')}</h2>
-        <p className="conflict-dialog__path">{current.relativePath}</p>
+        <p className="conflict-dialog__path">{current.path || current.name}</p>
 
         <div className="conflict-dialog__panels">
           <div className="conflict-dialog__panel">
@@ -25,10 +25,10 @@ function ConflictDialog({ open, conflicts, onResolve, onClose }) {
         </div>
 
         <div className="conflict-dialog__actions">
-          <button className="conflict-dialog__btn" onClick={() => onResolve(current.relativePath, 'local')}>
+          <button className="conflict-dialog__btn" onClick={() => onResolve(current.fileId, 'local')}>
             {t('sync.conflict.keepLocal')}
           </button>
-          <button className="conflict-dialog__btn conflict-dialog__btn--primary" onClick={() => onResolve(current.relativePath, 'remote')}>
+          <button className="conflict-dialog__btn conflict-dialog__btn--primary" onClick={() => onResolve(current.fileId, 'remote')}>
             {t('sync.conflict.useRemote')}
           </button>
         </div>

@@ -37,6 +37,9 @@ const STATUS_ICON_MAP = {
   synced: CheckIcon,
   error: AlertIcon,
   offline: CloudOffIcon,
+  server_unreachable: CloudOffIcon,
+  conflict: AlertIcon,
+  auth_required: AlertIcon,
 };
 
 function SyncStatusIndicator() {

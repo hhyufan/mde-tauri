@@ -30,14 +30,11 @@ export class SyncConfig extends Document {
   @Prop({ default: '' })
   workspacePath: string;
 
-  @Prop({ type: [Object], default: [] })
-  recentFiles: Record<string, any>[];
-
-  @Prop({ type: [Object], default: [] })
-  bookmarks: Record<string, any>[];
-
   @Prop({ type: Object, default: {} })
   editorState: Record<string, any>;
+
+  @Prop({ default: 2 })
+  protocolVersion: number;
 }
 
 export const SyncConfigSchema = SchemaFactory.createForClass(SyncConfig);

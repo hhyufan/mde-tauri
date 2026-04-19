@@ -1,6 +1,6 @@
 import pako from 'pako';
-import apiClient from './apiClient';
-import { readFileContent, saveFile, checkFileExists } from '@utils/tauriApi';
+import apiClient, { classifyApiError } from './apiClient';
+import { saveFile } from '@utils/tauriApi';
 import useEditorStore from '@store/useEditorStore';
 import useFileStore from '@store/useFileStore';
 import useFileIdStore from '@store/useFileIdStore';
@@ -10,29 +10,10 @@ import useNotificationStore from '@store/useNotificationStore';
 import useAuthStore from '@store/useAuthStore';
 import useDeviceStore from '@store/useDeviceStore';
 import useExternalDocsStore from '@store/useExternalDocsStore';
+import useSyncStore, { SYNC_PROTOCOL_VERSION } from '@store/useSyncStore';
 
-/**
- * Threshold above which we gzip the file body before sending. Below this
- * the overhead of base64 + gzip header is not worth it.
- */
 const COMPRESS_THRESHOLD_BYTES = 16 * 1024;
-
-/**
- * Hard ceiling for a single sync request payload, in bytes (compressed).
- *
- * Vercel caps Serverless Function request bodies at ~4.5MB on Hobby and
- * ~5MB on Pro. We stay well below that because the JSON envelope, base64
- * inflation (~33%), and headers also count. Files whose compressed body
- * exceeds this are skipped (with a friendly notification) instead of
- * crashing the sync.
- */
 const MAX_REQUEST_BYTES = 3.5 * 1024 * 1024;
-
-/**
- * Virtual path prefix used in `useFileStore.bookmarkedPaths` for cloud
- * bookmarks that have no local file on this device yet. The actual content
- * for such a bookmark lives in `useExternalDocsStore` keyed by fileId.
- */
 export const CLOUD_PATH_PREFIX = 'cloud://';
 
 export function makeCloudPath(fileId) {
@@ -88,10 +69,6 @@ function extOf(name) {
   return idx > 0 ? name.slice(idx + 1).toLowerCase() : '';
 }
 
-/**
- * Encode raw text into the wire format the server expects.
- * Returns { content, compressed, size, checksum, compressedBytes }.
- */
 async function encodeBody(rawText) {
   const rawBytes = textEncoder.encode(rawText);
   const checksum = await sha256(rawText);
@@ -122,44 +99,47 @@ function decodeBody(doc) {
   return textDecoder.decode(inflated);
 }
 
-/**
- * Read on-disk content for every bookmarked file that actually exists on
- * this device. Cloud-only bookmarks (`cloud://...` virtual paths) are
- * skipped here — their content lives in `useExternalDocsStore` and is only
- * pushed back once the user picks a real local path via "Save As".
- */
-async function collectBookmarkedFilesToSync() {
-  const bookmarks = useFileStore.getState().bookmarkedPaths || [];
-  const out = [];
-  for (const path of bookmarks) {
-    if (!path || isCloudPath(path)) continue;
-    try {
-      const exists = await checkFileExists(path);
-      if (!exists) continue;
-      const result = await readFileContent(path);
-      // `readFileContent` returns either the raw string (legacy) or a
-      // result object with { success, content, encoding }. Be defensive.
-      let content = '';
-      let encoding = 'UTF-8';
-      if (typeof result === 'string') {
-        content = result;
-      } else if (result && typeof result === 'object') {
-        if (result.success === false) continue;
-        content = result.content || '';
-        encoding = result.encoding || 'UTF-8';
-      }
-      out.push({ path, source: 'bookmark', content, encoding });
-    } catch {
-      // unreadable (deleted / permission denied) — skip silently
-    }
+function mutationId() {
+  if (typeof crypto !== 'undefined' && crypto.randomUUID) {
+    return crypto.randomUUID();
   }
-  return out;
+  return `mutation_${Date.now()}_${Math.random().toString(36).slice(2)}`;
+}
+
+function buildConfigPayload() {
+  const localConfig = useConfigStore.getState();
+  return {
+    theme: useThemeStore.getState().theme,
+    language: localConfig.language,
+    fontSize: localConfig.fontSize,
+    tabSize: localConfig.tabSize,
+    wordWrap: localConfig.wordWrap,
+    lineNumbers: localConfig.lineNumbers,
+    autoSave: localConfig.autoSave,
+    workspacePath: localConfig.workspacePath,
+    editorState: {
+      sidebarVisible: useEditorStore.getState().sidebarVisible,
+      sidebarView: useEditorStore.getState().sidebarView,
+    },
+    protocolVersion: SYNC_PROTOCOL_VERSION,
+  };
+}
+
+function getLocalConflictContent(path, fileId) {
+  const editor = useEditorStore.getState();
+  const tab = editor.tabs.find(
+    (item) => item.path === path || item.externalFileId === fileId,
+  );
+  if (tab?.content) return tab.content;
+  return useExternalDocsStore.getState().get(fileId)?.content || '';
 }
 
 class SyncEngine {
   constructor() {
     this.status = 'idle';
     this.listeners = new Set();
+    this.retryTimer = null;
+    this.syncing = false;
   }
 
   onStatusChange(fn) {
@@ -172,101 +152,285 @@ class SyncEngine {
     this.listeners.forEach((fn) => fn(s));
   }
 
-  /**
-   * Push one file to the cloud. Used both directly (e.g. on save) and as
-   * the per-file primitive of `fullSync`. The path is sent as both the
-   * legacy `originalPath` (purely informational) and as `devicePath` keyed
-   * under the current `deviceId`, so the server can remember where this
-   * device keeps the file locally.
-   *
-   * Returns:
-   *   { ok: true }                            on success / already in sync
-   *   { ok: false, reason: 'too-large', ... } if compressed body exceeds limit
-   *   { ok: false, reason: 'error', error }   on transport / server error
-   */
-  async pushSingle(filePath, content, encoding = 'UTF-8', source = 'manual') {
-    if (!useAuthStore.getState().isLoggedIn || !filePath) {
-      return { ok: false, reason: 'unauth' };
+  scheduleRetry() {
+    if (this.retryTimer) {
+      clearTimeout(this.retryTimer);
+      this.retryTimer = null;
     }
-    if (isCloudPath(filePath)) {
-      // Should never happen — virtual paths must be resolved to a real
-      // disk path (via Save As) before pushing.
-      return { ok: false, reason: 'virtual-path' };
+    const nextAt = useSyncStore.getState().getNextRetryAt();
+    if (!nextAt) return;
+    const delay = Math.max(0, nextAt - Date.now());
+    this.retryTimer = setTimeout(() => {
+      this.retryTimer = null;
+      if (useAuthStore.getState().isLoggedIn) {
+        this.fullSync();
+      }
+    }, delay);
+  }
+
+  shouldRetry(kind) {
+    return ['offline', 'server_unreachable', 'server_error', 'error'].includes(kind);
+  }
+
+  async ensureLocalReset() {
+    const syncStore = useSyncStore.getState();
+    if (syncStore.localResetDone) return;
+    useExternalDocsStore.getState().reset();
+    useFileStore.getState().removeCloudBookmarks();
+    useFileIdStore.getState().reset();
+    syncStore.resetDocumentsAndQueue();
+    syncStore.markLocalResetDone();
+  }
+
+  async ensureRemoteProtocol() {
+    const { data: remoteConfig = {} } = await apiClient.get('/sync/config');
+    if ((remoteConfig.protocolVersion || 1) >= SYNC_PROTOCOL_VERSION) {
+      return remoteConfig;
     }
     try {
-      const body = await encodeBody(content || '');
-      if (body.compressedBytes > MAX_REQUEST_BYTES) {
-        return {
-          ok: false,
-          reason: 'too-large',
-          size: body.size,
-          compressed: body.compressedBytes,
-        };
+      await apiClient.post('/sync/reset');
+    } catch (err) {
+      if (err?.response?.status === 404) {
+        const upgradeError = new Error('Sync server is outdated. Deploy the new server or update the server URL.');
+        upgradeError.code = 'SYNC_SERVER_OUTDATED';
+        throw upgradeError;
       }
-      const fileId = useFileIdStore.getState().getOrCreate(filePath);
-      const deviceId = useDeviceStore.getState().getId();
-      await apiClient.post('/sync/file', {
-        fileId,
-        fileName: basename(filePath),
+      throw err;
+    }
+    useSyncStore.getState().resetDocumentsAndQueue();
+    await apiClient.put('/sync/config', buildConfigPayload());
+    return { protocolVersion: SYNC_PROTOCOL_VERSION };
+  }
+
+  registerLocalDocument(filePath, meta = {}) {
+    if (!filePath || isCloudPath(filePath)) return null;
+    const fileIdStore = useFileIdStore.getState();
+    const existingFileId = fileIdStore.idOf(filePath);
+    const fileId = meta.fileId || existingFileId || fileIdStore.getOrCreate(filePath);
+    fileIdStore.bind(filePath, fileId);
+    useSyncStore.getState().bindLocalPath(fileId, filePath, {
+      name: meta.name || basename(filePath),
+      ext: meta.ext || extOf(meta.name || filePath),
+      encoding: meta.encoding || 'UTF-8',
+      lineEnding: meta.lineEnding || 'LF',
+      source: meta.source || 'local',
+      status: meta.status || 'idle',
+      deleted: false,
+    });
+    return fileId;
+  }
+
+  async queueLocalUpsert(filePath, content, encoding = 'UTF-8', options = {}) {
+    if (!filePath || isCloudPath(filePath)) {
+      return { ok: false, reason: 'invalid-path' };
+    }
+    const fileId = this.registerLocalDocument(filePath, {
+      name: options.name || basename(filePath),
+      encoding,
+      lineEnding: options.lineEnding || 'LF',
+      source: options.source || 'local',
+    });
+    if (!useConfigStore.getState().syncEnabled) {
+      return { ok: true, fileId, skipped: 'sync-disabled' };
+    }
+    const body = await encodeBody(content || '');
+    if (body.compressedBytes > MAX_REQUEST_BYTES) {
+      return {
+        ok: false,
+        reason: 'too-large',
+        size: body.size,
+        compressed: body.compressedBytes,
+      };
+    }
+    const doc = useSyncStore.getState().getDoc(fileId);
+    useSyncStore.getState().upsertDoc(fileId, {
+      name: options.name || doc?.name || basename(filePath),
+      ext: doc?.ext || extOf(options.name || basename(filePath)),
+      localPath: filePath,
+      encoding,
+      lineEnding: options.lineEnding || doc?.lineEnding || 'LF',
+      checksum: body.checksum,
+      deleted: false,
+      status: 'pending_push',
+      lastError: null,
+    });
+    useSyncStore.getState().enqueueMutation({
+      fileId,
+      type: 'upsert',
+      baseRev: doc?.lastKnownServerRev || doc?.rev || 0,
+      dedupeKey: 'upsert',
+      payload: {
+        fileName: options.name || basename(filePath),
         originalPath: filePath,
-        source,
+        source: options.source || 'local',
         content: body.content,
+        rawContent: content || '',
         compressed: body.compressed,
         size: body.size,
         encoding,
+        lineEnding: options.lineEnding || doc?.lineEnding || 'LF',
         checksum: body.checksum,
-        deviceId,
+        deviceId: useDeviceStore.getState().getId(),
         devicePath: filePath,
+      },
+    });
+    if (useAuthStore.getState().isLoggedIn && useConfigStore.getState().syncEnabled) {
+      this.fullSync();
+    }
+    return { ok: true, fileId };
+  }
+
+  async bindLocalPath(fileId, localPath, meta = {}) {
+    if (!fileId || !localPath) return;
+    useFileIdStore.getState().bind(localPath, fileId);
+    useSyncStore.getState().bindLocalPath(fileId, localPath, {
+      name: meta.name || basename(localPath),
+      ext: meta.ext || extOf(meta.name || localPath),
+      encoding: meta.encoding || 'UTF-8',
+      lineEnding: meta.lineEnding || 'LF',
+      deleted: false,
+    });
+    useSyncStore.getState().enqueueMutation({
+      fileId,
+      type: 'bind_path',
+      baseRev: useSyncStore.getState().getDoc(fileId)?.lastKnownServerRev || 0,
+      dedupeKey: 'bind_path',
+      payload: {
+        deviceId: useDeviceStore.getState().getId(),
+        devicePath: localPath,
+      },
+    });
+  }
+
+  async rebindLocalPath(oldPath, newPath, name = '') {
+    if (!oldPath || !newPath || oldPath === newPath) return;
+    useFileIdStore.getState().movePath(oldPath, newPath);
+    useFileStore.getState().replaceBookmarkPath(oldPath, newPath);
+    useFileStore.getState().replaceRecentFilePath(oldPath, newPath, name);
+    useSyncStore.getState().moveLocalPath(oldPath, newPath, {
+      name: name || basename(newPath),
+      ext: extOf(name || basename(newPath)),
+    });
+    const doc = useSyncStore.getState().findDocByPath(newPath);
+    if (doc) {
+      await this.bindLocalPath(doc.fileId, newPath, {
+        name: name || basename(newPath),
+        ext: extOf(name || basename(newPath)),
       });
-      return { ok: true };
-    } catch (err) {
-      return { ok: false, reason: 'error', error: err };
+      if (useAuthStore.getState().isLoggedIn && useConfigStore.getState().syncEnabled) {
+        this.fullSync();
+      }
     }
   }
 
-  /**
-   * Apply a pulled document to local state.
-   *
-   * If the server already remembers a local path for this device
-   * (`doc.devicePaths[myDeviceId]`), we refresh that on-disk file and
-   * keep the local fileId binding pointing at it.
-   *
-   * Otherwise the document is *external* on this device: we stash its
-   * content in `useExternalDocsStore` so the user can open and edit it,
-   * but we deliberately do NOT pick a fallback location on disk. The
-   * first save will go through the normal "Save As" flow which then
-   * registers the chosen path under our `deviceId` on the server.
-   */
-  async applyPulledDoc(doc) {
+  buildConflict(fileId, remoteDoc, remoteContent) {
+    const doc = useSyncStore.getState().getDoc(fileId);
+    return {
+      fileId,
+      path: doc?.localPath || fileId,
+      name: doc?.name || remoteDoc?.fileName || fileId,
+      localContent: getLocalConflictContent(doc?.localPath, fileId),
+      remoteContent,
+      remoteDoc,
+    };
+  }
+
+  async applyRemoteDoc(doc, { force = false } = {}) {
+    if (!doc?.fileId) return null;
     const deviceId = useDeviceStore.getState().getId();
-    const myPath = doc.devicePaths?.[deviceId];
-    let decoded;
+    const myPath = doc.deviceBindings?.[deviceId] || '';
+    const syncStore = useSyncStore.getState();
+    const existing = syncStore.getDoc(doc.fileId);
+
+    if (doc.deleted) {
+      syncStore.markDeleted(doc.fileId, {
+        rev: doc.rev || 0,
+        lastKnownServerRev: doc.rev || 0,
+        status: syncStore.hasPendingMutation(doc.fileId) ? 'conflict' : 'deleted',
+      });
+      useExternalDocsStore.getState().remove(doc.fileId);
+      if (syncStore.hasPendingMutation(doc.fileId) && !force) {
+        syncStore.addConflict(this.buildConflict(doc.fileId, doc, ''));
+      }
+      return { deleted: true };
+    }
+
+    let decoded = '';
     try {
       decoded = decodeBody(doc);
     } catch (err) {
-      // Bad payload — keep the metadata entry around so the user can
-      // still see the file name in the cloud-bookmarks list, but we
-      // can't honor an open request without content.
-      // eslint-disable-next-line no-console
       console.warn('[sync] failed to decode pulled doc', doc.fileId, err);
       return { writtenPath: null, external: true, decodeFailed: true };
     }
 
+    if (syncStore.hasPendingMutation(doc.fileId) && !force) {
+      syncStore.upsertDoc(doc.fileId, {
+        name: doc.fileName || basename(doc.originalPath || '') || doc.fileId,
+        rev: doc.rev || existing?.rev || 0,
+        lastKnownServerRev: doc.rev || existing?.lastKnownServerRev || 0,
+        status: 'conflict',
+      });
+      syncStore.addConflict(this.buildConflict(doc.fileId, doc, decoded));
+      return { conflict: true };
+    }
+
     if (myPath) {
+      const openTab = useEditorStore.getState().tabs.find((tab) => tab.path === myPath);
+      if (openTab?.modified && !force) {
+        syncStore.upsertDoc(doc.fileId, {
+          localPath: myPath,
+          name: doc.fileName || basename(myPath),
+          ext: extOf(doc.fileName || basename(myPath)),
+          rev: doc.rev || 0,
+          lastKnownServerRev: doc.rev || 0,
+          checksum: doc.contentHash || doc.checksum || '',
+          status: 'conflict',
+          deleted: false,
+        });
+        syncStore.addConflict(this.buildConflict(doc.fileId, doc, decoded));
+        return { conflict: true };
+      }
       try {
         const result = await saveFile(myPath, decoded, doc.encoding || 'UTF-8');
         if (result?.success !== false) {
           useFileIdStore.getState().bind(myPath, doc.fileId);
-          // The doc is now bound locally — drop any stale external entry.
+          syncStore.bindLocalPath(doc.fileId, myPath, {
+            name: doc.fileName || basename(myPath),
+            ext: extOf(doc.fileName || basename(myPath)),
+            encoding: doc.encoding || 'UTF-8',
+            lineEnding: doc.lineEnding || 'LF',
+            checksum: doc.contentHash || doc.checksum || '',
+            rev: doc.rev || 0,
+            lastKnownServerRev: doc.rev || 0,
+            status: 'synced',
+            deleted: false,
+          });
+          useEditorStore.getState().replaceTabContentByPath(myPath, {
+            name: doc.fileName || basename(myPath),
+            content: decoded,
+            encoding: doc.encoding || 'UTF-8',
+            lineEnding: doc.lineEnding || 'LF',
+          });
           useExternalDocsStore.getState().remove(doc.fileId);
           return { writtenPath: myPath, external: false };
         }
       } catch {
-        // fallthrough to "external" handling below — disk is unavailable
-        // or path is invalid on this device, treat as cloud-only for now.
+        // fall through to external representation below
       }
     }
 
+    syncStore.upsertDoc(doc.fileId, {
+      name: doc.fileName || basename(doc.originalPath || '') || doc.fileId,
+      ext: extOf(doc.fileName || doc.originalPath || ''),
+      localPath: '',
+      encoding: doc.encoding || 'UTF-8',
+      lineEnding: doc.lineEnding || 'LF',
+      checksum: doc.contentHash || doc.checksum || '',
+      rev: doc.rev || 0,
+      lastKnownServerRev: doc.rev || 0,
+      status: 'synced',
+      deleted: false,
+    });
     useExternalDocsStore.getState().put(doc.fileId, {
       name: doc.fileName || basename(doc.originalPath || '') || doc.fileId,
       ext: extOf(doc.fileName || doc.originalPath || ''),
@@ -274,19 +438,12 @@ class SyncEngine {
       lineEnding: doc.lineEnding || 'LF',
       originalPath: doc.originalPath || '',
       content: decoded,
-      checksum: doc.checksum || '',
+      checksum: doc.contentHash || doc.checksum || '',
+      rev: doc.rev || 0,
     });
     return { writtenPath: null, external: true };
   }
 
-  /**
-   * Ensure the external-docs cache has the *body* for `fileId`, fetching
-   * it from the server if necessary. Used as a self-heal step when the
-   * user clicks a `cloud://` bookmark whose content didn't make it into
-   * the cache during fullSync (e.g. a transient pull failure).
-   *
-   * Returns the cached entry on success, or `null` on failure.
-   */
   async ensureExternalDoc(fileId) {
     if (!fileId) return null;
     const cached = useExternalDocsStore.getState().get(fileId);
@@ -294,257 +451,281 @@ class SyncEngine {
     try {
       const { data: doc } = await apiClient.get(`/sync/file/${encodeURIComponent(fileId)}`);
       if (!doc) return null;
-      await this.applyPulledDoc(doc);
+      await this.applyRemoteDoc(doc);
       return useExternalDocsStore.getState().get(fileId);
     } catch (err) {
-      // eslint-disable-next-line no-console
       console.warn('[sync] ensureExternalDoc failed', fileId, err);
       return null;
     }
   }
 
-  /**
-   * Promote an "external" document to a real on-disk file: the user just
-   * picked `localPath` via Save As. We bind the fileId locally, replace
-   * the `cloud://<fileId>` virtual bookmark with the real path, drop the
-   * external-docs entry, and push the file (which also registers the
-   * device path on the server).
-   */
   async claimExternalDoc(fileId, localPath, content, encoding = 'UTF-8') {
     if (!fileId || !localPath) return { ok: false };
-    useFileIdStore.getState().bind(localPath, fileId);
+    await this.bindLocalPath(fileId, localPath, {
+      name: basename(localPath),
+      ext: extOf(localPath),
+      encoding,
+    });
     useExternalDocsStore.getState().remove(fileId);
-
-    const fileStore = useFileStore.getState();
-    const cloudPath = makeCloudPath(fileId);
-    const next = (fileStore.bookmarkedPaths || []).map((p) =>
-      p === cloudPath ? localPath : p,
-    );
-    if (!next.includes(localPath)) next.push(localPath);
-    useFileStore.setState({ bookmarkedPaths: next });
-
-    return this.pushSingle(localPath, content, encoding, 'bookmark');
+    return this.queueLocalUpsert(localPath, content, encoding, {
+      name: basename(localPath),
+      source: 'claim',
+    });
   }
 
-  async fullSync() {
-    if (!useAuthStore.getState().isLoggedIn) return;
-    if (this.status === 'syncing') return;
+  async syncSettings() {
+    await apiClient.put('/sync/config', buildConfigPayload());
+  }
 
-    this.setStatus('syncing');
-    const notify = useNotificationStore.getState().notify;
-    const skipped = [];
-
+  async processMutation(item) {
+    const syncStore = useSyncStore.getState();
+    const doc = syncStore.getDoc(item.fileId);
     try {
-      const { data: manifest } = await apiClient.get('/sync/manifest');
-      const remoteByFileId = new Map(manifest.map((m) => [m.fileId, m]));
-      const deviceId = useDeviceStore.getState().getId();
-
-      // ── Push: bookmarked files that exist locally on this device ──
-      const local = await collectBookmarkedFilesToSync();
-      for (const f of local) {
-        const fileId = useFileIdStore.getState().getOrCreate(f.path);
-        const remote = remoteByFileId.get(fileId);
-        const checksum = await sha256(f.content || '');
-        const remotePathOnThisDevice = remote?.devicePaths?.[deviceId];
-        const sameContent = remote && remote.checksum === checksum;
-        const samePath = remotePathOnThisDevice === f.path;
-        if (sameContent && samePath) {
-          remoteByFileId.delete(fileId);
-          continue;
-        }
-        const result = await this.pushSingle(f.path, f.content, f.encoding, 'bookmark');
-        if (!result.ok && result.reason === 'too-large') {
-          skipped.push({ path: f.path, size: result.size });
-        }
-        remoteByFileId.delete(fileId);
-      }
-
-      // ── Pull: every remaining remote doc; the per-doc apply step decides
-      // whether to write to disk (if this device has a registered path)
-      // or stash it in the external-docs cache for the user to claim.
-      //
-      // We first seed display metadata (name/ext/originalPath) from the
-      // lightweight manifest so the sidebar can render a meaningful row
-      // immediately — even if the per-file body pull below fails, the
-      // user at least sees the right file name and we self-heal on click
-      // via `ensureExternalDoc`.
-      for (const [fileId, meta] of remoteByFileId) {
-        const remoteDevicePath = meta?.devicePaths?.[deviceId];
-        if (remoteDevicePath) continue;
-        if (useFileIdStore.getState().pathOf(fileId)) continue;
-        const name = meta.fileName || basename(meta.originalPath || '') || fileId;
-        useExternalDocsStore.getState().put(fileId, {
-          name,
-          ext: extOf(name),
-          originalPath: meta.originalPath || '',
-          checksum: meta.checksum || '',
-        });
-      }
-
-      for (const [fileId] of remoteByFileId) {
-        try {
-          const { data: doc } = await apiClient.get(`/sync/file/${encodeURIComponent(fileId)}`);
-          if (doc) await this.applyPulledDoc(doc);
-        } catch (err) {
-          // eslint-disable-next-line no-console
-          console.warn('[sync] per-file pull failed', fileId, err);
-        }
-      }
-
-      // Garbage-collect external-docs entries the server no longer has.
-      const liveIds = new Set(manifest.map((m) => m.fileId));
-      const externalIds = useExternalDocsStore.getState().ids();
-      for (const id of externalIds) {
-        if (!liveIds.has(id)) useExternalDocsStore.getState().remove(id);
-      }
-
-      await this.syncConfig();
-
-      if (skipped.length > 0) {
-        const list = skipped
-          .slice(0, 3)
-          .map((s) => `${basename(s.path)} (${(s.size / 1024 / 1024).toFixed(1)} MB)`)
-          .join(', ');
-        notify(
-          'warning',
-          'Sync: some files skipped',
-          `${skipped.length} file(s) exceeded the request size limit even after compression: ${list}${skipped.length > 3 ? '…' : ''}`,
+      if (item.type === 'upsert') {
+        const { data } = await apiClient.put(
+          `/sync/file/${encodeURIComponent(item.fileId)}`,
+          {
+            ...item.payload,
+            baseRev: item.baseRev,
+            mutationId: item.mutationId,
+          },
         );
+        syncStore.upsertDoc(item.fileId, {
+          name: item.payload.fileName || doc?.name || item.fileId,
+          ext: doc?.ext || extOf(item.payload.fileName || ''),
+          localPath: item.payload.devicePath || doc?.localPath || '',
+          encoding: item.payload.encoding || doc?.encoding || 'UTF-8',
+          lineEnding: item.payload.lineEnding || doc?.lineEnding || 'LF',
+          checksum: data.contentHash || data.checksum || item.payload.checksum,
+          rev: data.rev || (doc?.rev || 0),
+          lastKnownServerRev: data.rev || (doc?.lastKnownServerRev || 0),
+          status: 'synced',
+          deleted: false,
+          lastError: null,
+        });
+        syncStore.completeMutation(item.mutationId);
+        return true;
       }
-      this.setStatus('synced');
+
+      if (item.type === 'bind_path') {
+        const { data } = await apiClient.post(
+          `/sync/bindings/${encodeURIComponent(item.fileId)}`,
+          {
+            ...item.payload,
+            mutationId: item.mutationId,
+          },
+        );
+        syncStore.upsertDoc(item.fileId, {
+          localPath: item.payload.devicePath || doc?.localPath || '',
+          status: syncStore.hasPendingMutation(item.fileId) ? doc?.status || 'idle' : 'synced',
+          lastKnownServerRev: data?.rev || doc?.lastKnownServerRev || 0,
+        });
+        syncStore.completeMutation(item.mutationId);
+        return true;
+      }
+
+      if (item.type === 'delete') {
+        const { data } = await apiClient.delete(
+          `/sync/file/${encodeURIComponent(item.fileId)}`,
+          {
+            data: {
+              baseRev: item.baseRev,
+              mutationId: item.mutationId,
+            },
+          },
+        );
+        syncStore.markDeleted(item.fileId, {
+          rev: data?.rev || doc?.rev || 0,
+          lastKnownServerRev: data?.rev || doc?.lastKnownServerRev || 0,
+          status: 'deleted',
+        });
+        useExternalDocsStore.getState().remove(item.fileId);
+        syncStore.completeMutation(item.mutationId);
+        return true;
+      }
     } catch (err) {
-      this.setStatus('error');
-      notify('error', 'Sync failed', String(err?.message || err));
+      if (err?.response?.status === 409) {
+        const current = err.response?.data?.current;
+        let remoteDoc = current;
+        if (current?.fileId && !current.content && !current.deleted) {
+          const { data } = await apiClient.get(`/sync/file/${encodeURIComponent(current.fileId)}`);
+          remoteDoc = data || current;
+        }
+        const remoteContent = remoteDoc?.deleted ? '' : decodeBody(remoteDoc || {});
+        useSyncStore.getState().upsertDoc(item.fileId, {
+          status: 'conflict',
+          rev: remoteDoc?.rev || doc?.rev || 0,
+          lastKnownServerRev: remoteDoc?.rev || doc?.lastKnownServerRev || 0,
+          deleted: !!remoteDoc?.deleted,
+        });
+        useSyncStore.getState().addConflict(
+          this.buildConflict(item.fileId, remoteDoc || current || {}, remoteContent),
+        );
+        useSyncStore.getState().completeMutation(item.mutationId);
+        this.setStatus('conflict');
+        return true;
+      }
+
+      const kind = classifyApiError(err);
+      useSyncStore.getState().failMutation(
+        item.mutationId,
+        err?.response?.data?.message || err?.message || 'sync failed',
+      );
+      useSyncStore.getState().setLastSyncError({
+        kind,
+        message: err?.response?.data?.message || err?.message || 'sync failed',
+      });
+      this.setStatus(kind === 'server_unreachable' ? 'server_unreachable' : kind);
+      this.scheduleRetry();
+      return false;
+    }
+    return true;
+  }
+
+  async processQueue() {
+    const syncStore = useSyncStore.getState();
+    let item = syncStore.getReadyMutation();
+    while (item) {
+      syncStore.markMutationProcessing(item.mutationId);
+      const ok = await this.processMutation(item);
+      if (!ok) return false;
+      item = useSyncStore.getState().getReadyMutation();
+    }
+    return true;
+  }
+
+  async pullRemoteChanges() {
+    const syncStore = useSyncStore.getState();
+    const cursor = syncStore.cursor;
+    const { data } = await apiClient.get('/sync/changes', {
+      params: cursor ? { since: cursor } : {},
+    });
+    for (const change of data?.changes || []) {
+      if (!change?.fileId) continue;
+      const localDoc = useSyncStore.getState().getDoc(change.fileId);
+      if (localDoc && (localDoc.lastKnownServerRev || 0) >= (change.rev || 0)) {
+        continue;
+      }
+      if (change.deleted) {
+        await this.applyRemoteDoc(change);
+        continue;
+      }
+      const { data: fullDoc } = await apiClient.get(
+        `/sync/file/${encodeURIComponent(change.fileId)}`,
+      );
+      if (fullDoc) {
+        await this.applyRemoteDoc(fullDoc);
+      }
+    }
+    useSyncStore.getState().setCursor(data?.cursor || cursor || '');
+    useSyncStore.getState().clearDeletedWithoutPath();
+  }
+
+  async pushSingle(filePath, content, encoding = 'UTF-8', source = 'manual') {
+    return this.queueLocalUpsert(filePath, content, encoding, {
+      name: basename(filePath),
+      source,
+    });
+  }
+
+  async deleteDocument(fileId) {
+    if (!fileId) return;
+    const syncStore = useSyncStore.getState();
+    const doc = syncStore.getDoc(fileId);
+    syncStore.dropMutationsForFile(fileId);
+    syncStore.markDeleted(fileId, { status: 'pending_push' });
+    syncStore.enqueueMutation({
+      fileId,
+      type: 'delete',
+      baseRev: doc?.lastKnownServerRev || doc?.rev || 0,
+      dedupeKey: 'delete',
+      payload: {},
+    });
+    useExternalDocsStore.getState().remove(fileId);
+    if (useAuthStore.getState().isLoggedIn && useConfigStore.getState().syncEnabled) {
+      this.fullSync();
     }
   }
 
-  /**
-   * Bidirectional config sync.
-   *
-   * The wire format for `recentFiles` / `bookmarks` is **fileId-based**, not
-   * path-based, so the same logical entry can be reconstructed on a
-   * different device whose absolute paths differ. The local UI lists are
-   * rebuilt from fileIds: bookmarks bound on this device become real local
-   * paths; bookmarks not bound here become `cloud://<fileId>` virtual
-   * paths backed by `useExternalDocsStore`.
-   *
-   * Both sides are merged (union by fileId) so a fresh device cannot
-   * accidentally wipe the cloud copy.
-   */
+  async resolveConflict(fileId, resolution) {
+    const conflict = useSyncStore.getState().conflicts.find((item) => item.fileId === fileId);
+    if (!conflict) return;
+    useSyncStore.getState().resolveConflict(fileId);
+    if (resolution === 'remote') {
+      await this.applyRemoteDoc(conflict.remoteDoc, { force: true });
+    } else if (resolution === 'local') {
+      const doc = useSyncStore.getState().getDoc(fileId);
+      const localPath = doc?.localPath || '';
+      const content = conflict.localContent || '';
+      if (localPath) {
+        await this.queueLocalUpsert(localPath, content, doc?.encoding || 'UTF-8', {
+          name: doc?.name || basename(localPath),
+          lineEnding: doc?.lineEnding || 'LF',
+          source: 'conflict',
+        });
+      }
+    }
+    const remainingConflicts = useSyncStore.getState().conflicts.length;
+    if (remainingConflicts === 0 && !useSyncStore.getState().queue.length) {
+      this.setStatus('synced');
+    }
+  }
+
   async syncConfig() {
     try {
-      const fileIdStore = useFileIdStore.getState();
-      const fileStore = useFileStore.getState();
-
-      // 1. Local entries → wire format (fileId-keyed). Cloud-only
-      //    bookmarks are already keyed by fileId via their virtual path;
-      //    real bookmarks need a path→fileId lookup.
-      const localBookmarkWire = (fileStore.bookmarkedPaths || [])
-        .map((p) => {
-          if (!p) return null;
-          if (isCloudPath(p)) return { fileId: fileIdFromCloudPath(p) };
-          const fileId = fileIdStore.idOf(p) || fileIdStore.getOrCreate(p);
-          return fileId ? { fileId } : null;
-        })
-        .filter(Boolean);
-
-      const localRecentWire = (fileStore.recentFiles || [])
-        .map((r) => {
-          if (!r?.path || isCloudPath(r.path)) return null;
-          const fileId = fileIdStore.idOf(r.path) || fileIdStore.getOrCreate(r.path);
-          if (!fileId) return null;
-          return {
-            fileId,
-            name: r.name || basename(r.path),
-            ext: r.ext || extOf(r.name || r.path),
-          };
-        })
-        .filter(Boolean);
-
-      // 2. Pull remote
-      const { data: remoteConfig = {} } = await apiClient.get('/sync/config');
-      const localConfig = useConfigStore.getState();
-      const localTheme = useThemeStore.getState().theme;
-
-      // 3. Merge by fileId. Local entries take priority for ordering;
-      // remote-only entries are appended.
-      const seenRecent = new Set();
-      const mergedRecentWire = [];
-      for (const r of localRecentWire) {
-        if (seenRecent.has(r.fileId)) continue;
-        seenRecent.add(r.fileId);
-        mergedRecentWire.push(r);
-      }
-      for (const r of remoteConfig.recentFiles || []) {
-        if (!r?.fileId || seenRecent.has(r.fileId)) continue;
-        seenRecent.add(r.fileId);
-        mergedRecentWire.push({
-          fileId: r.fileId,
-          name: r.name || '',
-          ext: r.ext || '',
-        });
-      }
-      const mergedRecentWireCapped = mergedRecentWire.slice(0, 100);
-
-      const bookmarkIds = new Set();
-      for (const b of localBookmarkWire) bookmarkIds.add(b.fileId);
-      for (const b of remoteConfig.bookmarks || []) {
-        if (b?.fileId) bookmarkIds.add(b.fileId);
-      }
-      const mergedBookmarkWire = [...bookmarkIds].map((fileId) => ({ fileId }));
-
-      // 4. Push merged config back
-      await apiClient.put('/sync/config', {
-        theme: localTheme,
-        language: localConfig.language,
-        fontSize: localConfig.fontSize,
-        tabSize: localConfig.tabSize,
-        wordWrap: localConfig.wordWrap,
-        lineNumbers: localConfig.lineNumbers,
-        autoSave: localConfig.autoSave,
-        workspacePath: localConfig.workspacePath,
-        recentFiles: mergedRecentWireCapped,
-        bookmarks: mergedBookmarkWire,
-        editorState: {
-          sidebarVisible: useEditorStore.getState().sidebarVisible,
-          sidebarView: useEditorStore.getState().sidebarView,
-        },
+      await this.ensureRemoteProtocol();
+      await apiClient.put('/sync/config', buildConfigPayload());
+    } catch (err) {
+      const kind = classifyApiError(err);
+      useSyncStore.getState().setLastSyncError({
+        kind,
+        message: err?.response?.data?.message || err?.message || 'config sync failed',
       });
+      this.setStatus(kind === 'server_unreachable' ? 'server_unreachable' : kind);
+    }
+  }
 
-      // 5. Apply remote → local
-      if (remoteConfig.theme && remoteConfig.theme !== localTheme) {
-        useThemeStore.getState().setTheme(remoteConfig.theme);
+  async fullSync() {
+    if (!useAuthStore.getState().isLoggedIn || !useConfigStore.getState().syncEnabled) {
+      return;
+    }
+    if (this.syncing) return;
+    this.syncing = true;
+    this.setStatus('syncing');
+    try {
+      await this.ensureLocalReset();
+      await this.ensureRemoteProtocol();
+      await this.syncConfig();
+      const queueOk = await this.processQueue();
+      if (queueOk) {
+        await this.pullRemoteChanges();
+        await this.syncConfig();
       }
-
-      // Recent: only re-list entries we have a real local path for.
-      const newLocalRecent = [];
-      for (const r of mergedRecentWireCapped) {
-        const path = useFileIdStore.getState().pathOf(r.fileId);
-        if (!path) continue;
-        newLocalRecent.push({
-          name: r.name || basename(path),
-          path,
-          ext: r.ext || extOf(path),
-        });
-        if (newLocalRecent.length >= 20) break;
+      if (useSyncStore.getState().conflicts.length > 0) {
+        this.setStatus('conflict');
+      } else if (useSyncStore.getState().queue.length > 0) {
+        this.scheduleRetry();
+        this.setStatus('idle');
+      } else {
+        this.setStatus('synced');
       }
-
-      // Bookmarks: real path if bound on this device, else virtual cloud path.
-      const newLocalBookmarks = [];
-      for (const fileId of bookmarkIds) {
-        const path = useFileIdStore.getState().pathOf(fileId);
-        if (path) {
-          newLocalBookmarks.push(path);
-        } else {
-          newLocalBookmarks.push(makeCloudPath(fileId));
-        }
-      }
-      useFileStore.setState({
-        recentFiles: newLocalRecent,
-        bookmarkedPaths: newLocalBookmarks,
+    } catch (err) {
+      const kind = classifyApiError(err);
+      useSyncStore.getState().setLastSyncError({
+        kind,
+        message: err?.response?.data?.message || err?.message || 'sync failed',
       });
-    } catch {
-      // config sync is best-effort
+      this.setStatus(kind === 'server_unreachable' ? 'server_unreachable' : kind);
+      useNotificationStore.getState().notify(
+        'error',
+        'Sync failed',
+        err?.response?.data?.message || String(err?.message || err),
+      );
+      if (this.shouldRetry(kind)) {
+        this.scheduleRetry();
+      }
+    } finally {
+      this.syncing = false;
     }
   }
 }

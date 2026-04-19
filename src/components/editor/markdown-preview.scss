@@ -6,6 +6,14 @@
   font-size: 15px;
   line-height: 1.75;
   color: var(--text);
+  // GPU-accelerate scrolling/paint for long documents.
+  contain: content;
+
+  &--stale {
+    // Very subtle hint that the preview is one step behind the editor
+    // while a deferred render is in flight. Costs nothing to paint.
+    opacity: 0.985;
+  }
 
   h1, h2, h3, h4, h5, h6 {
     margin-top: 1.2em;

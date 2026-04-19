@@ -17,10 +17,7 @@ const useConfigStore = create(
       serverUrl: 'https://www.miaogu.xyz',
       syncEnabled: true,
 
-      setConfig: (key, value) => {
-        if (key === 'serverUrl') return;
-        set({ [key]: value });
-      },
+      setConfig: (key, value) => set({ [key]: value }),
       loadConfig: (config) => set(config),
     }),
     {

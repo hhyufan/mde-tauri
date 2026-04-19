@@ -1,9 +1,10 @@
-import { useEffect, useRef, useCallback, useImperativeHandle, forwardRef, useState } from 'react';
+import { useEffect, useRef, useImperativeHandle, forwardRef, useState } from 'react';
 import * as monaco from 'monaco-editor';
 import '@/monaco-worker';
 import useEditorStore from '@store/useEditorStore';
 import useConfigStore from '@store/useConfigStore';
 import { getFileLanguage } from '@utils/fileLanguage';
+import { setBuffer, getBuffer, hasBuffer } from '@utils/editorBuffer';
 import './monaco-editor.scss';
 
 const SHIKI_LANGS = [
@@ -30,6 +31,7 @@ async function initShiki() {
       shikiToMonaco(highlighter, monaco);
       shikiReady = true;
     } catch (err) {
+      // eslint-disable-next-line no-console
       console.warn('Shiki initialization failed, falling back to built-in themes:', err);
     }
   })();
@@ -39,9 +41,13 @@ async function initShiki() {
 const MonacoEditorComponent = forwardRef(function MonacoEditorComponent({ className, onAutoSave }, ref) {
   const containerRef = useRef(null);
   const editorRef = useRef(null);
-  const suppressStoreSync = useRef(false);
-  const activeTab = useEditorStore((s) => s.getActiveTab());
-  const updateTabContent = useEditorStore((s) => s.updateTabContent);
+  const currentTabIdRef = useRef(null);
+
+  // The editor only needs to know which tab is active; it never
+  // subscribes to content. Typing therefore can never cause this
+  // component (or any other content-aware component) to re-render.
+  const activeTabId = useEditorStore((s) => s.activeTabId);
+  const markTabDirty = useEditorStore((s) => s.markTabDirty);
   const setCursorPosition = useEditorStore((s) => s.setCursorPosition);
   const setCharacterCount = useEditorStore((s) => s.setCharacterCount);
 
@@ -59,6 +65,7 @@ const MonacoEditorComponent = forwardRef(function MonacoEditorComponent({ classN
 
   useImperativeHandle(ref, () => ({
     getEditor: () => editorRef.current,
+    getCurrentValue: () => editorRef.current?.getValue() ?? '',
     insertText(text) {
       const editor = editorRef.current;
       if (!editor) return;
@@ -93,19 +100,10 @@ const MonacoEditorComponent = forwardRef(function MonacoEditorComponent({ classN
     },
   }), []);
 
-  const handleChangeRef = useRef(null);
-  handleChangeRef.current = (value) => {
-    const tab = useEditorStore.getState().getActiveTab();
-    if (tab) {
-      suppressStoreSync.current = true;
-      updateTabContent(tab.id, value);
-      suppressStoreSync.current = false;
-    }
-  };
-
   const onAutoSaveRef = useRef(onAutoSave);
   onAutoSaveRef.current = onAutoSave;
 
+  // Init editor exactly once.
   useEffect(() => {
     if (!containerRef.current) return;
 
@@ -142,7 +140,6 @@ const MonacoEditorComponent = forwardRef(function MonacoEditorComponent({ classN
       contextmenu: true,
       overviewRulerBorder: false,
       renderLineHighlight: 'none',
-      // Disable the unusual line terminators dialog — window.confirm is blocked in Tauri
       unusualLineTerminators: 'off',
       scrollbar: {
         verticalScrollbarSize: 6,
@@ -153,10 +150,52 @@ const MonacoEditorComponent = forwardRef(function MonacoEditorComponent({ classN
 
     editorRef.current = editor;
 
+    let dirtyMarkScheduled = false;
+    let charCountScheduled = false;
+    let autoSaveScheduled = false;
+
+    const scheduleDirtyMark = () => {
+      if (dirtyMarkScheduled) return;
+      dirtyMarkScheduled = true;
+      setTimeout(() => {
+        dirtyMarkScheduled = false;
+        const tabId = currentTabIdRef.current;
+        if (tabId) markTabDirty(tabId, true);
+      }, 200);
+    };
+
+    const scheduleCharCount = () => {
+      if (charCountScheduled) return;
+      charCountScheduled = true;
+      setTimeout(() => {
+        charCountScheduled = false;
+        if (editorRef.current) {
+          setCharacterCount(editorRef.current.getValue().length);
+        }
+      }, 250);
+    };
+
+    const scheduleAutoSave = () => {
+      if (autoSaveScheduled) return;
+      autoSaveScheduled = true;
+      setTimeout(() => {
+        autoSaveScheduled = false;
+        onAutoSaveRef.current?.();
+      }, 300);
+    };
+
     editor.onDidChangeModelContent(() => {
-      handleChangeRef.current?.(editor.getValue());
-      setCharacterCount(editor.getValue().length);
-      onAutoSaveRef.current?.();
+      const tabId = currentTabIdRef.current;
+      if (!tabId) return;
+      const value = editor.getValue();
+      // 1. Update the editor buffer synchronously — preview/outline
+      //    consumers will pick this up on their own debounce.
+      setBuffer(tabId, value);
+      // 2. Mark dirty + character count + auto-save are throttled so
+      //    typing never goes through Zustand on every keystroke.
+      scheduleDirtyMark();
+      scheduleCharCount();
+      scheduleAutoSave();
     });
 
     editor.onDidChangeCursorPosition((e) => {
@@ -178,7 +217,6 @@ const MonacoEditorComponent = forwardRef(function MonacoEditorComponent({ classN
       }
     });
 
-    // Outline jump-to-line
     const handleOutlineJump = (e) => {
       const { line } = e.detail ?? {};
       if (!line) return;
@@ -188,7 +226,6 @@ const MonacoEditorComponent = forwardRef(function MonacoEditorComponent({ classN
     };
     window.addEventListener('outline:jump', handleOutlineJump);
 
-    // Search result jump-to-line with fade-out highlight
     let jumpDecoration = null;
     let jumpDecorTimer = null;
     const handleSearchJump = (e) => {
@@ -199,7 +236,6 @@ const MonacoEditorComponent = forwardRef(function MonacoEditorComponent({ classN
       editor.setPosition({ lineNumber: line, column: 1 });
       editor.focus();
 
-      // Clear any previous decoration
       if (jumpDecorTimer) clearTimeout(jumpDecorTimer);
       if (jumpDecoration) { jumpDecoration.clear(); jumpDecoration = null; }
 
@@ -218,8 +254,6 @@ const MonacoEditorComponent = forwardRef(function MonacoEditorComponent({ classN
     };
     window.addEventListener('editor:jump-to-line', handleSearchJump);
 
-    // Suppress the internal "Canceled" promise rejection Monaco throws on dispose
-    // (https://github.com/microsoft/monaco-editor/issues/3455)
     const handleUnhandledRejection = (e) => {
       if (e.reason?.name === 'Canceled') e.preventDefault();
     };
@@ -235,40 +269,38 @@ const MonacoEditorComponent = forwardRef(function MonacoEditorComponent({ classN
     };
   }, []);
 
-  // Sync content and language when active tab changes
+  // Switch the editor's content when the active tab changes. We read the
+  // freshest content out of the editor buffer (or fall back to the tab's
+  // persisted content) so that switching back to a tab keeps unsaved
+  // edits intact.
   useEffect(() => {
     const editor = editorRef.current;
     if (!editor) return;
-    const currentValue = editor.getValue();
-    const newValue = activeTab?.content ?? '';
-    if (currentValue !== newValue) {
+    if (!activeTabId) {
+      currentTabIdRef.current = null;
+      editor.setValue('');
+      return;
+    }
+    const tab = useEditorStore.getState().tabs.find((t) => t.id === activeTabId);
+    if (!tab) return;
+
+    currentTabIdRef.current = activeTabId;
+    const newValue = hasBuffer(activeTabId)
+      ? getBuffer(activeTabId, tab.content || '')
+      : tab.content || '';
+
+    if (editor.getValue() !== newValue) {
       const pos = editor.getPosition();
       editor.setValue(newValue);
       if (pos) editor.setPosition(pos);
     }
-    // Update language based on file extension
-    const lang = getFileLanguage(activeTab?.name);
-    const model = editor.getModel();
-    if (model) {
-      monaco.editor.setModelLanguage(model, lang);
-    }
-    // Update character count
-    setCharacterCount(newValue.length);
-  }, [activeTab?.id]);
 
-  // Sync content from external changes (e.g. file watcher)
-  useEffect(() => {
-    if (suppressStoreSync.current) return;
-    const editor = editorRef.current;
-    if (!editor) return;
-    const currentValue = editor.getValue();
-    const newValue = activeTab?.content ?? '';
-    if (currentValue !== newValue) {
-      const selections = editor.getSelections();
-      editor.setValue(newValue);
-      if (selections) editor.setSelections(selections);
-    }
-  }, [activeTab?.content]);
+    const lang = getFileLanguage(tab.name);
+    const model = editor.getModel();
+    if (model) monaco.editor.setModelLanguage(model, lang);
+
+    setCharacterCount(newValue.length);
+  }, [activeTabId, setCharacterCount]);
 
   // Theme switching with Shiki themes
   useEffect(() => {
@@ -291,7 +323,6 @@ const MonacoEditorComponent = forwardRef(function MonacoEditorComponent({ classN
     return () => observer.disconnect();
   }, [highlighterReady]);
 
-  // Sync editor options from config store
   useEffect(() => {
     if (editorRef.current) {
       editorRef.current.updateOptions({

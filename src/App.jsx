@@ -14,7 +14,9 @@ import SearchModal from '@components/overlays/SearchModal';
 import SettingsModal from '@components/overlays/SettingsModal';
 import StatsPanel from '@components/overlays/StatsPanel';
 import LoginModal from '@components/overlays/LoginModal';
+import ConflictDialog from '@components/overlays/ConflictDialog';
 import NotificationContainer from '@components/notification/NotificationContainer';
+import useSyncStore from '@store/useSyncStore';
 import '@styles/App.scss';
 
 function App() {
@@ -23,6 +25,7 @@ function App() {
   const toggleEditPreview = useEditorStore((s) => s.toggleEditPreview);
   const loadToken = useAuthStore((s) => s.loadToken);
   const isLoggedIn = useAuthStore((s) => s.isLoggedIn);
+  const conflicts = useSyncStore((s) => s.conflicts);
   const [searchOpen, setSearchOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [statsOpen, setStatsOpen] = useState(false);
@@ -32,6 +35,7 @@ function App() {
   useEffect(() => {
     initTheme();
     loadToken();
+    syncEngine.ensureLocalReset();
     showMainWindow().catch(console.error);
   }, []);
 
@@ -99,6 +103,12 @@ function App() {
       <SettingsModal open={settingsOpen} onClose={() => setSettingsOpen(false)} />
       <StatsPanel open={statsOpen} onClose={() => setStatsOpen(false)} />
       <LoginModal open={loginOpen} onClose={() => setLoginOpen(false)} onLoggedIn={() => syncEngine.fullSync()} />
+      <ConflictDialog
+        open={conflicts.length > 0}
+        conflicts={conflicts}
+        onResolve={(fileId, resolution) => syncEngine.resolveConflict(fileId, resolution)}
+        onClose={() => {}}
+      />
       <NotificationContainer />
     </>
   );

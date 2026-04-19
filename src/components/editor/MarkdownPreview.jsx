@@ -1,4 +1,13 @@
-import { useMemo, useEffect, useRef, createElement, useCallback } from 'react';
+import {
+  useMemo,
+  useEffect,
+  useRef,
+  createElement,
+  useCallback,
+  useDeferredValue,
+  memo,
+} from 'react';
+import { useEditorBufferContent } from '@hooks/useEditorBufferContent';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import remarkMath from 'remark-math';
@@ -6,16 +15,42 @@ import rehypeRaw from 'rehype-raw';
 import rehypeKatex from 'rehype-katex';
 import rehypeSanitize, { defaultSchema } from 'rehype-sanitize';
 import Prism from 'prismjs';
-import 'prismjs/plugins/autoloader/prism-autoloader';
+import 'prismjs/components/prism-markup';
+import 'prismjs/components/prism-markup-templating';
+import 'prismjs/components/prism-css';
+import 'prismjs/components/prism-clike';
+import 'prismjs/components/prism-javascript';
+import 'prismjs/components/prism-jsx';
+import 'prismjs/components/prism-typescript';
+import 'prismjs/components/prism-tsx';
+import 'prismjs/components/prism-json';
+import 'prismjs/components/prism-bash';
+import 'prismjs/components/prism-markdown';
+import 'prismjs/components/prism-yaml';
+import 'prismjs/components/prism-python';
+import 'prismjs/components/prism-sql';
+import 'prismjs/components/prism-java';
+import 'prismjs/components/prism-c';
+import 'prismjs/components/prism-cpp';
+import 'prismjs/components/prism-go';
+import 'prismjs/components/prism-rust';
+import 'prismjs/components/prism-kotlin';
+import 'prismjs/components/prism-swift';
+import 'prismjs/components/prism-scss';
+import 'prismjs/components/prism-sass';
+import 'prismjs/components/prism-php';
+import 'prismjs/components/prism-ruby';
+import 'prismjs/components/prism-toml';
+import 'prismjs/components/prism-ini';
+import 'prismjs/components/prism-lua';
+import 'prismjs/components/prism-r';
+import 'prismjs/components/prism-dart';
 import i18n from '@/i18n';
 import useEditorStore from '@store/useEditorStore';
 import useToastStore from '@store/useToastStore';
 import { parseFootnotes, addFootnoteJumpHandlers } from '@utils/footnoteParser';
 import MermaidRenderer from './MermaidRenderer';
 import './markdown-preview.scss';
-
-Prism.plugins.autoloader.languages_path =
-  'https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/';
 
 function slugify(text) {
   return String(text)
@@ -107,17 +142,51 @@ function makeHeading(tag) {
   };
 }
 
+// Heavy parse + VDOM build is isolated in its own memoized component so
+// that unrelated parent re-renders (theme toggles, scroll, focus, etc.)
+// don't trigger a fresh ReactMarkdown pass on long documents.
+const MarkdownView = memo(function MarkdownView({ content, components }) {
+  return (
+    <ReactMarkdown
+      remarkPlugins={remarkPlugins}
+      rehypePlugins={rehypePlugins}
+      components={components}
+    >
+      {content}
+    </ReactMarkdown>
+  );
+});
+
+const requestIdle =
+  typeof window !== 'undefined' && typeof window.requestIdleCallback === 'function'
+    ? window.requestIdleCallback.bind(window)
+    : (cb) => setTimeout(() => cb({ timeRemaining: () => 16, didTimeout: false }), 16);
+
+const cancelIdle =
+  typeof window !== 'undefined' && typeof window.cancelIdleCallback === 'function'
+    ? window.cancelIdleCallback.bind(window)
+    : (id) => clearTimeout(id);
+
 function MarkdownPreview({ className }) {
-  const activeTab = useEditorStore((s) => s.getActiveTab());
-  const rawContent = activeTab?.content || '';
+  const activeTabId = useEditorStore((s) => s.activeTabId);
+  const fallback = useMemo(() => {
+    const tab = useEditorStore.getState().tabs.find((t) => t.id === activeTabId);
+    return tab?.content || '';
+  }, [activeTabId]);
+  const rawContent = useEditorBufferContent(activeTabId, fallback, 240);
   const containerRef = useRef(null);
 
-  const content = useMemo(() => {
+  const processedContent = useMemo(() => {
     const { content: processed } = parseFootnotes(rawContent);
     return processed;
   }, [rawContent]);
 
-  // Load Prism theme CSS based on current theme
+  // useDeferredValue lets React render the heavy markdown tree at a
+  // lower priority. While the new tree is being built, the previous
+  // tree stays interactive — this is what keeps the editor / scrollbar
+  // / sidebar from freezing on long documents.
+  const content = useDeferredValue(processedContent);
+
   const loadPrismTheme = useCallback(() => {
     const existing = document.getElementById('prism-theme');
     if (existing) existing.remove();
@@ -130,7 +199,6 @@ function MarkdownPreview({ className }) {
     document.head.appendChild(link);
   }, []);
 
-  // Init theme + watch for theme changes
   useEffect(() => {
     loadPrismTheme();
     const observer = new MutationObserver(() => loadPrismTheme());
@@ -141,13 +209,15 @@ function MarkdownPreview({ className }) {
     };
   }, [loadPrismTheme]);
 
-  // Add lang-tag buttons to code blocks (miaogu-notepad style)
+  // Idempotent: only adds a tag to a <pre> that doesn't already have one.
+  // Previously this removed every tag and re-created them on each render,
+  // which churned the DOM and forced layout on long documents.
   const addLangTags = useCallback((container) => {
     if (!container) return;
-    container.querySelectorAll('.lang-tag').forEach((el) => el.remove());
 
     const toast = useToastStore.getState().toast;
     container.querySelectorAll('pre').forEach((pre) => {
+      if (pre.querySelector(':scope > .lang-tag')) return;
       const code = pre.querySelector('code[class*="language-"]');
       if (!code) return;
 
@@ -167,24 +237,84 @@ function MarkdownPreview({ className }) {
         });
       });
 
-      pre.style.position = 'relative';
+      if (!pre.style.position) pre.style.position = 'relative';
       pre.appendChild(tag);
     });
   }, []);
 
-  // Run Prism highlight + lang-tags + footnote handlers after content renders
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      if (containerRef.current) {
-        Prism.highlightAllUnder(containerRef.current);
-        addLangTags(containerRef.current);
-      }
-      addFootnoteJumpHandlers(containerRef.current);
-    }, 80);
-    return () => clearTimeout(timer);
-  }, [content, addLangTags]);
+  // Incremental, idle-time syntax highlighting. Code blocks that already
+  // contain Prism tokens are skipped, so re-renders that didn't actually
+  // change a given block cost zero highlighting work.
+  const idleJobRef = useRef(null);
 
-  // Outline jump
+  const cancelHighlightJob = useCallback(() => {
+    if (idleJobRef.current != null) {
+      cancelIdle(idleJobRef.current);
+      idleJobRef.current = null;
+    }
+  }, []);
+
+  const scheduleHighlight = useCallback(() => {
+    const container = containerRef.current;
+    if (!container) return;
+
+    cancelHighlightJob();
+
+    const pending = [];
+    container.querySelectorAll('pre > code[class*="language-"]').forEach((codeEl) => {
+      // If the first child is already a Prism token span we've nothing
+      // to do — React only resets the code element's children when the
+      // text actually changed.
+      if (codeEl.querySelector(':scope > .token')) return;
+      // Skip mermaid (rendered via MermaidRenderer, not Prism).
+      if (codeEl.classList.contains('language-mermaid')) return;
+      pending.push(codeEl);
+    });
+
+    if (pending.length === 0) {
+      addLangTags(container);
+      return;
+    }
+
+    let i = 0;
+    const work = (deadline) => {
+      idleJobRef.current = null;
+      const hasTime = () =>
+        deadline.didTimeout || (deadline.timeRemaining && deadline.timeRemaining() > 4);
+
+      while (i < pending.length && hasTime()) {
+        const el = pending[i++];
+        try {
+          Prism.highlightElement(el);
+        } catch (_) {
+          // Ignore: a malformed code block shouldn't break the loop.
+        }
+      }
+
+      if (i < pending.length) {
+        idleJobRef.current = requestIdle(work, { timeout: 500 });
+      } else {
+        addLangTags(container);
+      }
+    };
+
+    idleJobRef.current = requestIdle(work, { timeout: 500 });
+  }, [addLangTags, cancelHighlightJob]);
+
+  // Schedule highlighting + footnote handlers after the deferred render
+  // commits. We wait one frame so the DOM is stable.
+  useEffect(() => {
+    let raf = requestAnimationFrame(() => {
+      raf = 0;
+      scheduleHighlight();
+      addFootnoteJumpHandlers(containerRef.current);
+    });
+    return () => {
+      if (raf) cancelAnimationFrame(raf);
+      cancelHighlightJob();
+    };
+  }, [content, scheduleHighlight, cancelHighlightJob]);
+
   useEffect(() => {
     const handler = (e) => {
       const { text, type } = e.detail ?? {};
@@ -253,15 +383,14 @@ function MarkdownPreview({ className }) {
     kbd: ({ children }) => <kbd className="md-preview__kbd">{children}</kbd>,
   }), []);
 
+  const isStale = content !== processedContent;
+
   return (
-    <div ref={containerRef} className={`md-preview ${className || ''}`}>
-      <ReactMarkdown
-        remarkPlugins={remarkPlugins}
-        rehypePlugins={rehypePlugins}
-        components={components}
-      >
-        {content}
-      </ReactMarkdown>
+    <div
+      ref={containerRef}
+      className={`md-preview ${isStale ? 'md-preview--stale' : ''} ${className || ''}`}
+    >
+      <MarkdownView content={content} components={components} />
     </div>
   );
 }

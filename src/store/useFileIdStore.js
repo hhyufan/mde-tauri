@@ -45,6 +45,26 @@ const useFileIdStore = create(
         }));
       },
 
+      /**
+       * Move an existing path binding to a new local path while preserving
+       * the logical document identity (`fileId`).
+       */
+      movePath: (oldPath, newPath) => {
+        if (!oldPath || !newPath || oldPath === newPath) return;
+        const fileId = get().pathToId[oldPath];
+        if (!fileId) return;
+        set((state) => {
+          const nextPathToId = { ...state.pathToId };
+          const nextIdToPath = { ...state.idToPath, [fileId]: newPath };
+          delete nextPathToId[oldPath];
+          nextPathToId[newPath] = fileId;
+          return {
+            pathToId: nextPathToId,
+            idToPath: nextIdToPath,
+          };
+        });
+      },
+
       /** Lookup helpers. */
       idOf: (path) => get().pathToId[path] || null,
       pathOf: (fileId) => get().idToPath[fileId] || null,
@@ -60,6 +80,21 @@ const useFileIdStore = create(
           return { pathToId: np, idToPath: ni };
         });
       },
+
+      unbindFileId: (fileId) => {
+        if (!fileId) return;
+        const path = get().idToPath[fileId];
+        if (!path) return;
+        set((state) => {
+          const np = { ...state.pathToId };
+          const ni = { ...state.idToPath };
+          delete np[path];
+          delete ni[fileId];
+          return { pathToId: np, idToPath: ni };
+        });
+      },
+
+      reset: () => set({ pathToId: {}, idToPath: {} }),
     }),
     {
       name: 'mde-file-ids',

@@ -1,11 +1,12 @@
-import { useState, useRef } from 'react';
+import { useState, useRef, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import useEditorStore from '@store/useEditorStore';
 import useThemeStore from '@store/useThemeStore';
 import useFileStore from '@store/useFileStore';
 import useNotificationStore from '@store/useNotificationStore';
 import useExternalDocsStore from '@store/useExternalDocsStore';
-import { isCloudPath, fileIdFromCloudPath } from '@/services/syncEngine';
+import useSyncStore from '@store/useSyncStore';
+import { fileIdFromCloudPath, syncEngine } from '@/services/syncEngine';
 import { useFileManager } from '@hooks/useFileManager';
 import FileTree from './explorer/FileTree';
 import OutlineView from './outline/OutlineView';
@@ -142,27 +143,39 @@ function RecentList({ onOpenStats }) {
   const recentFiles = useFileStore((s) => s.recentFiles);
   const bookmarkedPaths = useFileStore((s) => s.bookmarkedPaths);
   const externalDocs = useExternalDocsStore((s) => s.docs);
+  const syncDocsMap = useSyncStore((s) => s.docs);
   const { openFileFromPath } = useFileManager();
+  const syncDocs = useMemo(() => Object.values(syncDocsMap), [syncDocsMap]);
 
-  // Cloud-only bookmarks (synced from another device, not yet bound here)
-  // are not present in `recentFiles`; surface them as virtual rows so the
-  // user can click to open and "Save As" them onto local disk.
+  const handleRemove = useCallback(async (e, f) => {
+    e.stopPropagation();
+    if (f.cloud) {
+      const fileId = fileIdFromCloudPath(f.path);
+      useExternalDocsStore.getState().remove(fileId);
+      await syncEngine.deleteDocument(fileId);
+    } else {
+      useFileStore.getState().removeRecentFile(f.path);
+      if (bookmarkedPaths.includes(f.path)) {
+        useFileStore.getState().toggleBookmark(f.path);
+      }
+    }
+  }, [bookmarkedPaths]);
+
   const recentPaths = new Set(recentFiles.map((r) => r.path));
-  const cloudOnlyEntries = bookmarkedPaths
-    .filter((p) => isCloudPath(p) && !recentPaths.has(p))
-    .map((p) => {
-      const fileId = fileIdFromCloudPath(p);
+  const cloudOnlyEntries = syncDocs
+    .filter((doc) => !doc.deleted && !doc.localPath)
+    .map((doc) => {
+      const fileId = doc.fileId;
       const meta = externalDocs[fileId] || {};
-      // Prefer the synced metadata; fall back to a short, human-friendly
-      // placeholder rather than dumping the raw UUID into the UI.
-      const name = meta.name || `Cloud file (${(fileId || '').slice(0, 8)})`;
+      const name = doc.name || meta.name || `Cloud file (${(fileId || '').slice(0, 8)})`;
       return {
-        path: p,
+        path: `cloud://${fileId}`,
         name,
-        ext: meta.ext || name.split('.').pop() || '',
+        ext: doc.ext || meta.ext || name.split('.').pop() || '',
         cloud: true,
       };
-    });
+    })
+    .filter((entry) => !recentPaths.has(entry.path));
 
   const allFiles = [...cloudOnlyEntries, ...recentFiles];
   const sortedFiles = [...allFiles].sort((a, b) => {
@@ -203,7 +216,7 @@ function RecentList({ onOpenStats }) {
                     <svg viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" strokeWidth="2" width="12" height="12"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z" /></svg>
                   </span>
                 )}
-                <span className="sidebar__recent-del" onClick={(e) => { e.stopPropagation(); }} title="Remove">
+                <span className="sidebar__recent-del" onClick={(e) => handleRemove(e, f)} title={t('sidebar.recent.remove')}>
                   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>
                 </span>
               </div>

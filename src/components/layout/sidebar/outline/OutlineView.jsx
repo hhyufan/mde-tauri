@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react';
 import useEditorStore from '@store/useEditorStore';
+import { useEditorBufferContent } from '@hooks/useEditorBufferContent';
 import './outline.scss';
 
 function extractItems(content) {
@@ -77,12 +78,17 @@ function ListBadge({ type }) {
 }
 
 function OutlineView() {
-  const activeTab = useEditorStore((s) => s.getActiveTab());
+  const activeTabId = useEditorStore((s) => s.activeTabId);
+  const fallback = useMemo(() => {
+    const tab = useEditorStore.getState().tabs.find((t) => t.id === activeTabId);
+    return tab?.content || '';
+  }, [activeTabId]);
+  const content = useEditorBufferContent(activeTabId, fallback, 320);
   const [collapsed, setCollapsed] = useState({});
 
-  const items = useMemo(() => extractItems(activeTab?.content), [activeTab?.content]);
+  const items = useMemo(() => extractItems(content), [content]);
 
-  if (!activeTab) {
+  if (!activeTabId) {
     return <div className="outline__empty">No file open</div>;
   }
   if (items.length === 0) {

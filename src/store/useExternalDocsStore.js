@@ -52,6 +52,8 @@ const useExternalDocsStore = create(
       replaceAll: (docs) => set({ docs: docs || {} }),
 
       ids: () => Object.keys(get().docs),
+
+      reset: () => set({ docs: {} }),
     }),
     {
       name: 'mde-external-docs',

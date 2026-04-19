@@ -15,10 +15,18 @@ import useConfigStore from '@store/useConfigStore';
 import useNotificationStore from '@store/useNotificationStore';
 import useExternalDocsStore from '@store/useExternalDocsStore';
 import { syncEngine, isCloudPath, fileIdFromCloudPath } from '@/services/syncEngine';
+import { getBuffer } from '@utils/editorBuffer';
 import { debounce } from '@utils/debounce';
 
 export function useFileManager() {
-  const { openFile: openTab, openExternalFile, markTabSaved, updateTabContent, getActiveTab, createUntitledTab, updateTabPath } = useEditorStore.getState();
+  const {
+    openFile: openTab,
+    openExternalFile,
+    markTabSaved,
+    getActiveTab,
+    createUntitledTab,
+    updateTabPath,
+  } = useEditorStore.getState();
   const { setCurrentDir, setFiles, addRecentFile } = useFileStore.getState();
   const notify = useNotificationStore.getState().notify;
 
@@ -46,8 +54,9 @@ export function useFileManager() {
     const autoSave = useConfigStore.getState().autoSave;
     if (!autoSave) return;
     const tab = useEditorStore.getState().getActiveTab();
-    if (!tab || !tab.path || !tab.modified) return;
-    debouncedAutoSave(tab.path, tab.content, tab.encoding);
+    if (!tab || !tab.path) return;
+    const content = getBuffer(tab.id, tab.content);
+    debouncedAutoSave(tab.path, content, tab.encoding);
   }, [debouncedAutoSave]);
 
   const loadDirectory = useCallback(async (dirPath) => {
@@ -95,6 +104,12 @@ export function useFileManager() {
       const result = await readFileContent(filePath);
       if (result.success) {
         const ext = fileName.split('.').pop() || '';
+        syncEngine.registerLocalDocument(filePath, {
+          name: fileName,
+          ext,
+          encoding: result.encoding || 'UTF-8',
+          lineEnding: result.line_ending || 'LF',
+        });
         openTab({
           name: fileName,
           path: filePath,
@@ -157,12 +172,20 @@ export function useFileManager() {
             markTabSaved(path);
             addRecentFile({ name, path, ext });
             notify('success', 'File saved', name);
-            // If this tab originated from a cloud-only bookmark, register
-            // the freshly chosen local path under our deviceId so the
-            // server (and future syncs from this device) know where it
-            // lives now.
             if (externalFileId) {
-              syncEngine.claimExternalDoc(externalFileId, path, tab.content, tab.encoding);
+              await syncEngine.claimExternalDoc(externalFileId, path, tab.content, tab.encoding);
+            } else {
+              syncEngine.registerLocalDocument(path, {
+                name,
+                ext,
+                encoding: tab.encoding,
+                lineEnding: tab.lineEnding,
+              });
+              await syncEngine.queueLocalUpsert(path, tab.content, tab.encoding, {
+                name,
+                lineEnding: tab.lineEnding,
+                source: 'save-as',
+              });
             }
           }
         }
@@ -177,11 +200,17 @@ export function useFileManager() {
       if (result.success) {
         markTabSaved(tab.id);
         notify('success', 'File saved', tab.name);
-        // Only bookmarked files participate in cloud sync.
-        const bookmarked = useFileStore.getState().bookmarkedPaths.includes(tab.path);
-        if (bookmarked) {
-          syncEngine.pushSingle(tab.path, tab.content, tab.encoding, 'bookmark');
-        }
+        syncEngine.registerLocalDocument(tab.path, {
+          name: tab.name,
+          ext: tab.ext,
+          encoding: tab.encoding,
+          lineEnding: tab.lineEnding,
+        });
+        await syncEngine.queueLocalUpsert(tab.path, tab.content, tab.encoding, {
+          name: tab.name,
+          lineEnding: tab.lineEnding,
+          source: 'manual-save',
+        });
       } else {
         notify('error', 'Error', result.message);
       }
@@ -204,10 +233,30 @@ export function useFileManager() {
         ],
       });
       if (path) {
-        const result = await saveFile(path, tab.content);
+        const result = await saveFile(path, tab.content, tab.encoding);
         if (result.success) {
-          markTabSaved(tab.id);
+          const name = path.split(/[\\/]/).pop();
+          const ext = name.split('.').pop() || '';
+          const externalFileId = tab.externalFileId;
+          updateTabPath(tab.id, path, name);
+          markTabSaved(path);
+          addRecentFile({ name, path, ext });
           notify('success', 'File saved', path);
+          if (externalFileId) {
+            await syncEngine.claimExternalDoc(externalFileId, path, tab.content, tab.encoding);
+          } else {
+            syncEngine.registerLocalDocument(path, {
+              name,
+              ext,
+              encoding: tab.encoding,
+              lineEnding: tab.lineEnding,
+            });
+            await syncEngine.queueLocalUpsert(path, tab.content, tab.encoding, {
+              name,
+              lineEnding: tab.lineEnding,
+              source: 'save-as',
+            });
+          }
         }
       }
     } catch (err) {

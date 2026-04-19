@@ -1,4 +1,4 @@
-import { useCallback, useRef } from 'react';
+import { useCallback, useMemo, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import useEditorStore from '@store/useEditorStore';
 import MonacoEditor from '@components/editor/LazyMonacoEditor';
@@ -10,10 +10,15 @@ import './editor-content.scss';
 
 function EditorContent() {
   const { t } = useTranslation();
-  const activeTab = useEditorStore((s) => s.getActiveTab());
+  const tabs = useEditorStore((s) => s.tabRenderList);
+  const activeTabId = useEditorStore((s) => s.activeTabId);
   const viewMode = useEditorStore((s) => s.viewMode);
   const monacoRef = useRef(null);
   const { triggerAutoSave } = useFileManager();
+  const activeTabMeta = useMemo(
+    () => tabs.find((item) => item.id === activeTabId) || null,
+    [tabs, activeTabId],
+  );
 
   const handleToolbarInsert = useCallback((action) => {
     const editor = monacoRef.current;
@@ -26,7 +31,7 @@ function EditorContent() {
     }
   }, []);
 
-  if (!activeTab) {
+  if (!activeTabMeta) {
     return (
       <main className="editor-content">
         <div className="editor-content__empty">
@@ -38,27 +43,42 @@ function EditorContent() {
     );
   }
 
-  const isMarkdown = /\.(md|markdown|mdx)$/i.test(activeTab.name);
+  const isMarkdown = /\.(md|markdown|mdx)$/i.test(activeTabMeta.name);
 
   return (
     <main className="editor-content">
       <ToastContainer />
       <div className="editor-content__workspace">
         {viewMode === 'edit' && (
-          <MonacoEditor ref={monacoRef} className="editor-content__editor" onAutoSave={triggerAutoSave} />
+          <MonacoEditor
+            key={activeTabId}
+            ref={monacoRef}
+            className="editor-content__editor"
+            onAutoSave={triggerAutoSave}
+          />
         )}
         {viewMode === 'preview' && isMarkdown && (
           <MarkdownPreview className="editor-content__preview" />
         )}
         {viewMode === 'split' && isMarkdown && (
           <>
-            <MonacoEditor ref={monacoRef} className="editor-content__editor editor-content__editor--half" onAutoSave={triggerAutoSave} />
+            <MonacoEditor
+              key={`${activeTabId}-split`}
+              ref={monacoRef}
+              className="editor-content__editor editor-content__editor--half"
+              onAutoSave={triggerAutoSave}
+            />
             <div className="editor-content__split-divider" />
             <MarkdownPreview className="editor-content__preview editor-content__preview--half" />
           </>
         )}
         {!isMarkdown && viewMode !== 'edit' && (
-          <MonacoEditor ref={monacoRef} className="editor-content__editor" onAutoSave={triggerAutoSave} />
+          <MonacoEditor
+            key={`${activeTabId}-fallback`}
+            ref={monacoRef}
+            className="editor-content__editor"
+            onAutoSave={triggerAutoSave}
+          />
         )}
       </div>
 
