@@ -236,10 +236,28 @@
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
+  position: relative;
 
   svg {
     width: 16px;
     height: 16px;
+  }
+}
+
+.sidebar__recent-cloud-badge {
+  position: absolute;
+  right: 1px;
+  bottom: 1px;
+  width: 10px;
+  height: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--accent);
+
+  svg {
+    width: 10px;
+    height: 10px;
   }
 }
 

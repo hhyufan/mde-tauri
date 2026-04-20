@@ -152,6 +152,9 @@ function TabBar() {
       <div className="tabbar__tabs" ref={scrollRef}>
         {tabs.map((tab) => {
           const isRenaming = renamingTabId === tab.id;
+          const isCloudTab = Boolean(
+            tab.externalFileId || (typeof tab.path === 'string' && tab.path.startsWith('cloud://')),
+          );
           return (
             <div
               key={tab.id}
@@ -159,7 +162,14 @@ function TabBar() {
               onClick={() => !isRenaming && setActiveTab(tab.id)}
             >
               <span className="tabbar__tab-icon">
-                <FileTypeIcon extension={tab.ext} fileName={tab.name} />
+                <FileTypeIcon extension={tab.ext} fileName={tab.name} size={16} />
+                {isCloudTab && (
+                  <span className="tabbar__tab-cloud-badge" title="Cloud">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                      <path d="M18 10h-1.26A8 8 0 1 0 9 20h9a5 5 0 0 0 0-10z" />
+                    </svg>
+                  </span>
+                )}
               </span>
 
               {isRenaming ? (

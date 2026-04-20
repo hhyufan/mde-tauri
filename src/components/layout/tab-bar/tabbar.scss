@@ -106,14 +106,34 @@
 }
 
 .tabbar__tab-icon {
-  width: 14px;
-  height: 14px;
+  width: 16px;
+  height: 16px;
   display: flex;
   align-items: center;
+  position: relative;
 
   svg {
-    width: 14px;
-    height: 14px;
+    width: 16px;
+    height: 16px;
+  }
+}
+
+.tabbar__tab-cloud-badge {
+  position: absolute;
+  right: -1px;
+  bottom: -2px;
+  width: 8px;
+  height: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--accent);
+  pointer-events: none;
+  filter: drop-shadow(0 0 1px var(--surface));
+
+  svg {
+    width: 8px;
+    height: 8px;
   }
 }
 
