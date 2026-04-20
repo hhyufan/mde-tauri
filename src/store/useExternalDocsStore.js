@@ -1,5 +1,16 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
+import { getCurrentUserScopeId, isOwnedByUser } from './userScope';
+
+function scopedDocKey(fileId) {
+  return `${getCurrentUserScopeId()}::${fileId}`;
+}
+
+export function getScopedExternalDocsMap(docs, userId) {
+  return Object.fromEntries(
+    Object.entries(docs || {}).filter(([, doc]) => isOwnedByUser(doc?.ownerUserId, userId))
+  );
+}
 
 /**
  * In-memory cache of cloud documents that have been pulled to this device
@@ -29,29 +40,62 @@ const useExternalDocsStore = create(
        */
       put: (fileId, patch) => {
         if (!fileId) return;
+        const key = scopedDocKey(fileId);
         set((state) => ({
           docs: {
             ...state.docs,
-            [fileId]: { ...(state.docs[fileId] || {}), ...patch },
+            [key]: {
+              ...(state.docs[key] || {}),
+              ...patch,
+              fileId,
+              ownerUserId: getCurrentUserScopeId(),
+            },
           },
         }));
       },
 
-      get: (fileId) => get().docs[fileId] || null,
+      get: (fileId) => get().docs[scopedDocKey(fileId)] || null,
 
       remove: (fileId) => {
         if (!fileId) return;
         set((state) => {
           const next = { ...state.docs };
-          delete next[fileId];
+          delete next[scopedDocKey(fileId)];
           return { docs: next };
         });
       },
 
-      /** Replace the full set (used when reconciling against the server). */
-      replaceAll: (docs) => set({ docs: docs || {} }),
+      /** Replace the current user's full set (used when reconciling against the server). */
+      replaceAll: (docs) =>
+        set((state) => {
+          const ownerUserId = getCurrentUserScopeId();
+          const preserved = Object.fromEntries(
+            Object.entries(state.docs).filter(([, doc]) => !isOwnedByUser(doc?.ownerUserId, ownerUserId))
+          );
+          const nextDocs = Object.fromEntries(
+            Object.entries(docs || {}).map(([fileId, doc]) => [
+              `${ownerUserId}::${fileId}`,
+              { ...doc, fileId, ownerUserId },
+            ])
+          );
+          return { docs: { ...preserved, ...nextDocs } };
+        }),
 
-      ids: () => Object.keys(get().docs),
+      ids: () =>
+        Object.values(get().docs)
+          .filter((doc) => isOwnedByUser(doc?.ownerUserId, getCurrentUserScopeId()))
+          .map((doc) => doc.fileId)
+          .filter(Boolean),
+
+      resetCurrentUser: () =>
+        set((state) => {
+          const ownerUserId = getCurrentUserScopeId();
+          return {
+            docs: Object.fromEntries(
+              Object.entries(state.docs).filter(([, doc]) => !isOwnedByUser(doc?.ownerUserId, ownerUserId))
+            ),
+          };
+        }),
 
       reset: () => set({ docs: {} }),
     }),

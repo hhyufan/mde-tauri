@@ -2,7 +2,9 @@ import { useEffect, useRef, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Chart } from '@antv/g2';
 import useEditorStore from '@store/useEditorStore';
-import useFileStore from '@store/useFileStore';
+import useAuthStore from '@store/useAuthStore';
+import useFileStore, { getScopedRecentFiles } from '@store/useFileStore';
+import { GUEST_USER_SCOPE } from '@store/userScope';
 import './stats-panel.scss';
 
 function StatsPanel({ open, onClose }) {
@@ -10,7 +12,12 @@ function StatsPanel({ open, onClose }) {
   const chartRef = useRef(null);
   const chartInstanceRef = useRef(null);
   const tabs = useEditorStore((s) => s.tabs);
-  const recentFiles = useFileStore((s) => s.recentFiles);
+  const userId = useAuthStore((s) => s.user?.id || GUEST_USER_SCOPE);
+  const recentEntries = useFileStore((s) => s.recentFiles);
+  const recentFiles = useMemo(
+    () => getScopedRecentFiles(recentEntries, userId),
+    [recentEntries, userId],
+  );
 
   const extData = useMemo(() => {
     const allFiles = [...tabs, ...recentFiles];

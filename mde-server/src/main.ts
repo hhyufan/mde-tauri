@@ -17,6 +17,7 @@ import { setupApp } from './setup';
  */
 
 const expressApp: Express = express();
+expressApp.set('etag', false);
 // Body limits raised so larger sync payloads (gzip-compressed file blobs)
 // don't trip Express's default 100kb cap. Vercel itself imposes its own
 // per-request body cap (~4.5MB Hobby / ~5MB Pro) that we cannot override

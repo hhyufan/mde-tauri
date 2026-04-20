@@ -16,9 +16,18 @@ const useConfigStore = create(
       workspacePath: '',
       serverUrl: 'https://www.miaogu.xyz',
       syncEnabled: true,
+      configUpdatedAt: 0,
 
-      setConfig: (key, value) => set({ [key]: value }),
-      loadConfig: (config) => set(config),
+      setConfig: (key, value, meta = {}) => set((state) => ({
+        ...state,
+        [key]: value,
+        configUpdatedAt: meta.updatedAt ?? Date.now(),
+      })),
+      loadConfig: (config, meta = {}) => set((state) => ({
+        ...state,
+        ...config,
+        configUpdatedAt: meta.updatedAt ?? state.configUpdatedAt ?? Date.now(),
+      })),
     }),
     {
       name: 'mde-config',

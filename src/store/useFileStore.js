@@ -1,5 +1,29 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
+import {
+  getCurrentUserScopeId,
+  isOwnedByUser,
+  normalizeOwnerUserId,
+} from './userScope';
+
+function bookmarkPathOf(entry) {
+  return typeof entry === 'string' ? entry : entry?.path || '';
+}
+
+export function getScopedBookmarkedPaths(bookmarkedPaths, userId) {
+  return (bookmarkedPaths || [])
+    .filter((entry) =>
+      isOwnedByUser(typeof entry === 'string' ? null : entry?.ownerUserId, userId)
+    )
+    .map((entry) => bookmarkPathOf(entry))
+    .filter(Boolean);
+}
+
+export function getScopedRecentFiles(recentFiles, userId) {
+  return (recentFiles || []).filter((entry) =>
+    isOwnedByUser(entry?.ownerUserId, userId)
+  );
+}
 
 const useFileStore = create(
   persist(
@@ -47,21 +71,40 @@ const useFileStore = create(
 
       addRecentFile: (file) =>
         set((state) => {
-          const filtered = state.recentFiles.filter((f) => f.path !== file.path);
-          return { recentFiles: [file, ...filtered].slice(0, 20) };
+          const ownerUserId = getCurrentUserScopeId();
+          const nextFile = { ...file, ownerUserId };
+          const keptOtherUsers = state.recentFiles.filter(
+            (f) => !isOwnedByUser(f?.ownerUserId, ownerUserId)
+          );
+          const currentUserFiles = getScopedRecentFiles(state.recentFiles, ownerUserId)
+            .filter((f) => f.path !== file.path);
+          return {
+            recentFiles: [...keptOtherUsers, nextFile, ...currentUserFiles].slice(0, keptOtherUsers.length + 20),
+          };
         }),
 
-      clearRecentFiles: () => set({ recentFiles: [] }),
+      clearRecentFiles: () =>
+        set((state) => {
+          const ownerUserId = getCurrentUserScopeId();
+          return {
+            recentFiles: state.recentFiles.filter(
+              (f) => !isOwnedByUser(f?.ownerUserId, ownerUserId)
+            ),
+          };
+        }),
 
       removeRecentFile: (path) =>
         set((state) => ({
-          recentFiles: state.recentFiles.filter((f) => f.path !== path),
+          recentFiles: state.recentFiles.filter((f) => {
+            if (!isOwnedByUser(f?.ownerUserId, getCurrentUserScopeId())) return true;
+            return f.path !== path;
+          }),
         })),
 
       replaceRecentFilePath: (oldPath, newPath, name = '') =>
         set((state) => ({
           recentFiles: state.recentFiles.map((f) =>
-            f.path === oldPath
+            isOwnedByUser(f?.ownerUserId, getCurrentUserScopeId()) && f.path === oldPath
               ? {
                   ...f,
                   path: newPath,
@@ -74,36 +117,63 @@ const useFileStore = create(
 
       toggleBookmark: (path) =>
         set((state) => {
-          const exists = state.bookmarkedPaths.includes(path);
+          const ownerUserId = getCurrentUserScopeId();
+          const currentUserPaths = getScopedBookmarkedPaths(state.bookmarkedPaths, ownerUserId);
+          const exists = currentUserPaths.includes(path);
           return {
             bookmarkedPaths: exists
-              ? state.bookmarkedPaths.filter((p) => p !== path)
-              : [...state.bookmarkedPaths, path],
+              ? state.bookmarkedPaths.filter((entry) => !(
+                isOwnedByUser(
+                  typeof entry === 'string' ? null : entry?.ownerUserId,
+                  ownerUserId,
+                ) && bookmarkPathOf(entry) === path
+              ))
+              : [...state.bookmarkedPaths, { path, ownerUserId }],
           };
         }),
 
       isBookmarked: (path) => {
-        return useFileStore.getState().bookmarkedPaths.includes(path);
+        return getScopedBookmarkedPaths(
+          useFileStore.getState().bookmarkedPaths,
+          getCurrentUserScopeId(),
+        ).includes(path);
       },
 
       replaceBookmarkPath: (oldPath, newPath) =>
         set((state) => ({
-          bookmarkedPaths: state.bookmarkedPaths.map((p) =>
-            p === oldPath ? newPath : p
+          bookmarkedPaths: state.bookmarkedPaths.map((entry) =>
+            isOwnedByUser(
+              typeof entry === 'string' ? null : entry?.ownerUserId,
+              getCurrentUserScopeId(),
+            ) && bookmarkPathOf(entry) === oldPath
+              ? { path: newPath, ownerUserId: normalizeOwnerUserId(
+                typeof entry === 'string' ? null : entry?.ownerUserId
+              ) }
+              : entry
           ),
         })),
 
       removeCloudBookmarks: () =>
         set((state) => ({
           bookmarkedPaths: state.bookmarkedPaths.filter(
-            (p) => typeof p !== 'string' || !p.startsWith('cloud://'),
+            (entry) => !(
+              isOwnedByUser(
+                typeof entry === 'string' ? null : entry?.ownerUserId,
+                getCurrentUserScopeId(),
+              ) && bookmarkPathOf(entry).startsWith('cloud://')
+            ),
           ),
         })),
 
       resetSyncUiState: () =>
         set((state) => ({
           bookmarkedPaths: state.bookmarkedPaths.filter(
-            (p) => typeof p !== 'string' || !p.startsWith('cloud://'),
+            (entry) => !(
+              isOwnedByUser(
+                typeof entry === 'string' ? null : entry?.ownerUserId,
+                getCurrentUserScopeId(),
+              ) && bookmarkPathOf(entry).startsWith('cloud://')
+            ),
           ),
         })),
 

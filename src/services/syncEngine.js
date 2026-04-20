@@ -11,9 +11,13 @@ import useAuthStore from '@store/useAuthStore';
 import useDeviceStore from '@store/useDeviceStore';
 import useExternalDocsStore from '@store/useExternalDocsStore';
 import useSyncStore, { SYNC_PROTOCOL_VERSION } from '@store/useSyncStore';
+import { getLocalSettingsSnapshot, applySettingsSnapshot } from '@utils/settingsSync';
 
+// 小体积内容直接明文上传，避免不必要的 gzip 开销。
 const COMPRESS_THRESHOLD_BYTES = 16 * 1024;
+// 预留服务端请求体上限安全余量（避免触发平台硬限制）。
 const MAX_REQUEST_BYTES = 3.5 * 1024 * 1024;
+const CONFIG_SYNC_DEBOUNCE_MS = 900;
 export const CLOUD_PATH_PREFIX = 'cloud://';
 
 export function makeCloudPath(fileId) {
@@ -107,29 +111,13 @@ function mutationId() {
 }
 
 function buildConfigPayload() {
-  const localConfig = useConfigStore.getState();
-  return {
-    theme: useThemeStore.getState().theme,
-    language: localConfig.language,
-    fontSize: localConfig.fontSize,
-    tabSize: localConfig.tabSize,
-    wordWrap: localConfig.wordWrap,
-    lineNumbers: localConfig.lineNumbers,
-    autoSave: localConfig.autoSave,
-    workspacePath: localConfig.workspacePath,
-    editorState: {
-      sidebarVisible: useEditorStore.getState().sidebarVisible,
-      sidebarView: useEditorStore.getState().sidebarView,
-    },
-    protocolVersion: SYNC_PROTOCOL_VERSION,
-  };
+  return getLocalSettingsSnapshot();
 }
 
 function getLocalConflictContent(path, fileId) {
   const editor = useEditorStore.getState();
-  const tab = editor.tabs.find(
-    (item) => item.path === path || item.externalFileId === fileId,
-  );
+  const tab = editor.getTabByPath?.(path)
+    || editor.tabs.find((item) => item.path === path || item.externalFileId === fileId);
   if (tab?.content) return tab.content;
   return useExternalDocsStore.getState().get(fileId)?.content || '';
 }
@@ -140,6 +128,50 @@ class SyncEngine {
     this.listeners = new Set();
     this.retryTimer = null;
     this.syncing = false;
+    this.configSyncTimer = null;
+    this.suppressConfigAutoSync = false;
+    this.setupConfigSubscriptions();
+  }
+
+  setupConfigSubscriptions() {
+    useConfigStore.subscribe((state, prev) => {
+      if ((state.configUpdatedAt || 0) !== (prev.configUpdatedAt || 0)) {
+        this.scheduleConfigSync();
+      }
+    });
+    useThemeStore.subscribe((state, prev) => {
+      if ((state.themeUpdatedAt || 0) !== (prev.themeUpdatedAt || 0)) {
+        this.scheduleConfigSync();
+      }
+    });
+    useEditorStore.subscribe((state, prev) => {
+      if ((state.uiStateUpdatedAt || 0) !== (prev.uiStateUpdatedAt || 0)) {
+        this.scheduleConfigSync();
+      }
+    });
+  }
+
+  scheduleConfigSync() {
+    if (this.suppressConfigAutoSync || this.syncing) return;
+    if (!useAuthStore.getState().isLoggedIn || !useConfigStore.getState().syncEnabled) return;
+    if (this.configSyncTimer) clearTimeout(this.configSyncTimer);
+    this.configSyncTimer = setTimeout(() => {
+      this.configSyncTimer = null;
+      this.syncConfig().catch(() => {});
+    }, CONFIG_SYNC_DEBOUNCE_MS);
+  }
+
+  getLocalConfigUpdatedAt() {
+    return Number(buildConfigPayload().updatedAt || 0);
+  }
+
+  applyRemoteConfig(remoteConfig = {}) {
+    this.suppressConfigAutoSync = true;
+    try {
+      applySettingsSnapshot(remoteConfig);
+    } finally {
+      this.suppressConfigAutoSync = false;
+    }
   }
 
   onStatusChange(fn) {
@@ -174,10 +206,10 @@ class SyncEngine {
 
   async ensureLocalReset() {
     const syncStore = useSyncStore.getState();
-    if (syncStore.localResetDone) return;
-    useExternalDocsStore.getState().reset();
+    if (syncStore.isLocalResetDone()) return;
+    useExternalDocsStore.getState().resetCurrentUser();
     useFileStore.getState().removeCloudBookmarks();
-    useFileIdStore.getState().reset();
+    useFileIdStore.getState().resetCurrentUser();
     syncStore.resetDocumentsAndQueue();
     syncStore.markLocalResetDone();
   }
@@ -206,7 +238,16 @@ class SyncEngine {
     if (!filePath || isCloudPath(filePath)) return null;
     const fileIdStore = useFileIdStore.getState();
     const existingFileId = fileIdStore.idOf(filePath);
-    const fileId = meta.fileId || existingFileId || fileIdStore.getOrCreate(filePath);
+    const isBookmarked = useFileStore.getState().isBookmarked(filePath);
+
+    // 只有在以下两种情况时，才会创建（生成）一个新的 fileId
+    let fileId = meta.fileId || existingFileId;
+    if (!fileId && isBookmarked) {
+      fileId = fileIdStore.getOrCreate(filePath);
+    }
+
+    if (!fileId) return null;
+
     fileIdStore.bind(filePath, fileId);
     useSyncStore.getState().bindLocalPath(fileId, filePath, {
       name: meta.name || basename(filePath),
@@ -224,16 +265,38 @@ class SyncEngine {
     if (!filePath || isCloudPath(filePath)) {
       return { ok: false, reason: 'invalid-path' };
     }
+    if (typeof content !== 'string') {
+      console.warn('[sync] skipped upload because content is not a string', {
+        filePath,
+        source: options.source || 'local',
+        contentType: typeof content,
+      });
+      return { ok: false, reason: 'missing-content' };
+    }
+
+    const existingFileId = useFileIdStore.getState().idOf(filePath);
+    const isBookmarked = useFileStore.getState().isBookmarked(filePath);
+
+    // 本地文件只有在“已收藏”或“已存在云端 fileId”时才进入云同步。
+    if (!existingFileId && !isBookmarked) {
+      return { ok: true, skipped: 'not-bookmarked-and-not-cloud' };
+    }
+
     const fileId = this.registerLocalDocument(filePath, {
       name: options.name || basename(filePath),
       encoding,
       lineEnding: options.lineEnding || 'LF',
       source: options.source || 'local',
     });
+
+    if (!fileId) {
+      return { ok: true, skipped: 'not-bookmarked' };
+    }
+
     if (!useConfigStore.getState().syncEnabled) {
       return { ok: true, fileId, skipped: 'sync-disabled' };
     }
-    const body = await encodeBody(content || '');
+    const body = await encodeBody(content);
     if (body.compressedBytes > MAX_REQUEST_BYTES) {
       return {
         ok: false,
@@ -254,6 +317,8 @@ class SyncEngine {
       status: 'pending_push',
       lastError: null,
     });
+    // 同一文件只保留一条去重后的 upsert，后续编辑覆盖旧 payload，
+    // 确保队列里始终是最新内容快照。
     useSyncStore.getState().enqueueMutation({
       fileId,
       type: 'upsert',
@@ -264,7 +329,7 @@ class SyncEngine {
         originalPath: filePath,
         source: options.source || 'local',
         content: body.content,
-        rawContent: content || '',
+        rawContent: content,
         compressed: body.compressed,
         size: body.size,
         encoding,
@@ -272,6 +337,85 @@ class SyncEngine {
         checksum: body.checksum,
         deviceId: useDeviceStore.getState().getId(),
         devicePath: filePath,
+      },
+    });
+    if (useAuthStore.getState().isLoggedIn && useConfigStore.getState().syncEnabled) {
+      this.fullSync();
+    }
+    return { ok: true, fileId };
+  }
+
+  async queueExternalUpsert(fileId, content, encoding = 'UTF-8', options = {}) {
+    if (!fileId) {
+      return { ok: false, reason: 'invalid-fileId' };
+    }
+    if (typeof content !== 'string') {
+      return { ok: false, reason: 'missing-content' };
+    }
+
+    const syncStore = useSyncStore.getState();
+    const externalStore = useExternalDocsStore.getState();
+    const doc = syncStore.getDoc(fileId);
+    const externalDoc = externalStore.get(fileId);
+
+    if (!useConfigStore.getState().syncEnabled) {
+      return { ok: true, fileId, skipped: 'sync-disabled' };
+    }
+
+    const body = await encodeBody(content);
+    if (body.compressedBytes > MAX_REQUEST_BYTES) {
+      return {
+        ok: false,
+        reason: 'too-large',
+        size: body.size,
+        compressed: body.compressedBytes,
+      };
+    }
+
+    const fileName = options.name || doc?.name || externalDoc?.name || fileId;
+    const ext = doc?.ext || externalDoc?.ext || extOf(fileName);
+    const lineEnding = options.lineEnding || doc?.lineEnding || externalDoc?.lineEnding || 'LF';
+    const originalPath = externalDoc?.originalPath || doc?.localPath || '';
+
+    syncStore.upsertDoc(fileId, {
+      name: fileName,
+      ext,
+      localPath: '',
+      encoding,
+      lineEnding,
+      checksum: body.checksum,
+      deleted: false,
+      status: 'pending_push',
+      lastError: null,
+    });
+    externalStore.put(fileId, {
+      name: fileName,
+      ext,
+      encoding,
+      lineEnding,
+      originalPath,
+      content,
+      checksum: body.checksum,
+      rev: doc?.rev || externalDoc?.rev || 0,
+    });
+    syncStore.enqueueMutation({
+      fileId,
+      type: 'upsert',
+      baseRev: doc?.lastKnownServerRev || doc?.rev || externalDoc?.rev || 0,
+      dedupeKey: 'upsert',
+      payload: {
+        fileName,
+        originalPath,
+        source: options.source || 'external',
+        content: body.content,
+        rawContent: content,
+        compressed: body.compressed,
+        size: body.size,
+        encoding,
+        lineEnding,
+        checksum: body.checksum,
+        deviceId: useDeviceStore.getState().getId(),
+        devicePath: '',
       },
     });
     if (useAuthStore.getState().isLoggedIn && useConfigStore.getState().syncEnabled) {
@@ -323,15 +467,48 @@ class SyncEngine {
     }
   }
 
-  buildConflict(fileId, remoteDoc, remoteContent) {
+  buildConflict(fileId, remoteDoc, remoteContent, localContentOverride) {
     const doc = useSyncStore.getState().getDoc(fileId);
     return {
       fileId,
       path: doc?.localPath || fileId,
       name: doc?.name || remoteDoc?.fileName || fileId,
-      localContent: getLocalConflictContent(doc?.localPath, fileId),
+      localContent: typeof localContentOverride === 'string'
+        ? localContentOverride
+        : getLocalConflictContent(doc?.localPath, fileId),
       remoteContent,
       remoteDoc,
+    };
+  }
+
+  getOpenLocalState(fileId, localPath = '') {
+    const editorStore = useEditorStore.getState();
+    const localTab = localPath
+      ? editorStore.getTabByPath?.(localPath) || editorStore.tabs.find((tab) => tab.path === localPath)
+      : null;
+    const externalTab = editorStore.getTabByExternalFileId?.(fileId)
+      || editorStore.tabs.find((tab) => tab.externalFileId === fileId);
+    const tab = localTab || externalTab || null;
+    return {
+      tab,
+      localTab,
+      externalTab,
+      modified: !!tab?.modified,
+      content: typeof tab?.content === 'string' ? tab.content : '',
+    };
+  }
+
+  getRemoteConflictDecision(fileId, remoteContent, localPath = '', { force = false } = {}) {
+    const localState = this.getOpenLocalState(fileId, localPath);
+    if (force || useConfigStore.getState().autoSave) {
+      return { shouldConflict: false, localState };
+    }
+    if (!localState.modified) {
+      return { shouldConflict: false, localState };
+    }
+    return {
+      shouldConflict: localState.content !== (remoteContent || ''),
+      localState,
     };
   }
 
@@ -340,18 +517,31 @@ class SyncEngine {
     const deviceId = useDeviceStore.getState().getId();
     const myPath = doc.deviceBindings?.[deviceId] || '';
     const syncStore = useSyncStore.getState();
+    const editorStore = useEditorStore.getState();
     const existing = syncStore.getDoc(doc.fileId);
 
     if (doc.deleted) {
+      const deleteDecision = this.getRemoteConflictDecision(doc.fileId, '', myPath, { force });
+      if (syncStore.hasPendingMutation(doc.fileId) && deleteDecision.shouldConflict) {
+        syncStore.markDeleted(doc.fileId, {
+          rev: doc.rev || 0,
+          lastKnownServerRev: doc.rev || 0,
+          status: 'conflict',
+        });
+        syncStore.addConflict(
+          this.buildConflict(doc.fileId, doc, '', deleteDecision.localState.content),
+        );
+        return { conflict: true };
+      }
+      if (syncStore.hasPendingMutation(doc.fileId) && !force) {
+        syncStore.dropMutationsForFile(doc.fileId);
+      }
       syncStore.markDeleted(doc.fileId, {
         rev: doc.rev || 0,
         lastKnownServerRev: doc.rev || 0,
-        status: syncStore.hasPendingMutation(doc.fileId) ? 'conflict' : 'deleted',
+        status: 'deleted',
       });
       useExternalDocsStore.getState().remove(doc.fileId);
-      if (syncStore.hasPendingMutation(doc.fileId) && !force) {
-        syncStore.addConflict(this.buildConflict(doc.fileId, doc, ''));
-      }
       return { deleted: true };
     }
 
@@ -364,19 +554,27 @@ class SyncEngine {
     }
 
     if (syncStore.hasPendingMutation(doc.fileId) && !force) {
-      syncStore.upsertDoc(doc.fileId, {
-        name: doc.fileName || basename(doc.originalPath || '') || doc.fileId,
-        rev: doc.rev || existing?.rev || 0,
-        lastKnownServerRev: doc.rev || existing?.lastKnownServerRev || 0,
-        status: 'conflict',
-      });
-      syncStore.addConflict(this.buildConflict(doc.fileId, doc, decoded));
-      return { conflict: true };
+      const pendingDecision = this.getRemoteConflictDecision(doc.fileId, decoded, myPath, { force });
+      if (pendingDecision.shouldConflict) {
+        syncStore.upsertDoc(doc.fileId, {
+          name: doc.fileName || basename(doc.originalPath || '') || doc.fileId,
+          rev: doc.rev || existing?.rev || 0,
+          lastKnownServerRev: doc.rev || existing?.lastKnownServerRev || 0,
+          status: 'conflict',
+        });
+        syncStore.addConflict(
+          this.buildConflict(doc.fileId, doc, decoded, pendingDecision.localState.content),
+        );
+        return { conflict: true };
+      }
+      syncStore.dropMutationsForFile(doc.fileId);
     }
 
     if (myPath) {
-      const openTab = useEditorStore.getState().tabs.find((tab) => tab.path === myPath);
-      if (openTab?.modified && !force) {
+      const openTab = editorStore.getTabByPath?.(myPath)
+        || editorStore.tabs.find((tab) => tab.path === myPath);
+      const localDecision = this.getRemoteConflictDecision(doc.fileId, decoded, myPath, { force });
+      if (localDecision.shouldConflict) {
         syncStore.upsertDoc(doc.fileId, {
           localPath: myPath,
           name: doc.fileName || basename(myPath),
@@ -387,9 +585,17 @@ class SyncEngine {
           status: 'conflict',
           deleted: false,
         });
-        syncStore.addConflict(this.buildConflict(doc.fileId, doc, decoded));
+        syncStore.addConflict(
+          this.buildConflict(
+            doc.fileId,
+            doc,
+            decoded,
+            localDecision.localState.content || openTab?.content || '',
+          ),
+        );
         return { conflict: true };
       }
+
       try {
         const result = await saveFile(myPath, decoded, doc.encoding || 'UTF-8');
         if (result?.success !== false) {
@@ -405,7 +611,7 @@ class SyncEngine {
             status: 'synced',
             deleted: false,
           });
-          useEditorStore.getState().replaceTabContentByPath(myPath, {
+          editorStore.replaceTabContentByPath(myPath, {
             name: doc.fileName || basename(myPath),
             content: decoded,
             encoding: doc.encoding || 'UTF-8',
@@ -417,6 +623,23 @@ class SyncEngine {
       } catch {
         // fall through to external representation below
       }
+    }
+
+    const externalDecision = this.getRemoteConflictDecision(doc.fileId, decoded, myPath, { force });
+    if (externalDecision.shouldConflict) {
+      syncStore.upsertDoc(doc.fileId, {
+        name: doc.fileName || externalDecision.localState.tab?.name || doc.fileId,
+        ext: extOf(doc.fileName || externalDecision.localState.tab?.name || ''),
+        rev: doc.rev || 0,
+        lastKnownServerRev: doc.rev || 0,
+        checksum: doc.contentHash || doc.checksum || '',
+        status: 'conflict',
+        deleted: false,
+      });
+      syncStore.addConflict(
+        this.buildConflict(doc.fileId, doc, decoded, externalDecision.localState.content || ''),
+      );
+      return { conflict: true };
     }
 
     syncStore.upsertDoc(doc.fileId, {
@@ -440,6 +663,13 @@ class SyncEngine {
       content: decoded,
       checksum: doc.contentHash || doc.checksum || '',
       rev: doc.rev || 0,
+    });
+    editorStore.replaceTabContentByExternalFileId?.(doc.fileId, {
+      name: doc.fileName || basename(doc.originalPath || '') || doc.fileId,
+      ext: extOf(doc.fileName || doc.originalPath || ''),
+      content: decoded,
+      encoding: doc.encoding || 'UTF-8',
+      lineEnding: doc.lineEnding || 'LF',
     });
     return { writtenPath: null, external: true };
   }
@@ -467,6 +697,11 @@ class SyncEngine {
       encoding,
     });
     useExternalDocsStore.getState().remove(fileId);
+    
+    if (!useFileStore.getState().isBookmarked(localPath)) {
+      useFileStore.getState().toggleBookmark(localPath);
+    }
+    
     return this.queueLocalUpsert(localPath, content, encoding, {
       name: basename(localPath),
       source: 'claim',
@@ -474,7 +709,7 @@ class SyncEngine {
   }
 
   async syncSettings() {
-    await apiClient.put('/sync/config', buildConfigPayload());
+    await this.syncConfig();
   }
 
   async processMutation(item) {
@@ -486,7 +721,7 @@ class SyncEngine {
           `/sync/file/${encodeURIComponent(item.fileId)}`,
           {
             ...item.payload,
-            baseRev: item.baseRev,
+            baseRev: Math.max(doc?.lastKnownServerRev || 0, item.baseRev || 0),
             mutationId: item.mutationId,
           },
         );
@@ -503,6 +738,18 @@ class SyncEngine {
           deleted: false,
           lastError: null,
         });
+        if (!(item.payload.devicePath || doc?.localPath)) {
+          useExternalDocsStore.getState().put(item.fileId, {
+            name: item.payload.fileName || doc?.name || item.fileId,
+            ext: doc?.ext || extOf(item.payload.fileName || ''),
+            encoding: item.payload.encoding || doc?.encoding || 'UTF-8',
+            lineEnding: item.payload.lineEnding || doc?.lineEnding || 'LF',
+            originalPath: item.payload.originalPath || '',
+            content: item.payload.rawContent || '',
+            checksum: data.contentHash || data.checksum || item.payload.checksum,
+            rev: data.rev || (doc?.rev || 0),
+          });
+        }
         syncStore.completeMutation(item.mutationId);
         return true;
       }
@@ -552,6 +799,15 @@ class SyncEngine {
           remoteDoc = data || current;
         }
         const remoteContent = remoteDoc?.deleted ? '' : decodeBody(remoteDoc || {});
+        const localPath = item.payload?.devicePath || doc?.localPath || '';
+        const decision = this.getRemoteConflictDecision(item.fileId, remoteContent, localPath);
+        useSyncStore.getState().completeMutation(item.mutationId);
+        if (!decision.shouldConflict) {
+          if (remoteDoc) {
+            await this.applyRemoteDoc(remoteDoc, { force: true });
+          }
+          return true;
+        }
         useSyncStore.getState().upsertDoc(item.fileId, {
           status: 'conflict',
           rev: remoteDoc?.rev || doc?.rev || 0,
@@ -559,9 +815,13 @@ class SyncEngine {
           deleted: !!remoteDoc?.deleted,
         });
         useSyncStore.getState().addConflict(
-          this.buildConflict(item.fileId, remoteDoc || current || {}, remoteContent),
+          this.buildConflict(
+            item.fileId,
+            remoteDoc || current || {},
+            remoteContent,
+            decision.localState.content,
+          ),
         );
-        useSyncStore.getState().completeMutation(item.mutationId);
         this.setStatus('conflict');
         return true;
       }
@@ -596,7 +856,7 @@ class SyncEngine {
 
   async pullRemoteChanges() {
     const syncStore = useSyncStore.getState();
-    const cursor = syncStore.cursor;
+    const cursor = syncStore.getCursor();
     const { data } = await apiClient.get('/sync/changes', {
       params: cursor ? { since: cursor } : {},
     });
@@ -648,7 +908,7 @@ class SyncEngine {
   }
 
   async resolveConflict(fileId, resolution) {
-    const conflict = useSyncStore.getState().conflicts.find((item) => item.fileId === fileId);
+    const conflict = useSyncStore.getState().listConflicts().find((item) => item.fileId === fileId);
     if (!conflict) return;
     useSyncStore.getState().resolveConflict(fileId);
     if (resolution === 'remote') {
@@ -665,16 +925,35 @@ class SyncEngine {
         });
       }
     }
-    const remainingConflicts = useSyncStore.getState().conflicts.length;
-    if (remainingConflicts === 0 && !useSyncStore.getState().queue.length) {
+    const remainingConflicts = useSyncStore.getState().listConflicts().length;
+    if (remainingConflicts === 0 && !useSyncStore.getState().listQueue().length) {
       this.setStatus('synced');
     }
   }
 
-  async syncConfig() {
+  async syncConfig(options = {}) {
     try {
-      await this.ensureRemoteProtocol();
-      await apiClient.put('/sync/config', buildConfigPayload());
+      const remoteConfig = await this.ensureRemoteProtocol();
+      const remoteUpdatedAt = Number(remoteConfig?.updatedAt || 0);
+      const localUpdatedAt = this.getLocalConfigUpdatedAt();
+
+      if (options.preferRemote) {
+        this.applyRemoteConfig(remoteConfig);
+        return remoteConfig;
+      }
+
+      if (remoteUpdatedAt > localUpdatedAt) {
+        this.applyRemoteConfig(remoteConfig);
+        return remoteConfig;
+      }
+
+      if (localUpdatedAt > remoteUpdatedAt || remoteUpdatedAt === 0) {
+        const payload = buildConfigPayload();
+        await apiClient.put('/sync/config', payload);
+        return payload;
+      }
+
+      return remoteConfig;
     } catch (err) {
       const kind = classifyApiError(err);
       useSyncStore.getState().setLastSyncError({
@@ -682,6 +961,7 @@ class SyncEngine {
         message: err?.response?.data?.message || err?.message || 'config sync failed',
       });
       this.setStatus(kind === 'server_unreachable' ? 'server_unreachable' : kind);
+      throw err;
     }
   }
 
@@ -701,9 +981,9 @@ class SyncEngine {
         await this.pullRemoteChanges();
         await this.syncConfig();
       }
-      if (useSyncStore.getState().conflicts.length > 0) {
+      if (useSyncStore.getState().listConflicts().length > 0) {
         this.setStatus('conflict');
-      } else if (useSyncStore.getState().queue.length > 0) {
+      } else if (useSyncStore.getState().listQueue().length > 0) {
         this.scheduleRetry();
         this.setStatus('idle');
       } else {

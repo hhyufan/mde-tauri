@@ -5,16 +5,23 @@ const useThemeStore = create(
   persist(
     (set, get) => ({
       theme: 'light',
+      themeUpdatedAt: 0,
 
-      setTheme: (theme) => {
+      setTheme: (theme, meta = {}) => {
         document.documentElement.dataset.theme = theme;
-        set({ theme });
+        set({
+          theme,
+          themeUpdatedAt: meta.updatedAt ?? Date.now(),
+        });
       },
 
       toggleTheme: () => {
         const next = get().theme === 'dark' ? 'light' : 'dark';
         document.documentElement.dataset.theme = next;
-        set({ theme: next });
+        set({
+          theme: next,
+          themeUpdatedAt: Date.now(),
+        });
       },
 
       initTheme: () => {
@@ -23,7 +30,10 @@ const useThemeStore = create(
         const savedTheme = persisted ? JSON.parse(persisted)?.state?.theme : null;
         const initial = savedTheme || (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
         document.documentElement.dataset.theme = initial;
-        set({ theme: initial });
+        set((state) => ({
+          theme: initial,
+          themeUpdatedAt: state.themeUpdatedAt || 0,
+        }));
       },
     }),
     {

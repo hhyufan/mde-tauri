@@ -34,6 +34,16 @@ ensureDnsServers();
  * handler (`api/index.ts`).
  */
 export function setupApp(app: INestApplication): void {
+  app.use((req, res, next) => {
+    if (req.path.startsWith('/sync')) {
+      res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+      res.setHeader('Pragma', 'no-cache');
+      res.setHeader('Expires', '0');
+      res.setHeader('Surrogate-Control', 'no-store');
+    }
+    next();
+  });
+
   app.enableCors({
     origin: true,
     credentials: true,

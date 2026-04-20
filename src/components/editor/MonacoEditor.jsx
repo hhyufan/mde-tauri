@@ -4,49 +4,21 @@ import '@/monaco-worker';
 import useEditorStore from '@store/useEditorStore';
 import useConfigStore from '@store/useConfigStore';
 import { getFileLanguage } from '@utils/fileLanguage';
+import { initMonacoShiki, isMonacoShikiReady, getMonacoThemeName } from '@utils/monacoShiki';
 import { setBuffer, getBuffer, hasBuffer } from '@utils/editorBuffer';
 import './monaco-editor.scss';
-
-const SHIKI_LANGS = [
-  'markdown', 'javascript', 'typescript', 'json', 'html', 'css', 'scss',
-  'python', 'java', 'c', 'cpp', 'csharp', 'go', 'rust', 'ruby', 'php',
-  'shell', 'yaml', 'xml', 'sql', 'lua', 'kotlin', 'swift', 'vue', 'svelte',
-  'toml', 'powershell', 'ini',
-];
-
-let shikiReady = false;
-let shikiInitPromise = null;
-
-async function initShiki() {
-  if (shikiReady) return;
-  if (shikiInitPromise) return shikiInitPromise;
-  shikiInitPromise = (async () => {
-    try {
-      const { createHighlighter } = await import('shiki');
-      const { shikiToMonaco } = await import('@shikijs/monaco');
-      const highlighter = await createHighlighter({
-        themes: ['one-dark-pro', 'one-light'],
-        langs: SHIKI_LANGS,
-      });
-      shikiToMonaco(highlighter, monaco);
-      shikiReady = true;
-    } catch (err) {
-      // eslint-disable-next-line no-console
-      console.warn('Shiki initialization failed, falling back to built-in themes:', err);
-    }
-  })();
-  return shikiInitPromise;
-}
 
 const MonacoEditorComponent = forwardRef(function MonacoEditorComponent({ className, onAutoSave }, ref) {
   const containerRef = useRef(null);
   const editorRef = useRef(null);
   const currentTabIdRef = useRef(null);
+  const suppressModelChangeRef = useRef(false);
 
   // The editor only needs to know which tab is active; it never
   // subscribes to content. Typing therefore can never cause this
   // component (or any other content-aware component) to re-render.
   const activeTabId = useEditorStore((s) => s.activeTabId);
+  const tabsRevision = useEditorStore((s) => s.tabsRevision);
   const markTabDirty = useEditorStore((s) => s.markTabDirty);
   const setCursorPosition = useEditorStore((s) => s.setCursorPosition);
   const setCharacterCount = useEditorStore((s) => s.setCharacterCount);
@@ -61,7 +33,7 @@ const MonacoEditorComponent = forwardRef(function MonacoEditorComponent({ classN
 
   const fontFamily = `'${fontFamilyBase}', 'Fira Code', Consolas, monospace`;
 
-  const [highlighterReady, setHighlighterReady] = useState(shikiReady);
+  const [highlighterReady, setHighlighterReady] = useState(isMonacoShikiReady());
 
   useImperativeHandle(ref, () => ({
     getEditor: () => editorRef.current,
@@ -108,12 +80,7 @@ const MonacoEditorComponent = forwardRef(function MonacoEditorComponent({ classN
     if (!containerRef.current) return;
 
     const isDark = document.documentElement.dataset.theme === 'dark';
-    let initialTheme;
-    if (shikiReady) {
-      initialTheme = isDark ? 'one-dark-pro' : 'one-light';
-    } else {
-      initialTheme = isDark ? 'vs-dark' : 'vs';
-    }
+    const initialTheme = getMonacoThemeName(isDark);
 
     const editor = monaco.editor.create(containerRef.current, {
       value: '',
@@ -185,6 +152,7 @@ const MonacoEditorComponent = forwardRef(function MonacoEditorComponent({ classN
     };
 
     editor.onDidChangeModelContent(() => {
+      if (suppressModelChangeRef.current) return;
       const tabId = currentTabIdRef.current;
       if (!tabId) return;
       const value = editor.getValue();
@@ -205,12 +173,12 @@ const MonacoEditorComponent = forwardRef(function MonacoEditorComponent({ classN
       });
     });
 
-    initShiki().then(() => {
+    initMonacoShiki().then(() => {
       if (editorRef.current) {
         setHighlighterReady(true);
         const dark = document.documentElement.dataset.theme === 'dark';
         try {
-          monaco.editor.setTheme(dark ? 'one-dark-pro' : 'one-light');
+          monaco.editor.setTheme(getMonacoThemeName(dark));
         } catch (_) {
           monaco.editor.setTheme(dark ? 'vs-dark' : 'vs');
         }
@@ -276,13 +244,16 @@ const MonacoEditorComponent = forwardRef(function MonacoEditorComponent({ classN
   useEffect(() => {
     const editor = editorRef.current;
     if (!editor) return;
-    if (!activeTabId) {
+    const tab = activeTabId
+      ? useEditorStore.getState().tabs.find((t) => t.id === activeTabId) || null
+      : null;
+    if (!activeTabId || !tab) {
       currentTabIdRef.current = null;
+      suppressModelChangeRef.current = true;
       editor.setValue('');
+      suppressModelChangeRef.current = false;
       return;
     }
-    const tab = useEditorStore.getState().tabs.find((t) => t.id === activeTabId);
-    if (!tab) return;
 
     currentTabIdRef.current = activeTabId;
     const newValue = hasBuffer(activeTabId)
@@ -291,7 +262,9 @@ const MonacoEditorComponent = forwardRef(function MonacoEditorComponent({ classN
 
     if (editor.getValue() !== newValue) {
       const pos = editor.getPosition();
+      suppressModelChangeRef.current = true;
       editor.setValue(newValue);
+      suppressModelChangeRef.current = false;
       if (pos) editor.setPosition(pos);
     }
 
@@ -300,7 +273,7 @@ const MonacoEditorComponent = forwardRef(function MonacoEditorComponent({ classN
     if (model) monaco.editor.setModelLanguage(model, lang);
 
     setCharacterCount(newValue.length);
-  }, [activeTabId, setCharacterCount]);
+  }, [activeTabId, tabsRevision, setCharacterCount]);
 
   // Theme switching with Shiki themes
   useEffect(() => {
@@ -308,7 +281,7 @@ const MonacoEditorComponent = forwardRef(function MonacoEditorComponent({ classN
       const isDark = document.documentElement.dataset.theme === 'dark';
       if (highlighterReady) {
         try {
-          monaco.editor.setTheme(isDark ? 'one-dark-pro' : 'one-light');
+          monaco.editor.setTheme(getMonacoThemeName(isDark));
         } catch (_) {
           monaco.editor.setTheme(isDark ? 'vs-dark' : 'vs');
         }

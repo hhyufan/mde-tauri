@@ -30,10 +30,15 @@ const useEditorStore = create(
       tabs: [],
       tabRenderList: [],
       activeTabId: null,
+      // Increments whenever we programmatically replace a tab's content.
+      // MonacoEditor subscribes to this to refresh the model without
+      // subscribing to content objects (avoids React getSnapshot warnings).
+      tabsRevision: 0,
       sidebarVisible: true,
       sidebarView: 'explorer',
       viewMode: 'edit',
       toolbarVisible: false,
+      uiStateUpdatedAt: 0,
       cursorPosition: { lineNumber: 1, column: 1 },
       characterCount: 0,
 
@@ -183,6 +188,11 @@ const useEditorStore = create(
         const tab = get().tabRenderList.find((t) => t.id === tabId);
         if (!tab || tab.modified === modified) return;
         set((state) => ({
+          // `syncEngine` 读取 `tabs`，UI 渲染依赖 `tabRenderList`，
+          // 两处都要同步 modified，避免冲突检测读到过期脏状态。
+          tabs: state.tabs.map((t) =>
+            t.id === tabId ? { ...t, modified } : t
+          ),
           tabRenderList: state.tabRenderList.map((t) =>
             t.id === tabId ? { ...t, modified } : t
           ),
@@ -215,6 +225,7 @@ const useEditorStore = create(
                 }
               : t
           ),
+          tabsRevision: state.tabsRevision + 1,
         }));
       },
 
@@ -241,6 +252,35 @@ const useEditorStore = create(
                 }
               : t
           ),
+          tabsRevision: state.tabsRevision + 1,
+        }));
+      },
+
+      replaceTabContentByExternalFileId: (externalFileId, patch) => {
+        if (!externalFileId) return;
+        const tab = get().tabs.find((t) => t.externalFileId === externalFileId);
+        if (tab && patch && typeof patch.content === 'string') {
+          setBuffer(tab.id, patch.content);
+        }
+        set((state) => ({
+          tabs: state.tabs.map((t) =>
+            t.externalFileId === externalFileId
+              ? {
+                  ...t,
+                  ...patch,
+                  modified: false,
+                }
+              : t
+          ),
+          tabRenderList: state.tabRenderList.map((t) =>
+            t.externalFileId === externalFileId
+              ? {
+                  ...t,
+                  ...toTabMeta({ ...t, ...patch, modified: false }),
+                }
+              : t
+          ),
+          tabsRevision: state.tabsRevision + 1,
         }));
       },
 
@@ -282,22 +322,83 @@ const useEditorStore = create(
         };
       },
 
-      toggleSidebar: () => set((s) => ({ sidebarVisible: !s.sidebarVisible })),
-      setSidebarView: (view) => set({ sidebarView: view }),
+      getTabByPath: (path) => {
+        if (!path) return null;
+        const tab = get().tabs.find((t) => t.path === path) || null;
+        if (!tab) return null;
+        const meta = get().tabRenderList.find((t) => t.id === tab.id || t.path === path);
+        // 优先读取实时编辑缓冲区，避免使用落后于编辑器的持久化内容。
+        const buffered = hasBuffer(tab.id) ? getBuffer(tab.id, tab.content) : tab.content;
+        return {
+          ...tab,
+          content: buffered,
+          modified: meta?.modified ?? tab.modified,
+        };
+      },
 
-      setViewMode: (mode) => set({ viewMode: mode }),
+      getTabByExternalFileId: (externalFileId) => {
+        if (!externalFileId) return null;
+        const tab = get().tabs.find((t) => t.externalFileId === externalFileId) || null;
+        if (!tab) return null;
+        const meta = get().tabRenderList.find((t) => t.id === tab.id);
+        const buffered = hasBuffer(tab.id) ? getBuffer(tab.id, tab.content) : tab.content;
+        return {
+          ...tab,
+          content: buffered,
+          modified: meta?.modified ?? tab.modified,
+        };
+      },
+
+      toggleSidebar: () => set((s) => ({
+        sidebarVisible: !s.sidebarVisible,
+        uiStateUpdatedAt: Date.now(),
+      })),
+      setSidebarVisible: (visible, meta = {}) => set({
+        sidebarVisible: visible,
+        uiStateUpdatedAt: meta.updatedAt ?? Date.now(),
+      }),
+      setSidebarView: (view, meta = {}) => set({
+        sidebarView: view,
+        uiStateUpdatedAt: meta.updatedAt ?? Date.now(),
+      }),
+
+      setViewMode: (mode, meta = {}) => set({
+        viewMode: mode,
+        uiStateUpdatedAt: meta.updatedAt ?? Date.now(),
+      }),
       toggleEditPreview: () =>
         set((s) => {
           if (s.viewMode === 'split') return {};
-          return { viewMode: s.viewMode === 'edit' ? 'preview' : 'edit' };
+          return {
+            viewMode: s.viewMode === 'edit' ? 'preview' : 'edit',
+            uiStateUpdatedAt: Date.now(),
+          };
         }),
       toggleSplit: () =>
         set((s) => ({
           viewMode: s.viewMode === 'split' ? 'edit' : 'split',
+          uiStateUpdatedAt: Date.now(),
         })),
 
-      toggleToolbar: () => set((s) => ({ toolbarVisible: !s.toolbarVisible })),
-      setToolbarVisible: (v) => set({ toolbarVisible: v }),
+      toggleToolbar: () => set((s) => ({
+        toolbarVisible: !s.toolbarVisible,
+        uiStateUpdatedAt: Date.now(),
+      })),
+      setToolbarVisible: (v, meta = {}) => set({
+        toolbarVisible: v,
+        uiStateUpdatedAt: meta.updatedAt ?? Date.now(),
+      }),
+      applySyncedUiState: (uiState = {}, meta = {}) => set((state) => ({
+        sidebarVisible: typeof uiState.sidebarVisible === 'boolean'
+          ? uiState.sidebarVisible
+          : state.sidebarVisible,
+        sidebarView: uiState.sidebarView || state.sidebarView,
+        viewMode: uiState.viewMode || state.viewMode,
+        toolbarVisible: typeof uiState.toolbarVisible === 'boolean'
+          ? uiState.toolbarVisible
+          : state.toolbarVisible,
+        uiStateUpdatedAt: meta.updatedAt ?? state.uiStateUpdatedAt ?? Date.now(),
+      })),
     }),
     {
       name: 'mde-editor',
@@ -306,6 +407,7 @@ const useEditorStore = create(
         sidebarView: state.sidebarView,
         viewMode: state.viewMode,
         toolbarVisible: state.toolbarVisible,
+        uiStateUpdatedAt: state.uiStateUpdatedAt,
       }),
     }
   )

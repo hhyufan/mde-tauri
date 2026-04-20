@@ -1,89 +1,225 @@
 .conflict-overlay {
   position: fixed;
   inset: 0;
-  background: rgba(0, 0, 0, 0.45);
+  background: rgba(22, 24, 29, 0.36);
   backdrop-filter: blur(8px);
   display: flex;
   align-items: center;
   justify-content: center;
   z-index: 1100;
+  padding: 24px;
 }
 
 .conflict-dialog {
-  width: 680px;
-  max-width: 90vw;
-  max-height: 80vh;
+  width: min(1180px, 94vw);
+  max-height: min(86vh, 860px);
   background: var(--surface);
+  border: 1px solid var(--border-light);
   border-radius: var(--radius);
   box-shadow: var(--shadow-lg);
-  padding: 24px;
-  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
 
   h2 {
-    font-size: 16px;
+    margin: 0;
+    font-size: 18px;
     font-weight: 600;
-    color: var(--warning);
-    margin-bottom: 8px;
+    color: var(--text);
   }
+}
+
+.conflict-dialog__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--border);
+}
+
+.conflict-dialog__title-wrap {
+  min-width: 0;
+}
+
+.conflict-dialog__eyebrow {
+  display: inline-flex;
+  align-items: center;
+  height: 22px;
+  padding: 0 9px;
+  margin-bottom: 8px;
+  border-radius: 999px;
+  background: var(--accent-bg);
+  color: var(--accent);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
 }
 
 .conflict-dialog__path {
   font-family: var(--font-editor);
   font-size: 12px;
   color: var(--text-sec);
-  margin-bottom: 16px;
+  margin: 8px 0 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
-.conflict-dialog__panels {
+.conflict-dialog__header-right {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.conflict-dialog__hint {
+  flex: 0 0 auto;
+  padding: 7px 10px;
+  border: 1px solid var(--border-light);
+  border-radius: 999px;
+  background: var(--bg);
+  color: var(--text-sec);
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.conflict-dialog__diff {
+  margin: 16px 20px 18px;
+  border: 1px solid var(--border-light);
+  border-radius: 8px;
+  overflow: hidden;
+  background: linear-gradient(180deg, color-mix(in srgb, var(--surface) 96%, var(--accent-light)) 0%, var(--surface) 100%);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.28);
+}
+
+.conflict-dialog__diff-shell {
+  width: 100%;
+}
+
+.conflict-dialog__pane-labels {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 12px;
-  margin-bottom: 20px;
+  border-bottom: 1px solid var(--border-light);
+  background: color-mix(in srgb, var(--surface) 94%, var(--bg));
+  width: 100%;
 }
 
-.conflict-dialog__panel {
-  h3 {
-    font-size: 12px;
-    font-weight: 600;
-    color: var(--text-sec);
-    margin-bottom: 8px;
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
+.conflict-dialog__pane-label {
+  display: flex;
+  align-items: center;
+  min-height: 34px;
+  padding: 0 12px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-sec);
+  min-width: 0;
+}
+
+.conflict-dialog__pane-label--local {
+  border-right: 1px solid var(--border-light);
+}
+
+.conflict-dialog__pane-label--remote {
+  justify-content: flex-start;
+}
+
+.conflict-dialog__monaco {
+  height: min(56vh, 620px);
+  min-height: 320px;
+}
+
+.conflict-dialog__diff {
+  .monaco-diff-editor {
+    background: transparent !important;
   }
 
-  pre {
-    background: var(--bg);
-    border: 1px solid var(--border-light);
-    border-radius: var(--radius-sm);
-    padding: 12px;
-    font-family: var(--font-editor);
-    font-size: 12px;
-    line-height: 1.5;
-    max-height: 300px;
-    overflow-y: auto;
-    white-space: pre-wrap;
-    word-break: break-all;
+  .monaco-diff-editor,
+  .monaco-editor,
+  .overflow-guard {
+    border-radius: inherit;
+  }
+
+  .monaco-diff-editor .editor.original,
+  .monaco-diff-editor .editor.modified,
+  .monaco-editor-background,
+  .margin,
+  .monaco-scrollable-element {
+    background: var(--surface) !important;
+  }
+
+  .monaco-editor .margin,
+  .monaco-diff-editor .margin {
+    background: color-mix(in srgb, var(--surface) 94%, var(--bg));
+  }
+
+  .monaco-editor,
+  .monaco-diff-editor,
+  .monaco-diff-editor * {
+    outline: none !important;
+    box-shadow: none !important;
+  }
+
+  .monaco-diff-editor .synthetic-focus,
+  .monaco-diff-editor .focused,
+  .monaco-diff-editor [tabindex='0']:focus,
+  .monaco-diff-editor [tabindex='-1']:focus {
+    outline: none !important;
+    box-shadow: none !important;
+  }
+
+  .monaco-diff-editor .diagonal-fill {
+    background: color-mix(in srgb, var(--surface) 92%, var(--bg)) !important;
+  }
+
+  .monaco-diff-editor .gutter {
+    background: color-mix(in srgb, var(--surface) 96%, var(--bg)) !important;
+  }
+
+  .monaco-editor .line-numbers {
+    opacity: 0.72;
+  }
+
+  .monaco-editor .cldr.codicon-toolbar-more,
+  .monaco-editor .codicon-folding-expanded,
+  .monaco-editor .codicon-folding-collapsed {
+    opacity: 0.8;
+  }
+
+  .monaco-diff-editor .editor.modified {
+    border-left: 1px solid var(--border-light);
+  }
+
+  .monaco-diff-editor .editor.original .line-delete,
+  .monaco-diff-editor .editor.original .char-delete,
+  .monaco-diff-editor .editor.modified .line-insert,
+  .monaco-diff-editor .editor.modified .char-insert {
+    border-radius: 3px;
   }
 }
 
 .conflict-dialog__actions {
   display: flex;
-  gap: 8px;
+  gap: 10px;
   justify-content: flex-end;
+  padding: 0 20px 18px;
 }
 
 .conflict-dialog__btn {
-  padding: 8px 20px;
+  min-width: 132px;
+  padding: 9px 18px;
   border: 1px solid var(--border);
-  background: var(--bg);
+  background: color-mix(in srgb, var(--bg) 84%, transparent);
   color: var(--text);
   border-radius: var(--radius-sm);
   cursor: pointer;
   font-size: 13px;
+  font-weight: 600;
   font-family: var(--font-app);
-  transition: all 0.15s;
+  transition: all 0.18s ease;
 
   &:hover {
+    transform: translateY(-1px);
     background: var(--hover);
   }
 
@@ -93,7 +229,112 @@
     color: #fff;
 
     &:hover {
-      opacity: 0.9;
+      background: color-mix(in srgb, var(--accent) 90%, #000 10%);
+      border-color: color-mix(in srgb, var(--accent) 88%, #000 12%);
+      color: #fff;
+      opacity: 1;
     }
+
+    &:active {
+      background: color-mix(in srgb, var(--accent) 84%, #000 16%);
+      border-color: color-mix(in srgb, var(--accent) 82%, #000 18%);
+      color: #fff;
+    }
+  }
+}
+
+html[data-theme='dark'] {
+  .conflict-overlay {
+    background: rgba(5, 8, 12, 0.48);
+  }
+
+  .conflict-dialog {
+    border-color: var(--border);
+  }
+
+  .conflict-dialog__hint {
+    background: color-mix(in srgb, var(--surface) 88%, var(--bg));
+    border-color: var(--border);
+  }
+
+  .conflict-dialog__diff {
+    border-color: var(--border);
+    background: linear-gradient(180deg, color-mix(in srgb, var(--surface) 94%, #0b1220) 0%, var(--surface) 100%);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.03);
+  }
+
+  .conflict-dialog__pane-labels {
+    border-bottom-color: var(--border);
+    background: color-mix(in srgb, var(--surface) 92%, var(--bg));
+  }
+
+  .conflict-dialog__pane-label--local {
+    border-right-color: var(--border);
+  }
+
+  .conflict-dialog__diff {
+    .monaco-diff-editor .editor.original,
+    .monaco-diff-editor .editor.modified,
+    .monaco-editor-background,
+    .margin,
+    .monaco-scrollable-element {
+      background: var(--surface) !important;
+    }
+
+    .monaco-editor .margin,
+    .monaco-diff-editor .margin,
+    .monaco-diff-editor .gutter,
+    .monaco-diff-editor .diagonal-fill {
+      background: color-mix(in srgb, var(--surface) 92%, var(--bg)) !important;
+    }
+  }
+
+  .conflict-dialog__btn--primary {
+    &:hover {
+      background: color-mix(in srgb, var(--accent) 90%, #fff 10%);
+      border-color: color-mix(in srgb, var(--accent) 88%, #fff 12%);
+      color: #fff;
+    }
+
+    &:active {
+      background: color-mix(in srgb, var(--accent) 84%, #fff 16%);
+      border-color: color-mix(in srgb, var(--accent) 82%, #fff 18%);
+      color: #fff;
+    }
+  }
+}
+
+@media (max-width: 900px) {
+  .conflict-dialog {
+    width: min(96vw, 1180px);
+  }
+
+  .conflict-dialog__header {
+    flex-direction: column;
+    align-items: stretch;
+    padding: 14px 16px;
+  }
+
+  .conflict-dialog__header-right {
+    width: 100%;
+    justify-content: space-between;
+  }
+
+  .conflict-dialog__hint {
+    flex: 1 1 auto;
+    justify-content: center;
+  }
+
+  .conflict-dialog__actions {
+    justify-content: stretch;
+    padding: 0 16px 16px;
+  }
+
+  .conflict-dialog__btn {
+    flex: 1 1 0;
+  }
+
+  .conflict-dialog__diff {
+    margin: 14px 16px 16px;
   }
 }

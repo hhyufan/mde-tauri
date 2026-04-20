@@ -51,6 +51,15 @@ apiClient.interceptors.request.use((config) => {
   if (token) {
     config.headers.Authorization = `Bearer ${token}`;
   }
+  if (
+    typeof config.url === 'string' &&
+    config.url.startsWith('/sync/') &&
+    String(config.method || 'get').toLowerCase() === 'get'
+  ) {
+    config.headers['Cache-Control'] = 'no-cache, no-store, max-age=0';
+    config.headers.Pragma = 'no-cache';
+    config.headers.Expires = '0';
+  }
   return config;
 });
 

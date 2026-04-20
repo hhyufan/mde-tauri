@@ -35,7 +35,7 @@ export function useFileManager() {
   }, []);
 
   const debouncedAutoSave = useMemo(
-    () => debounce(async (filePath, content, encoding) => {
+    () => debounce(async (filePath, content, encoding, meta = {}) => {
       if (!filePath) return;
       try {
         const result = await saveFile(filePath, content, encoding);
@@ -44,20 +44,63 @@ export function useFileManager() {
           if (tab && tab.path === filePath) {
             markTabSaved(tab.id);
           }
+          syncEngine.registerLocalDocument(filePath, {
+            name: meta.name || filePath.split(/[\\/]/).pop() || '',
+            ext: meta.ext || '',
+            encoding,
+            lineEnding: meta.lineEnding || 'LF',
+          });
+          await syncEngine.queueLocalUpsert(filePath, content, encoding, {
+            name: meta.name || filePath.split(/[\\/]/).pop() || '',
+            lineEnding: meta.lineEnding || 'LF',
+            source: 'auto-save',
+          });
         }
       } catch (_) { /* silent */ }
     }, 1000),
     []
   );
 
+  const debouncedExternalSync = useMemo(
+    () => debounce(async (tabId, fileId, content, encoding, meta = {}) => {
+      if (!fileId) return;
+      try {
+        const result = await syncEngine.queueExternalUpsert(fileId, content, encoding, {
+          name: meta.name || fileId,
+          lineEnding: meta.lineEnding || 'LF',
+          source: 'auto-sync-external',
+        });
+        if (result?.ok) {
+          const currentTab = useEditorStore.getState().tabs.find((item) => item.id === tabId);
+          if (currentTab?.externalFileId === fileId) {
+            markTabSaved(tabId);
+          }
+        }
+      } catch (_) { /* silent */ }
+    }, 1000),
+    [markTabSaved]
+  );
+
   const triggerAutoSave = useCallback(() => {
     const autoSave = useConfigStore.getState().autoSave;
     if (!autoSave) return;
     const tab = useEditorStore.getState().getActiveTab();
-    if (!tab || !tab.path) return;
+    if (!tab) return;
     const content = getBuffer(tab.id, tab.content);
-    debouncedAutoSave(tab.path, content, tab.encoding);
-  }, [debouncedAutoSave]);
+    if (!tab.path && tab.externalFileId) {
+      debouncedExternalSync(tab.id, tab.externalFileId, content, tab.encoding, {
+        name: tab.name,
+        lineEnding: tab.lineEnding,
+      });
+      return;
+    }
+    if (!tab.path) return;
+    debouncedAutoSave(tab.path, content, tab.encoding, {
+      name: tab.name,
+      ext: tab.ext,
+      lineEnding: tab.lineEnding,
+    });
+  }, [debouncedAutoSave, debouncedExternalSync]);
 
   const loadDirectory = useCallback(async (dirPath) => {
     try {
@@ -151,6 +194,21 @@ export function useFileManager() {
   const saveCurrentFile = useCallback(async () => {
     const tab = useEditorStore.getState().getActiveTab();
     if (!tab) return;
+
+    if (!tab.path && tab.externalFileId) {
+      try {
+        await syncEngine.queueExternalUpsert(tab.externalFileId, tab.content, tab.encoding, {
+          name: tab.name,
+          lineEnding: tab.lineEnding,
+          source: 'manual-save-external',
+        });
+        markTabSaved(tab.id);
+        notify('success', 'Synced', tab.name);
+      } catch (err) {
+        notify('error', 'Error', String(err));
+      }
+      return;
+    }
 
     if (!tab.path) {
       try {

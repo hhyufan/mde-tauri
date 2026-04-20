@@ -1,5 +1,14 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
+import { getCurrentUserScopeId } from './userScope';
+
+function scopePathKey(path) {
+  return `${getCurrentUserScopeId()}::path::${path}`;
+}
+
+function scopeFileIdKey(fileId) {
+  return `${getCurrentUserScopeId()}::file::${fileId}`;
+}
 
 /**
  * Stable mapping `originalPath -> fileId (UUID)`.
@@ -25,13 +34,14 @@ const useFileIdStore = create(
       getOrCreate: (path) => {
         if (!path) return null;
         const { pathToId } = get();
-        if (pathToId[path]) return pathToId[path];
+        const scopedPath = scopePathKey(path);
+        if (pathToId[scopedPath]) return pathToId[scopedPath];
         const id = (typeof crypto !== 'undefined' && crypto.randomUUID)
           ? crypto.randomUUID()
           : `id_${Date.now()}_${Math.random().toString(36).slice(2)}`;
         set((state) => ({
-          pathToId: { ...state.pathToId, [path]: id },
-          idToPath: { ...state.idToPath, [id]: path },
+          pathToId: { ...state.pathToId, [scopedPath]: id },
+          idToPath: { ...state.idToPath, [scopeFileIdKey(id)]: path },
         }));
         return id;
       },
@@ -40,8 +50,8 @@ const useFileIdStore = create(
       bind: (path, fileId) => {
         if (!path || !fileId) return;
         set((state) => ({
-          pathToId: { ...state.pathToId, [path]: fileId },
-          idToPath: { ...state.idToPath, [fileId]: path },
+          pathToId: { ...state.pathToId, [scopePathKey(path)]: fileId },
+          idToPath: { ...state.idToPath, [scopeFileIdKey(fileId)]: path },
         }));
       },
 
@@ -51,13 +61,14 @@ const useFileIdStore = create(
        */
       movePath: (oldPath, newPath) => {
         if (!oldPath || !newPath || oldPath === newPath) return;
-        const fileId = get().pathToId[oldPath];
+        const oldScopedPath = scopePathKey(oldPath);
+        const fileId = get().pathToId[oldScopedPath];
         if (!fileId) return;
         set((state) => {
           const nextPathToId = { ...state.pathToId };
-          const nextIdToPath = { ...state.idToPath, [fileId]: newPath };
-          delete nextPathToId[oldPath];
-          nextPathToId[newPath] = fileId;
+          const nextIdToPath = { ...state.idToPath, [scopeFileIdKey(fileId)]: newPath };
+          delete nextPathToId[oldScopedPath];
+          nextPathToId[scopePathKey(newPath)] = fileId;
           return {
             pathToId: nextPathToId,
             idToPath: nextIdToPath,
@@ -66,33 +77,48 @@ const useFileIdStore = create(
       },
 
       /** Lookup helpers. */
-      idOf: (path) => get().pathToId[path] || null,
-      pathOf: (fileId) => get().idToPath[fileId] || null,
+      idOf: (path) => get().pathToId[scopePathKey(path)] || null,
+      pathOf: (fileId) => get().idToPath[scopeFileIdKey(fileId)] || null,
 
       forget: (path) => {
-        const id = get().pathToId[path];
+        const scopedPath = scopePathKey(path);
+        const id = get().pathToId[scopedPath];
         if (!id) return;
         set((state) => {
           const np = { ...state.pathToId };
           const ni = { ...state.idToPath };
-          delete np[path];
-          delete ni[id];
+          delete np[scopedPath];
+          delete ni[scopeFileIdKey(id)];
           return { pathToId: np, idToPath: ni };
         });
       },
 
       unbindFileId: (fileId) => {
         if (!fileId) return;
-        const path = get().idToPath[fileId];
+        const scopedFileId = scopeFileIdKey(fileId);
+        const path = get().idToPath[scopedFileId];
         if (!path) return;
         set((state) => {
           const np = { ...state.pathToId };
           const ni = { ...state.idToPath };
-          delete np[path];
-          delete ni[fileId];
+          delete np[scopePathKey(path)];
+          delete ni[scopedFileId];
           return { pathToId: np, idToPath: ni };
         });
       },
+
+      resetCurrentUser: () =>
+        set((state) => {
+          const scopePrefix = `${getCurrentUserScopeId()}::`;
+          return {
+            pathToId: Object.fromEntries(
+              Object.entries(state.pathToId).filter(([key]) => !key.startsWith(scopePrefix))
+            ),
+            idToPath: Object.fromEntries(
+              Object.entries(state.idToPath).filter(([key]) => !key.startsWith(scopePrefix))
+            ),
+          };
+        }),
 
       reset: () => set({ pathToId: {}, idToPath: {} }),
     }),

@@ -102,14 +102,23 @@ export class SyncService implements OnModuleInit {
       theme: config.theme ?? 'light',
       language: config.language ?? 'en',
       fontSize: config.fontSize ?? 14,
+      fontFamily: config.fontFamily ?? 'JetBrains Mono',
+      lineHeight: config.lineHeight ?? 24,
       tabSize: config.tabSize ?? 2,
       wordWrap: config.wordWrap ?? true,
       lineNumbers: config.lineNumbers ?? true,
+      minimap: config.minimap ?? { enabled: false },
       autoSave: config.autoSave ?? true,
       workspacePath: config.workspacePath ?? '',
       editorState: config.editorState ?? {},
       protocolVersion:
         typeof config.protocolVersion === 'number' ? config.protocolVersion : 1,
+      updatedAt:
+        typeof config.updatedAt === 'number'
+          ? config.updatedAt
+          : typeof config.updatedAtMs === 'number'
+            ? config.updatedAtMs
+            : 0,
     };
   }
 
@@ -422,6 +431,7 @@ export class SyncService implements OnModuleInit {
       const created = await this.configModel.create({
         userId: this.userObjectId(userId),
         protocolVersion: 2,
+        updatedAtMs: 0,
       });
       config = created.toObject();
     }
@@ -436,7 +446,7 @@ export class SyncService implements OnModuleInit {
     });
     await this.configModel.updateOne(
       { userId: this.userObjectId(userId) },
-      { $set: sanitized },
+      { $set: { ...sanitized, updatedAtMs: sanitized.updatedAt } },
       { upsert: true },
     );
     return { updated: true };

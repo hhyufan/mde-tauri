@@ -1,7 +1,30 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
+import { getCurrentUserScopeId, isOwnedByUser } from './userScope';
 
 export const SYNC_PROTOCOL_VERSION = 2;
+
+function scopedDocKey(fileId) {
+  return `${getCurrentUserScopeId()}::${fileId}`;
+}
+
+function listOwnedDocs(docs) {
+  return Object.values(docs || {}).filter((doc) =>
+    isOwnedByUser(doc?.ownerUserId, getCurrentUserScopeId())
+  );
+}
+
+function listOwnedQueue(queue) {
+  return (queue || []).filter((item) =>
+    isOwnedByUser(item?.ownerUserId, getCurrentUserScopeId())
+  );
+}
+
+function listOwnedConflicts(conflicts) {
+  return (conflicts || []).filter((item) =>
+    isOwnedByUser(item?.ownerUserId, getCurrentUserScopeId())
+  );
+}
 
 function newMutationId() {
   if (typeof crypto !== 'undefined' && crypto.randomUUID) {
@@ -20,60 +43,95 @@ const useSyncStore = create(
     (set, get) => ({
       protocolVersion: SYNC_PROTOCOL_VERSION,
       localResetDone: false,
+      localResetDoneScopes: {},
       docs: {},
       queue: [],
       conflicts: [],
       cursor: '',
+      cursors: {},
       lastSyncError: null,
 
-      markLocalResetDone: () => set({ localResetDone: true }),
+      markLocalResetDone: () =>
+        set((state) => ({
+          localResetDone: true,
+          localResetDoneScopes: {
+            ...(state.localResetDoneScopes || {}),
+            [getCurrentUserScopeId()]: true,
+          },
+        })),
+      isLocalResetDone: () => !!get().localResetDoneScopes?.[getCurrentUserScopeId()],
 
       clearAllSyncState: () =>
         set({
           protocolVersion: SYNC_PROTOCOL_VERSION,
           localResetDone: false,
+          localResetDoneScopes: {},
           docs: {},
           queue: [],
           conflicts: [],
           cursor: '',
+          cursors: {},
           lastSyncError: null,
         }),
 
       resetDocumentsAndQueue: () =>
-        set({
-          docs: {},
-          queue: [],
-          conflicts: [],
-          cursor: '',
-          lastSyncError: null,
+        set((state) => {
+          const ownerUserId = getCurrentUserScopeId();
+          return {
+            docs: Object.fromEntries(
+              Object.entries(state.docs).filter(([, doc]) => !isOwnedByUser(doc?.ownerUserId, ownerUserId))
+            ),
+            queue: state.queue.filter((item) => !isOwnedByUser(item?.ownerUserId, ownerUserId)),
+            conflicts: state.conflicts.filter((item) => !isOwnedByUser(item?.ownerUserId, ownerUserId)),
+            cursor: '',
+            cursors: Object.fromEntries(
+              Object.entries(state.cursors || {}).filter(([key]) => key !== ownerUserId)
+            ),
+            lastSyncError: null,
+          };
         }),
 
-      setCursor: (cursor) => set({ cursor: cursor || '' }),
+      setCursor: (cursor) =>
+        set((state) => ({
+          cursor: cursor || '',
+          cursors: {
+            ...(state.cursors || {}),
+            [getCurrentUserScopeId()]: cursor || '',
+          },
+        })),
+      getCursor: () => {
+        const ownerUserId = getCurrentUserScopeId();
+        return get().cursors?.[ownerUserId] || (ownerUserId === 'guest' ? get().cursor || '' : '');
+      },
       setLastSyncError: (error) => set({ lastSyncError: error || null }),
 
-      getDoc: (fileId) => get().docs[fileId] || null,
+      getDoc: (fileId) => get().docs[scopedDocKey(fileId)] || null,
 
       findDocByPath: (localPath) => {
         if (!localPath) return null;
-        return Object.values(get().docs).find((doc) => doc.localPath === localPath) || null;
+        return listOwnedDocs(get().docs).find((doc) => doc.localPath === localPath) || null;
       },
 
-      listDocs: () => Object.values(get().docs),
+      listDocs: () => listOwnedDocs(get().docs),
 
       upsertDoc: (fileId, patch) => {
         if (!fileId) return;
+        const key = scopedDocKey(fileId);
         set((state) => ({
           docs: {
             ...state.docs,
-            [fileId]: {
-              ...(state.docs[fileId] || {
+            [key]: {
+              ...(state.docs[key] || {
                 fileId,
                 rev: 0,
                 lastKnownServerRev: 0,
                 deleted: false,
                 status: 'idle',
+                ownerUserId: getCurrentUserScopeId(),
               }),
               ...patch,
+              fileId,
+              ownerUserId: getCurrentUserScopeId(),
             },
           },
         }));
@@ -83,26 +141,30 @@ const useSyncStore = create(
         if (!fileId) return;
         set((state) => {
           const nextDocs = { ...state.docs };
-          delete nextDocs[fileId];
+          delete nextDocs[scopedDocKey(fileId)];
           return { docs: nextDocs };
         });
       },
 
       bindLocalPath: (fileId, localPath, patch = {}) => {
         if (!fileId || !localPath) return;
+        const key = scopedDocKey(fileId);
         set((state) => ({
           docs: {
             ...state.docs,
-            [fileId]: {
-              ...(state.docs[fileId] || {
+            [key]: {
+              ...(state.docs[key] || {
                 fileId,
                 rev: 0,
                 lastKnownServerRev: 0,
                 deleted: false,
+                ownerUserId: getCurrentUserScopeId(),
               }),
               ...patch,
               localPath,
               deleted: false,
+              fileId,
+              ownerUserId: getCurrentUserScopeId(),
             },
           },
         }));
@@ -110,7 +172,7 @@ const useSyncStore = create(
 
       moveLocalPath: (oldPath, newPath, patch = {}) => {
         if (!oldPath || !newPath || oldPath === newPath) return;
-        const fileId = Object.values(get().docs).find((doc) => doc.localPath === oldPath)?.fileId;
+        const fileId = listOwnedDocs(get().docs).find((doc) => doc.localPath === oldPath)?.fileId;
         if (!fileId) return;
         get().bindLocalPath(fileId, newPath, patch);
       },
@@ -127,14 +189,17 @@ const useSyncStore = create(
       clearDeletedWithoutPath: () => {
         set((state) => {
           const nextDocs = Object.fromEntries(
-            Object.entries(state.docs).filter(([, doc]) => !(doc.deleted && !doc.localPath)),
+            Object.entries(state.docs).filter(([, doc]) => {
+              if (!isOwnedByUser(doc?.ownerUserId, getCurrentUserScopeId())) return true;
+              return !(doc.deleted && !doc.localPath);
+            }),
           );
           return { docs: nextDocs };
         });
       },
 
       hasPendingMutation: (fileId) =>
-        get().queue.some(
+        listOwnedQueue(get().queue).some(
           (item) =>
             item.fileId === fileId && ['pending', 'processing'].includes(item.status),
         ),
@@ -143,13 +208,20 @@ const useSyncStore = create(
         if (!fileId || !type) return null;
         const id = mutationId || newMutationId();
         set((state) => {
+          const ownerUserId = getCurrentUserScopeId();
           let nextQueue = [...state.queue];
 
           if (type === 'delete') {
-            nextQueue = nextQueue.filter((item) => item.fileId !== fileId);
+            nextQueue = nextQueue.filter(
+              (item) => !(isOwnedByUser(item?.ownerUserId, ownerUserId) && item.fileId === fileId)
+            );
           } else if (dedupeKey) {
             nextQueue = nextQueue.filter(
-              (item) => !(item.fileId === fileId && item.dedupeKey === dedupeKey),
+              (item) => !(
+                isOwnedByUser(item?.ownerUserId, ownerUserId)
+                && item.fileId === fileId
+                && item.dedupeKey === dedupeKey
+              ),
             );
           }
 
@@ -164,6 +236,7 @@ const useSyncStore = create(
             nextRetryAt: Date.now(),
             status: 'pending',
             dedupeKey: dedupeKey || type,
+            ownerUserId,
           });
           return { queue: nextQueue };
         });
@@ -172,13 +245,13 @@ const useSyncStore = create(
 
       getReadyMutation: () => {
         const now = Date.now();
-        return get().queue
+        return listOwnedQueue(get().queue)
           .filter((item) => item.status === 'pending' && item.nextRetryAt <= now)
           .sort((a, b) => a.nextRetryAt - b.nextRetryAt)[0] || null;
       },
 
       getNextRetryAt: () => {
-        const times = get().queue
+        const times = listOwnedQueue(get().queue)
           .filter((item) => item.status === 'pending')
           .map((item) => item.nextRetryAt);
         if (times.length === 0) return null;
@@ -188,19 +261,30 @@ const useSyncStore = create(
       markMutationProcessing: (mutationId) =>
         set((state) => ({
           queue: state.queue.map((item) =>
-            item.mutationId === mutationId ? { ...item, status: 'processing' } : item
+            item.mutationId === mutationId
+              && isOwnedByUser(item?.ownerUserId, getCurrentUserScopeId())
+              ? { ...item, status: 'processing' }
+              : item
           ),
         })),
 
       completeMutation: (mutationId) =>
         set((state) => ({
-          queue: state.queue.filter((item) => item.mutationId !== mutationId),
+          queue: state.queue.filter((item) => !(
+            item.mutationId === mutationId
+            && isOwnedByUser(item?.ownerUserId, getCurrentUserScopeId())
+          )),
         })),
 
       failMutation: (mutationId, lastError) =>
         set((state) => ({
           queue: state.queue.map((item) => {
-            if (item.mutationId !== mutationId) return item;
+            if (
+              item.mutationId !== mutationId
+              || !isOwnedByUser(item?.ownerUserId, getCurrentUserScopeId())
+            ) {
+              return item;
+            }
             const retryCount = item.retryCount + 1;
             return {
               ...item,
@@ -214,20 +298,33 @@ const useSyncStore = create(
 
       dropMutationsForFile: (fileId) =>
         set((state) => ({
-          queue: state.queue.filter((item) => item.fileId !== fileId),
+          queue: state.queue.filter((item) => !(
+            item.fileId === fileId
+            && isOwnedByUser(item?.ownerUserId, getCurrentUserScopeId())
+          )),
         })),
 
       addConflict: (conflict) => {
         if (!conflict?.fileId) return;
+        const ownerUserId = getCurrentUserScopeId();
         set((state) => {
-          const existing = state.conflicts.filter((item) => item.fileId !== conflict.fileId);
-          return { conflicts: [...existing, conflict] };
+          const existing = state.conflicts.filter((item) => !(
+            item.fileId === conflict.fileId
+            && isOwnedByUser(item?.ownerUserId, ownerUserId)
+          ));
+          return { conflicts: [...existing, { ...conflict, ownerUserId }] };
         });
       },
 
+      listConflicts: () => listOwnedConflicts(get().conflicts),
+      listQueue: () => listOwnedQueue(get().queue),
+
       resolveConflict: (fileId) =>
         set((state) => ({
-          conflicts: state.conflicts.filter((item) => item.fileId !== fileId),
+          conflicts: state.conflicts.filter((item) => !(
+            item.fileId === fileId
+            && isOwnedByUser(item?.ownerUserId, getCurrentUserScopeId())
+          )),
         })),
     }),
     {
@@ -236,10 +333,12 @@ const useSyncStore = create(
       partialize: (state) => ({
         protocolVersion: state.protocolVersion,
         localResetDone: state.localResetDone,
+        localResetDoneScopes: state.localResetDoneScopes,
         docs: state.docs,
         queue: state.queue,
         conflicts: state.conflicts,
         cursor: state.cursor,
+        cursors: state.cursors,
       }),
     },
   ),

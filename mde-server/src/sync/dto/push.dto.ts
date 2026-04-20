@@ -114,6 +114,14 @@ export class UpdateConfigDto {
   fontSize?: number;
 
   @IsOptional()
+  @IsString()
+  fontFamily?: string;
+
+  @IsOptional()
+  @IsInt()
+  lineHeight?: number;
+
+  @IsOptional()
   @IsInt()
   tabSize?: number;
 
@@ -124,6 +132,10 @@ export class UpdateConfigDto {
   @IsOptional()
   @IsBoolean()
   lineNumbers?: boolean;
+
+  @IsOptional()
+  @IsObject()
+  minimap?: Record<string, any>;
 
   @IsOptional()
   @IsBoolean()
@@ -140,6 +152,10 @@ export class UpdateConfigDto {
   @IsOptional()
   @IsInt()
   protocolVersion?: number;
+
+  @IsOptional()
+  @IsInt()
+  updatedAt?: number;
 }
 
 export class PushDto {

@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useMemo } from 'react';
 import { showMainWindow } from '@utils/tauriApi';
 import useThemeStore from '@store/useThemeStore';
 import useEditorStore from '@store/useEditorStore';
@@ -17,6 +17,7 @@ import LoginModal from '@components/overlays/LoginModal';
 import ConflictDialog from '@components/overlays/ConflictDialog';
 import NotificationContainer from '@components/notification/NotificationContainer';
 import useSyncStore from '@store/useSyncStore';
+import { GUEST_USER_SCOPE, isOwnedByUser } from '@store/userScope';
 import '@styles/App.scss';
 
 function App() {
@@ -25,7 +26,12 @@ function App() {
   const toggleEditPreview = useEditorStore((s) => s.toggleEditPreview);
   const loadToken = useAuthStore((s) => s.loadToken);
   const isLoggedIn = useAuthStore((s) => s.isLoggedIn);
-  const conflicts = useSyncStore((s) => s.conflicts);
+  const userId = useAuthStore((s) => s.user?.id || GUEST_USER_SCOPE);
+  const conflictEntries = useSyncStore((s) => s.conflicts);
+  const conflicts = useMemo(
+    () => conflictEntries.filter((item) => isOwnedByUser(item?.ownerUserId, userId)),
+    [conflictEntries, userId],
+  );
   const [searchOpen, setSearchOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [statsOpen, setStatsOpen] = useState(false);

@@ -1,11 +1,14 @@
 import { useState, useRef, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import useEditorStore from '@store/useEditorStore';
+import useAuthStore from '@store/useAuthStore';
 import useThemeStore from '@store/useThemeStore';
-import useFileStore from '@store/useFileStore';
+import useFileStore, { getScopedBookmarkedPaths, getScopedRecentFiles } from '@store/useFileStore';
 import useNotificationStore from '@store/useNotificationStore';
-import useExternalDocsStore from '@store/useExternalDocsStore';
+import useExternalDocsStore, { getScopedExternalDocsMap } from '@store/useExternalDocsStore';
 import useSyncStore from '@store/useSyncStore';
+import useFileIdStore from '@store/useFileIdStore';
+import { GUEST_USER_SCOPE, isOwnedByUser } from '@store/userScope';
 import { fileIdFromCloudPath, syncEngine } from '@/services/syncEngine';
 import { useFileManager } from '@hooks/useFileManager';
 import FileTree from './explorer/FileTree';
@@ -140,12 +143,28 @@ const EXT_COLORS = { md: '#4091ff', txt: '#6d6d6f', json: '#ff9500', py: '#34c75
 
 function RecentList({ onOpenStats }) {
   const { t } = useTranslation();
-  const recentFiles = useFileStore((s) => s.recentFiles);
-  const bookmarkedPaths = useFileStore((s) => s.bookmarkedPaths);
-  const externalDocs = useExternalDocsStore((s) => s.docs);
+  const userId = useAuthStore((s) => s.user?.id || GUEST_USER_SCOPE);
+  const recentEntries = useFileStore((s) => s.recentFiles);
+  const bookmarkEntries = useFileStore((s) => s.bookmarkedPaths);
+  const externalDocEntries = useExternalDocsStore((s) => s.docs);
   const syncDocsMap = useSyncStore((s) => s.docs);
   const { openFileFromPath } = useFileManager();
-  const syncDocs = useMemo(() => Object.values(syncDocsMap), [syncDocsMap]);
+  const recentFiles = useMemo(
+    () => getScopedRecentFiles(recentEntries, userId),
+    [recentEntries, userId],
+  );
+  const bookmarkedPaths = useMemo(
+    () => getScopedBookmarkedPaths(bookmarkEntries, userId),
+    [bookmarkEntries, userId],
+  );
+  const externalDocs = useMemo(
+    () => getScopedExternalDocsMap(externalDocEntries, userId),
+    [externalDocEntries, userId],
+  );
+  const syncDocs = useMemo(
+    () => Object.values(syncDocsMap).filter((doc) => isOwnedByUser(doc?.ownerUserId, userId)),
+    [syncDocsMap, userId],
+  );
 
   const handleRemove = useCallback(async (e, f) => {
     e.stopPropagation();
@@ -157,6 +176,11 @@ function RecentList({ onOpenStats }) {
       useFileStore.getState().removeRecentFile(f.path);
       if (bookmarkedPaths.includes(f.path)) {
         useFileStore.getState().toggleBookmark(f.path);
+        const fileId = useFileIdStore.getState().idOf(f.path);
+        if (fileId) {
+          await syncEngine.deleteDocument(fileId);
+          useFileIdStore.getState().unbindFileId(fileId);
+        }
       }
     }
   }, [bookmarkedPaths]);

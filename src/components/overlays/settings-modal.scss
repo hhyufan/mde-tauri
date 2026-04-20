@@ -173,6 +173,34 @@
   }
 }
 
+.setting-row__actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.setting-row__action-btn {
+  padding: 6px 12px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+  background: var(--bg);
+  color: var(--text);
+  font-size: 12px;
+  cursor: pointer;
+  font-family: var(--font-app);
+  transition: all 0.15s;
+
+  &:hover:not(:disabled) {
+    background: var(--hover);
+    border-color: var(--accent);
+  }
+
+  &:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+}
+
 .toggle-switch {
   width: 40px;
   height: 22px;

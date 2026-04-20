@@ -2,11 +2,14 @@ import { useRef, useCallback, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import useEditorStore from '@store/useEditorStore';
 import useConfigStore from '@store/useConfigStore';
-import useFileStore from '@store/useFileStore';
+import useAuthStore from '@store/useAuthStore';
+import useFileStore, { getScopedBookmarkedPaths } from '@store/useFileStore';
 import useNotificationStore from '@store/useNotificationStore';
+import { GUEST_USER_SCOPE } from '@store/userScope';
 import { renameFile } from '@utils/tauriApi';
 import { useFileManager } from '@hooks/useFileManager';
 import { syncEngine } from '@/services/syncEngine';
+import useFileIdStore from '@store/useFileIdStore';
 import { cn } from '@utils/classNames';
 import './tabbar.scss';
 
@@ -38,7 +41,8 @@ function TabBar() {
   const toggleSidebar = useEditorStore((s) => s.toggleSidebar);
   const notify = useNotificationStore((s) => s.notify);
   const autoSave = useConfigStore((s) => s.autoSave);
-  const bookmarkedPaths = useFileStore((s) => s.bookmarkedPaths);
+  const userId = useAuthStore((s) => s.user?.id || GUEST_USER_SCOPE);
+  const bookmarkEntries = useFileStore((s) => s.bookmarkedPaths);
   const toggleBookmark = useFileStore((s) => s.toggleBookmark);
   const addRecentFile = useFileStore((s) => s.addRecentFile);
   const currentDir = useFileStore((s) => s.currentDir);
@@ -104,6 +108,10 @@ function TabBar() {
     setRenamingTabId(null);
   }, []);
 
+  const bookmarkedPaths = useMemo(
+    () => getScopedBookmarkedPaths(bookmarkEntries, userId),
+    [bookmarkEntries, userId],
+  );
   const isBookmarked = activeTab?.path && bookmarkedPaths.includes(activeTab.path);
 
   const scrollLeft = useCallback(() => {
@@ -114,15 +122,31 @@ function TabBar() {
     scrollRef.current?.scrollBy({ left: 120, behavior: 'smooth' });
   }, []);
 
-  const handleBookmark = useCallback(() => {
+  const handleBookmark = useCallback(async () => {
     if (!activeTab?.path) return;
     toggleBookmark(activeTab.path);
-    // Ensure the file is in the recent list so it appears in the sidebar
-    addRecentFile({ path: activeTab.path, name: activeTab.name, ext: activeTab.ext });
-    // Open sidebar and navigate to Recent tab to show the bookmarked file
-    if (!sidebarVisible) toggleSidebar();
-    setSidebarView('recent');
-  }, [activeTab, toggleBookmark, addRecentFile, sidebarVisible, toggleSidebar, setSidebarView]);
+    
+    if (!isBookmarked) {
+      const liveTab = useEditorStore.getState().getActiveTab();
+      const syncTab = liveTab?.id === activeTab.id ? liveTab : activeTab;
+      await syncEngine.queueLocalUpsert(syncTab.path, syncTab.content, syncTab.encoding, {
+        name: syncTab.name,
+        lineEnding: syncTab.lineEnding,
+        source: 'bookmark-add',
+      });
+      // Ensure the file is in the recent list so it appears in the sidebar
+      addRecentFile({ path: syncTab.path, name: syncTab.name, ext: syncTab.ext });
+      // Open sidebar and navigate to Recent tab to show the bookmarked file
+      if (!sidebarVisible) toggleSidebar();
+      setSidebarView('recent');
+    } else {
+      const fileId = useFileIdStore.getState().idOf(activeTab.path);
+      if (fileId) {
+        syncEngine.deleteDocument(fileId);
+        useFileIdStore.getState().unbindFileId(fileId);
+      }
+    }
+  }, [activeTab, isBookmarked, toggleBookmark, addRecentFile, sidebarVisible, toggleSidebar, setSidebarView]);
 
   return (
     <div className="tabbar">

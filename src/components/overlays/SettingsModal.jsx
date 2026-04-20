@@ -1,8 +1,17 @@
 import { useState } from 'react';
+import { open, save } from '@tauri-apps/plugin-dialog';
+import { readTextFile, writeTextFile } from '@tauri-apps/plugin-fs';
 import { useTranslation } from 'react-i18next';
 import useConfigStore from '@store/useConfigStore';
 import useThemeStore from '@store/useThemeStore';
 import useAuthStore from '@store/useAuthStore';
+import useNotificationStore from '@store/useNotificationStore';
+import syncEngine from '../../services/syncEngine';
+import {
+  applySettingsSnapshot,
+  buildSettingsExportPayload,
+  parseSettingsImportPayload,
+} from '@utils/settingsSync';
 import './settings-modal.scss';
 
 const NAV_ICONS = {
@@ -21,16 +30,85 @@ const NAV_ITEMS = [
 function SettingsModal({ open, onClose }) {
   const { t, i18n } = useTranslation();
   const [activeNav, setActiveNav] = useState('general');
+  const [cloudBusy, setCloudBusy] = useState(false);
   const config = useConfigStore();
-  const { theme, toggleTheme } = useThemeStore();
+  const { theme, setTheme } = useThemeStore();
   const { isLoggedIn, user, logout } = useAuthStore();
+  const notify = useNotificationStore((s) => s.notify);
 
   if (!open) return null;
 
   function handleChange(key, value) {
     config.setConfig(key, value);
     if (key === 'language') {
-      i18n.changeLanguage(value === 'zh' ? 'zh_cn' : 'en_us');
+      i18n.changeLanguage(value === 'zh' ? 'zh' : 'en');
+    }
+  }
+
+  async function handleSyncSettings() {
+    if (!isLoggedIn) return;
+    setCloudBusy(true);
+    try {
+      await syncEngine.syncConfig();
+      notify('success', t('settings.cloud.syncSettings'), t('settings.cloud.syncSuccess'));
+    } catch (err) {
+      notify('error', t('notification.error'), err?.message || t('sync.status.error'));
+    } finally {
+      setCloudBusy(false);
+    }
+  }
+
+  async function handlePullSettings() {
+    if (!isLoggedIn) return;
+    setCloudBusy(true);
+    try {
+      const remote = await syncEngine.syncConfig({ preferRemote: true });
+      if (remote?.language) {
+        i18n.changeLanguage(remote.language === 'zh' ? 'zh' : 'en');
+      }
+      notify('success', t('settings.cloud.pullSettings'), t('settings.cloud.pullSuccess'));
+    } catch (err) {
+      notify('error', t('notification.error'), err?.message || t('sync.status.error'));
+    } finally {
+      setCloudBusy(false);
+    }
+  }
+
+  async function handleExportJson() {
+    setCloudBusy(true);
+    try {
+      const path = await save({
+        defaultPath: 'mde-settings.json',
+        filters: [{ name: 'JSON', extensions: ['json'] }],
+      });
+      if (!path) return;
+      const payload = buildSettingsExportPayload();
+      await writeTextFile(path, JSON.stringify(payload, null, 2));
+      notify('success', t('settings.cloud.exportJson'), t('settings.cloud.exportSuccess'));
+    } catch (err) {
+      notify('error', t('notification.error'), err?.message || String(err));
+    } finally {
+      setCloudBusy(false);
+    }
+  }
+
+  async function handleImportJson() {
+    setCloudBusy(true);
+    try {
+      const path = await open({
+        multiple: false,
+        filters: [{ name: 'JSON', extensions: ['json'] }],
+      });
+      if (!path || Array.isArray(path)) return;
+      const raw = await readTextFile(path);
+      const settings = parseSettingsImportPayload(raw);
+      applySettingsSnapshot(settings);
+      i18n.changeLanguage((settings.language || 'en') === 'zh' ? 'zh' : 'en');
+      notify('success', t('settings.cloud.importJson'), t('settings.cloud.importSuccess'));
+    } catch (err) {
+      notify('error', t('notification.error'), err?.message || String(err));
+    } finally {
+      setCloudBusy(false);
     }
   }
 
@@ -102,7 +180,7 @@ function SettingsModal({ open, onClose }) {
                   label={t('settings.appearance.colorTheme')}
                   desc={t('settings.appearance.colorThemeDesc')}
                 >
-                  <select value={theme} onChange={() => toggleTheme()}>
+                  <select value={theme} onChange={(e) => setTheme(e.target.value)}>
                     <option value="light">Light</option>
                     <option value="dark">Dark</option>
                   </select>
@@ -227,6 +305,48 @@ function SettingsModal({ open, onClose }) {
                   ) : (
                     <span style={{ color: 'var(--text-dim)', fontSize: 12 }}>—</span>
                   )}
+                </SettingRow>
+                <SettingRow
+                  label={t('settings.cloud.syncSettings')}
+                  desc={t('settings.cloud.syncSettingsDesc')}
+                >
+                  <div className="setting-row__actions">
+                    <button
+                      className="setting-row__action-btn"
+                      onClick={handleSyncSettings}
+                      disabled={!isLoggedIn || cloudBusy}
+                    >
+                      {t('sync.syncNow')}
+                    </button>
+                    <button
+                      className="setting-row__action-btn"
+                      onClick={handlePullSettings}
+                      disabled={!isLoggedIn || cloudBusy}
+                    >
+                      {t('settings.cloud.pullSettings')}
+                    </button>
+                  </div>
+                </SettingRow>
+                <SettingRow
+                  label={t('settings.cloud.settingsJson')}
+                  desc={t('settings.cloud.settingsJsonDesc')}
+                >
+                  <div className="setting-row__actions">
+                    <button
+                      className="setting-row__action-btn"
+                      onClick={handleExportJson}
+                      disabled={cloudBusy}
+                    >
+                      {t('settings.cloud.exportJson')}
+                    </button>
+                    <button
+                      className="setting-row__action-btn"
+                      onClick={handleImportJson}
+                      disabled={cloudBusy}
+                    >
+                      {t('settings.cloud.importJson')}
+                    </button>
+                  </div>
                 </SettingRow>
               </div>
             )}
