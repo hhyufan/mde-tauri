@@ -11,17 +11,8 @@ import { useFileManager } from '@hooks/useFileManager';
 import { syncEngine } from '@/services/syncEngine';
 import useFileIdStore from '@store/useFileIdStore';
 import { cn } from '@utils/classNames';
+import FileTypeIcon from '@components/ui/FileTypeIcon';
 import './tabbar.scss';
-
-const EXT_COLORS = {
-  md: '#4091ff',
-  txt: '#6d6d6f',
-  json: '#ff9500',
-  py: '#34c759',
-  js: '#f7df1e',
-  html: '#e44d26',
-  css: '#264de4',
-};
 
 function TabBar() {
   const { t } = useTranslation();
@@ -168,10 +159,7 @@ function TabBar() {
               onClick={() => !isRenaming && setActiveTab(tab.id)}
             >
               <span className="tabbar__tab-icon">
-                <svg viewBox="0 0 24 24" fill="none" stroke={EXT_COLORS[tab.ext] || '#6d6d6f'} strokeWidth="2">
-                  <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
-                  <polyline points="14 2 14 8 20 8" />
-                </svg>
+                <FileTypeIcon extension={tab.ext} fileName={tab.name} />
               </span>
 
               {isRenaming ? (

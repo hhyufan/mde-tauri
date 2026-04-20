@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import useFileStore from '@store/useFileStore';
 import useEditorStore from '@store/useEditorStore';
@@ -6,35 +6,8 @@ import { useFileManager } from '@hooks/useFileManager';
 import { deleteFile as deleteFileApi } from '@utils/tauriApi';
 import useNotificationStore from '@store/useNotificationStore';
 import { cn } from '@utils/classNames';
+import FileTypeIcon from '@components/ui/FileTypeIcon';
 import './file-tree.scss';
-
-const EXT_COLORS = {
-  md: '#4091ff', txt: '#6d6d6f', json: '#ff9500', py: '#34c759',
-  js: '#f7df1e', html: '#e44d26', css: '#264de4', java: '#ff3b30',
-};
-
-function FileIcon({ ext }) {
-  const color = EXT_COLORS[ext] || '#6d6d6f';
-  return (
-    <svg viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2">
-      <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
-      <polyline points="14 2 14 8 20 8" />
-    </svg>
-  );
-}
-
-function FolderIcon({ open }) {
-  return open ? (
-    <svg viewBox="0 0 24 24" fill="none" stroke="#ff9500" strokeWidth="2">
-      <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z" />
-      <line x1="2" y1="10" x2="22" y2="10" />
-    </svg>
-  ) : (
-    <svg viewBox="0 0 24 24" fill="none" stroke="#ff9500" strokeWidth="2">
-      <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z" />
-    </svg>
-  );
-}
 
 function buildBreadcrumbPath(currentDir, index) {
   if (!currentDir) return '';
@@ -73,19 +46,6 @@ function FileTree() {
   const currentDir = useFileStore((s) => s.currentDir);
   const activeTabId = useEditorStore((s) => s.activeTabId);
   const { loadDirectory, openFileFromPath, openInExplorer } = useFileManager();
-  const [expandedDirs, setExpandedDirs] = useState(new Set());
-
-  const toggleDir = useCallback((dirPath) => {
-    setExpandedDirs((prev) => {
-      const next = new Set(prev);
-      if (next.has(dirPath)) {
-        next.delete(dirPath);
-      } else {
-        next.add(dirPath);
-      }
-      return next;
-    });
-  }, []);
 
   const handleFileClick = useCallback((file) => {
     if (file.is_dir) {
@@ -166,7 +126,11 @@ function FileTree() {
               onClick={() => handleFileClick(file)}
             >
               <span className="file-tree__item-icon">
-                {file.is_dir ? <FolderIcon open={expandedDirs.has(file.path)} /> : <FileIcon ext={ext} />}
+                {file.is_dir ? (
+                  <FileTypeIcon fileName={file.name} isFolder />
+                ) : (
+                  <FileTypeIcon extension={ext} fileName={file.name} />
+                )}
               </span>
               <span className="file-tree__item-name">{file.name}</span>
               {!file.is_dir && (

@@ -4,13 +4,8 @@ import useFileStore from '@store/useFileStore';
 import { useFileManager } from '@hooks/useFileManager';
 import { searchFiles } from '@utils/tauriApi';
 import { debounce } from '@utils/debounce';
+import FileTypeIcon from '@components/ui/FileTypeIcon';
 import './search-modal.scss';
-
-const EXT_COLORS = {
-  md: '#4091ff', txt: '#6d6d6f', json: '#ff9500', py: '#34c759',
-  js: '#f7df1e', html: '#e44d26', css: '#264de4', rs: '#ff3b30',
-  ts: '#3178c6', jsx: '#f7df1e', tsx: '#3178c6', scss: '#c76494',
-};
 
 function SearchModal({ open, onClose }) {
   const { t } = useTranslation();
@@ -177,10 +172,7 @@ function SearchModal({ open, onClose }) {
                   onMouseEnter={() => setSelectedIndex(idx)}
                 >
                   <span className="search-box__item-icon">
-                    <svg viewBox="0 0 24 24" fill="none" stroke={EXT_COLORS[ext] || '#6d6d6f'} strokeWidth="2">
-                      <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
-                      <polyline points="14 2 14 8 20 8" />
-                    </svg>
+                    <FileTypeIcon extension={ext} fileName={item.name} />
                   </span>
                   <div className="search-box__item-info">
                     <span className="search-box__item-name">

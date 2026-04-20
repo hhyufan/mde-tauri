@@ -6,6 +6,7 @@ import { useFileManager } from '@hooks/useFileManager';
 import { getDirectoryContents, showInExplorer } from '@utils/tauriApi';
 import { splitPath, buildFullPath } from '@utils/pathUtils';
 import SyncStatusIndicator from '@components/ui/SyncStatusIndicator';
+import FileTypeIcon from '@components/ui/FileTypeIcon';
 import './footer.scss';
 
 const MARKDOWN_EXT = /^(md|markdown|mdx)$/i;
@@ -200,14 +201,9 @@ function Footer() {
                       >
                         <span className="footer__dropdown-icon">
                           {item.is_dir ? (
-                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width="12" height="12">
-                              <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z" />
-                            </svg>
+                            <FileTypeIcon fileName={item.name} isFolder />
                           ) : (
-                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width="12" height="12">
-                              <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
-                              <polyline points="14 2 14 8 20 8" />
-                            </svg>
+                            <FileTypeIcon extension={item.ext} fileName={item.name} />
                           )}
                         </span>
                         <span className="footer__dropdown-name">{item.name}</span>

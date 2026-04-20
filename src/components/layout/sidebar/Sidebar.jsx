@@ -14,6 +14,7 @@ import { useFileManager } from '@hooks/useFileManager';
 import FileTree from './explorer/FileTree';
 import OutlineView from './outline/OutlineView';
 import UserMenu from '@components/ui/UserMenu';
+import FileTypeIcon from '@components/ui/FileTypeIcon';
 import { cn } from '@utils/classNames';
 import './sidebar.scss';
 
@@ -139,8 +140,6 @@ function RecentToolbar({ onOpenStats }) {
   );
 }
 
-const EXT_COLORS = { md: '#4091ff', txt: '#6d6d6f', json: '#ff9500', py: '#34c759', js: '#f7df1e', html: '#e44d26', css: '#264de4' };
-
 function RecentList({ onOpenStats }) {
   const { t } = useTranslation();
   const userId = useAuthStore((s) => s.user?.id || GUEST_USER_SCOPE);
@@ -218,8 +217,6 @@ function RecentList({ onOpenStats }) {
       ) : (
         <div className="sidebar__recent-list">
           {sortedFiles.map((f) => {
-            const ext = f.ext || f.name?.split('.').pop() || '';
-            const color = EXT_COLORS[ext] || '#6d6d6f';
             const isBookmarked = bookmarkedPaths.includes(f.path);
             const isCloud = !!f.cloud;
             const titleText = isCloud
@@ -227,12 +224,8 @@ function RecentList({ onOpenStats }) {
               : f.path;
             return (
               <div key={f.path} className={cn('sidebar__recent-item', isBookmarked && 'sidebar__recent-item--bookmarked')} onClick={() => openFileFromPath(f.path, f.name)} title={titleText}>
-                <span className="sidebar__recent-icon" style={{ background: `${color}18`, color }}>
-                  {isCloud ? (
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M18 10h-1.26A8 8 0 1 0 9 20h9a5 5 0 0 0 0-10z" /></svg>
-                  ) : (
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" /><polyline points="14 2 14 8 20 8" /></svg>
-                  )}
+                <span className="sidebar__recent-icon">
+                  <FileTypeIcon extension={f.ext} fileName={f.name} />
                 </span>
                 <span className="sidebar__recent-name">{f.name}</span>
                 {isBookmarked && (
