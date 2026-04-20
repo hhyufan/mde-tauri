@@ -17,6 +17,7 @@ import useExternalDocsStore from '@store/useExternalDocsStore';
 import { syncEngine, isCloudPath, fileIdFromCloudPath } from '@/services/syncEngine';
 import { getBuffer } from '@utils/editorBuffer';
 import { debounce } from '@utils/debounce';
+import i18n from '@/i18n';
 
 export function useFileManager() {
   const {
@@ -29,6 +30,7 @@ export function useFileManager() {
   } = useEditorStore.getState();
   const { setCurrentDir, setFiles, addRecentFile } = useFileStore.getState();
   const notify = useNotificationStore.getState().notify;
+  const t = i18n.t.bind(i18n);
 
   const createNewFile = useCallback(() => {
     createUntitledTab();
@@ -113,7 +115,7 @@ export function useFileManager() {
       setFiles(sorted);
       setCurrentDir(dirPath);
     } catch (err) {
-      notify('error', 'Error', String(err));
+      notify('error', t('notification.error'), String(err));
     }
   }, []);
 
@@ -128,7 +130,7 @@ export function useFileManager() {
       // it on demand here.
       const doc = await syncEngine.ensureExternalDoc(fileId);
       if (!doc || typeof doc.content !== 'string') {
-        notify('error', 'Error', 'Cloud file content unavailable. Try syncing again.');
+        notify('error', t('notification.error'), t('notification.cloudFileContentUnavailable'));
         return;
       }
       const displayName = doc.name || fileName || fileId;
@@ -163,10 +165,10 @@ export function useFileManager() {
         addRecentFile({ name: fileName, path: filePath, ext });
         startFileWatching(filePath).catch(() => {});
       } else {
-        notify('error', 'Error', result.message);
+        notify('error', t('notification.error'), result.message);
       }
     } catch (err) {
-      notify('error', 'Error', String(err));
+      notify('error', t('notification.error'), String(err));
     }
   }, []);
 
@@ -187,7 +189,7 @@ export function useFileManager() {
         await openFileFromPath(path, name);
       }
     } catch (err) {
-      notify('error', 'Error', String(err));
+      notify('error', t('notification.error'), String(err));
     }
   }, [openFileFromPath]);
 
@@ -203,9 +205,9 @@ export function useFileManager() {
           source: 'manual-save-external',
         });
         markTabSaved(tab.id);
-        notify('success', 'Synced', tab.name);
+        notify('success', t('notification.synced'), tab.name);
       } catch (err) {
-        notify('error', 'Error', String(err));
+        notify('error', t('notification.error'), String(err));
       }
       return;
     }
@@ -229,7 +231,7 @@ export function useFileManager() {
             updateTabPath(tab.id, path, name);
             markTabSaved(path);
             addRecentFile({ name, path, ext });
-            notify('success', 'File saved', name);
+            notify('success', t('notification.fileSaved'), name);
             if (externalFileId) {
               await syncEngine.claimExternalDoc(externalFileId, path, tab.content, tab.encoding);
             } else {
@@ -248,7 +250,7 @@ export function useFileManager() {
           }
         }
       } catch (err) {
-        notify('error', 'Error', String(err));
+        notify('error', t('notification.error'), String(err));
       }
       return;
     }
@@ -257,7 +259,7 @@ export function useFileManager() {
       const result = await saveFile(tab.path, tab.content, tab.encoding);
       if (result.success) {
         markTabSaved(tab.id);
-        notify('success', 'File saved', tab.name);
+        notify('success', t('notification.fileSaved'), tab.name);
         syncEngine.registerLocalDocument(tab.path, {
           name: tab.name,
           ext: tab.ext,
@@ -270,10 +272,10 @@ export function useFileManager() {
           source: 'manual-save',
         });
       } else {
-        notify('error', 'Error', result.message);
+        notify('error', t('notification.error'), result.message);
       }
     } catch (err) {
-      notify('error', 'Error', String(err));
+      notify('error', t('notification.error'), String(err));
     }
   }, []);
 
@@ -299,7 +301,7 @@ export function useFileManager() {
           updateTabPath(tab.id, path, name);
           markTabSaved(path);
           addRecentFile({ name, path, ext });
-          notify('success', 'File saved', path);
+          notify('success', t('notification.fileSaved'), path);
           if (externalFileId) {
             await syncEngine.claimExternalDoc(externalFileId, path, tab.content, tab.encoding);
           } else {
@@ -318,7 +320,7 @@ export function useFileManager() {
         }
       }
     } catch (err) {
-      notify('error', 'Error', String(err));
+      notify('error', t('notification.error'), String(err));
     }
   }, []);
 
@@ -326,7 +328,7 @@ export function useFileManager() {
     try {
       await showInExplorer(path);
     } catch (err) {
-      notify('error', 'Error', String(err));
+      notify('error', t('notification.error'), String(err));
     }
   }, []);
 
@@ -339,7 +341,7 @@ export function useFileManager() {
         await loadDirectory(dirPath);
       }
     } catch (err) {
-      notify('error', 'Error', String(err));
+      notify('error', t('notification.error'), String(err));
     }
   }, [loadDirectory]);
 

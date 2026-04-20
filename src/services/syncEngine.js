@@ -12,6 +12,7 @@ import useDeviceStore from '@store/useDeviceStore';
 import useExternalDocsStore from '@store/useExternalDocsStore';
 import useSyncStore, { SYNC_PROTOCOL_VERSION } from '@store/useSyncStore';
 import { getLocalSettingsSnapshot, applySettingsSnapshot } from '@utils/settingsSync';
+import i18n from '@/i18n';
 
 // 小体积内容直接明文上传，避免不必要的 gzip 开销。
 const COMPRESS_THRESHOLD_BYTES = 16 * 1024;
@@ -998,7 +999,7 @@ class SyncEngine {
       this.setStatus(kind === 'server_unreachable' ? 'server_unreachable' : kind);
       useNotificationStore.getState().notify(
         'error',
-        'Sync failed',
+        i18n.t('notification.syncFailed'),
         err?.response?.data?.message || String(err?.message || err),
       );
       if (this.shouldRetry(kind)) {

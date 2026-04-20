@@ -88,12 +88,12 @@ function TabBar() {
         await syncEngine.rebindLocalPath(tab.path, actualPath, trimmed);
         if (currentDir) loadDirectory(currentDir);
       } else {
-        notify('error', 'Rename failed', result?.message || '');
+        notify('error', t('notification.renameFailed'), result?.message || '');
       }
     } catch (err) {
-      notify('error', 'Rename failed', String(err));
+      notify('error', t('notification.renameFailed'), String(err));
     }
-  }, [renameValue, renameTab, updateTabPath, notify]);
+  }, [renameValue, renameTab, updateTabPath, notify, t, currentDir, loadDirectory]);
 
   const cancelRename = useCallback(() => {
     setRenamingTabId(null);
