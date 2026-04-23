@@ -81,10 +81,14 @@
 
 .search-box__tab {
   font-size: 12px;
+  font-family: var(--font-app);
   color: var(--text-sec);
   padding: 6px 12px;
   cursor: pointer;
+  background: none;
+  border: none;
   border-bottom: 2px solid transparent;
+  outline: none;
   transition: all 0.15s;
 
   &:hover {

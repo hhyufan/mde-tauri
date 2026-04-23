@@ -1,10 +1,12 @@
 import { lazy, Suspense, forwardRef } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Spin } from 'antd';
 import { LoadingOutlined } from '@ant-design/icons';
 
 const MonacoEditor = lazy(() => import('./MonacoEditor'));
 
 function LoadingFallback() {
+  const { t } = useTranslation();
   return (
     <div
       style={{
@@ -19,7 +21,7 @@ function LoadingFallback() {
       }}
     >
       <Spin indicator={<LoadingOutlined style={{ fontSize: 16 }} spin />} />
-      <span>Loading editor…</span>
+      <span>{t('editor.loading')}</span>
     </div>
   );
 }

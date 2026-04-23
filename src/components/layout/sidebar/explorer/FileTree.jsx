@@ -320,8 +320,8 @@ function FileTree() {
                   </span>
                 </span>
                 <span className="file-tree__breadcrumb-item">
-                  <svg className="file-tree__breadcrumb-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                    <polyline points="9 18 15 12 9 6" />
+                  <svg className="file-tree__breadcrumb-chevron" viewBox="0 0 1024 1024" xmlns="http://www.w3.org/2000/svg" style={{ color: 'var(--accent)', opacity: 0.7 }}>
+                    <path d="M704 514.368a52.864 52.864 0 0 1-15.808 37.888L415.872 819.2a55.296 55.296 0 0 1-73.984-2.752 52.608 52.608 0 0 1-2.816-72.512l233.6-228.928-233.6-228.992a52.736 52.736 0 0 1-17.536-53.056 53.952 53.952 0 0 1 40.192-39.424c19.904-4.672 40.832 1.92 54.144 17.216l272.32 266.88c9.92 9.792 15.616 23.04 15.808 36.8z" fill="currentColor" />
                   </svg>
                   <Tooltip title={t('sidebar.explorer.expandBreadcrumb')} placement="bottom" mouseEnterDelay={0.3}>
                     <span
@@ -333,8 +333,8 @@ function FileTree() {
                   </Tooltip>
                 </span>
                 <span className="file-tree__breadcrumb-item">
-                  <svg className="file-tree__breadcrumb-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                    <polyline points="9 18 15 12 9 6" />
+                  <svg className="file-tree__breadcrumb-chevron" viewBox="0 0 1024 1024" xmlns="http://www.w3.org/2000/svg" style={{ color: 'var(--accent)', opacity: 0.7 }}>
+                    <path d="M704 514.368a52.864 52.864 0 0 1-15.808 37.888L415.872 819.2a55.296 55.296 0 0 1-73.984-2.752 52.608 52.608 0 0 1-2.816-72.512l233.6-228.928-233.6-228.992a52.736 52.736 0 0 1-17.536-53.056 53.952 53.952 0 0 1 40.192-39.424c19.904-4.672 40.832 1.92 54.144 17.216l272.32 266.88c9.92 9.792 15.616 23.04 15.808 36.8z" fill="currentColor" />
                   </svg>
                   <span
                     className="file-tree__breadcrumb-part"
@@ -349,8 +349,8 @@ function FileTree() {
               breadcrumbParts.map((part, i) => (
                 <span key={i} className="file-tree__breadcrumb-item">
                   {i > 0 && (
-                    <svg className="file-tree__breadcrumb-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                      <polyline points="9 18 15 12 9 6" />
+                    <svg className="file-tree__breadcrumb-chevron" viewBox="0 0 1024 1024" xmlns="http://www.w3.org/2000/svg" style={{ color: 'var(--accent)', opacity: 0.7 }}>
+                      <path d="M704 514.368a52.864 52.864 0 0 1-15.808 37.888L415.872 819.2a55.296 55.296 0 0 1-73.984-2.752 52.608 52.608 0 0 1-2.816-72.512l233.6-228.928-233.6-228.992a52.736 52.736 0 0 1-17.536-53.056 53.952 53.952 0 0 1 40.192-39.424c19.904-4.672 40.832 1.92 54.144 17.216l272.32 266.88c9.92 9.792 15.616 23.04 15.808 36.8z" fill="currentColor" />
                     </svg>
                   )}
                   <span
@@ -382,8 +382,8 @@ function FileTree() {
               onClick={() => setBreadcrumbExpanded(false)}
               type="button"
             >
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width="10" height="10">
-                <polyline points="18 15 12 9 6 15" />
+              <svg viewBox="0 0 1024 1024" xmlns="http://www.w3.org/2000/svg" width="10" height="10" style={{ transform: 'rotate(-90deg)', color: 'var(--accent)', opacity: 0.7 }}>
+                <path d="M704 514.368a52.864 52.864 0 0 1-15.808 37.888L415.872 819.2a55.296 55.296 0 0 1-73.984-2.752 52.608 52.608 0 0 1-2.816-72.512l233.6-228.928-233.6-228.992a52.736 52.736 0 0 1-17.536-53.056 53.952 53.952 0 0 1 40.192-39.424c19.904-4.672 40.832 1.92 54.144 17.216l272.32 266.88c9.92 9.792 15.616 23.04 15.808 36.8z" fill="currentColor" />
               </svg>
             </button>
           </Tooltip>
@@ -408,9 +408,9 @@ function FileTree() {
               </span>
               <span className="file-tree__item-name">{file.name}</span>
               {!file.is_dir && (
+                <Tooltip title={t('sidebar.explorer.deleteFile')} placement="top" mouseEnterDelay={0.3}>
                 <span
                   className="file-tree__item-del"
-                  title={t('sidebar.recent.remove')}
                   onClick={(e) => {
                     e.stopPropagation();
                     deleteFileApi(file.path)
@@ -425,6 +425,7 @@ function FileTree() {
                     <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
                   </svg>
                 </span>
+                </Tooltip>
               )}
             </div>
           );

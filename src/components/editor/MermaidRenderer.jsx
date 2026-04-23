@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Alert } from 'antd';
 import mermaid from 'mermaid';
 
@@ -14,6 +15,7 @@ mermaid.initialize({
 });
 
 function MermaidRenderer({ code, isDark }) {
+  const { t } = useTranslation();
   const ref = useRef(null);
   const [svg, setSvg] = useState('');
   const [error, setError] = useState(null);
@@ -33,7 +35,7 @@ function MermaidRenderer({ code, isDark }) {
         const { svg: rendered } = await mermaid.render(id, code);
         if (!cancelled) { setSvg(rendered); setError(null); }
       } catch (err) {
-        if (!cancelled) { setError(err.message || 'Mermaid render failed'); setSvg(''); }
+        if (!cancelled) { setError(err.message || t('preview.mermaidError')); setSvg(''); }
       }
     })();
 
@@ -46,7 +48,7 @@ function MermaidRenderer({ code, isDark }) {
         <Alert
           type="error"
           showIcon
-          message="Mermaid Error"
+          message={t('preview.mermaidErrorTitle')}
           description={error}
           style={{ background: 'transparent', border: 'none', padding: 0 }}
         />

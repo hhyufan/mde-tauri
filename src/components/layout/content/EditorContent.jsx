@@ -1,5 +1,6 @@
 import { useCallback, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { Tooltip } from 'antd';
 import useEditorStore from '@store/useEditorStore';
 import MonacoEditor from '@components/editor/LazyMonacoEditor';
 import MarkdownPreview from '@components/editor/MarkdownPreview';
@@ -100,11 +101,12 @@ function EditorContent() {
               className="editor-content__editor editor-content__editor--half"
               onAutoSave={triggerAutoSave}
             />
-            <div
-              className="editor-content__split-divider"
-              onMouseDown={handleDividerMouseDown}
-              title="拖动调整分屏比例"
-            />
+            <Tooltip title={t('editor.splitDivider')} placement="top" mouseEnterDelay={0.5}>
+              <div
+                className="editor-content__split-divider"
+                onMouseDown={handleDividerMouseDown}
+              />
+            </Tooltip>
             <MarkdownPreview className="editor-content__preview editor-content__preview--half" />
           </>
         )}

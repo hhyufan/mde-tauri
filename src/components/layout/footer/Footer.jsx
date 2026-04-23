@@ -32,8 +32,17 @@ function CodeIcon() {
 
 function ChevronIcon() {
   return (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width="10" height="10" style={{ opacity: 0.5 }}>
-      <polyline points="9 18 15 12 9 6" />
+    <svg
+      viewBox="0 0 1024 1024"
+      xmlns="http://www.w3.org/2000/svg"
+      width="12"
+      height="12"
+      style={{ flexShrink: 0, color: 'var(--accent)', opacity: 0.7, transform: 'translateY(1px)' }}
+    >
+      <path
+        d="M704 514.368a52.864 52.864 0 0 1-15.808 37.888L415.872 819.2a55.296 55.296 0 0 1-73.984-2.752 52.608 52.608 0 0 1-2.816-72.512l233.6-228.928-233.6-228.992a52.736 52.736 0 0 1-17.536-53.056 53.952 53.952 0 0 1 40.192-39.424c19.904-4.672 40.832 1.92 54.144 17.216l272.32 266.88c9.92 9.792 15.616 23.04 15.808 36.8z"
+        fill="currentColor"
+      />
     </svg>
   );
 }
@@ -225,25 +234,30 @@ function Footer() {
                 return (
                   <span key={index} className="footer__breadcrumb-item">
                     {index > 0 && <ChevronIcon />}
-                    <Dropdown
-                      open={isOpen}
-                      trigger={['click']}
-                      placement="topLeft"
-                      arrow={false}
-                      dropdownRender={renderDropdown(index)}
-                      onOpenChange={(open) => {
-                        if (!open) setOpenDropdown(null);
-                      }}
+                    <Tooltip
+                      title={buildFullPath(pathSegments, index)}
+                      placement="top"
+                      mouseEnterDelay={0.5}
                     >
+                      <Dropdown
+                        open={isOpen}
+                        trigger={['click']}
+                        placement="topLeft"
+                        arrow={false}
+                        dropdownRender={renderDropdown(index)}
+                        onOpenChange={(open) => {
+                          if (!open) setOpenDropdown(null);
+                        }}
+                      >
                       <span
                         className="footer__breadcrumb-segment"
                         onClick={() => handleSegmentClick(index)}
                         onContextMenu={(e) => handleContextMenu(e, index)}
-                        title={buildFullPath(pathSegments, index)}
                       >
                         {/^[A-Z]:\\$/i.test(segment) ? segment.substring(0, 2) : segment}
                       </span>
-                    </Dropdown>
+                      </Dropdown>
+                    </Tooltip>
                   </span>
                 );
               })}
@@ -266,7 +280,7 @@ function Footer() {
       <div className="footer__right">
         {activeTab && (
           <>
-            <span>Ln {cursorPosition.lineNumber}, Col {cursorPosition.column}</span>
+            <span>{t('footer.line')} {cursorPosition.lineNumber}, {t('footer.column')} {cursorPosition.column}</span>
             <span className="footer__sep" />
             <span>{characterCount} {t('footer.chars')}</span>
             <span className="footer__sep" />

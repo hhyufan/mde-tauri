@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Modal, Input, Segmented } from 'antd';
-import { SearchOutlined, FileSearchOutlined } from '@ant-design/icons';
+import { Modal, Input } from 'antd';
+import { SearchOutlined } from '@ant-design/icons';
 import useFileStore from '@store/useFileStore';
 import { useFileManager } from '@hooks/useFileManager';
 import { searchFiles } from '@utils/tauriApi';
@@ -129,15 +129,20 @@ function SearchModal({ open, onClose }) {
         </div>
 
         <div className="search-box__tabs">
-          <Segmented
-            size="small"
-            value={searchContent ? 'content' : 'file'}
-            onChange={(v) => setSearchContent(v === 'content')}
-            options={[
-              { label: t('search.fileTab'), value: 'file', icon: <SearchOutlined /> },
-              { label: t('search.contentTab'), value: 'content', icon: <FileSearchOutlined /> },
-            ]}
-          />
+          <button
+            type="button"
+            className={`search-box__tab${!searchContent ? ' search-box__tab--active' : ''}`}
+            onClick={() => setSearchContent(false)}
+          >
+            {t('search.fileTab')}
+          </button>
+          <button
+            type="button"
+            className={`search-box__tab${searchContent ? ' search-box__tab--active' : ''}`}
+            onClick={() => setSearchContent(true)}
+          >
+            {t('search.contentTab')}
+          </button>
         </div>
 
         <div className="search-box__results" ref={resultsRef}>

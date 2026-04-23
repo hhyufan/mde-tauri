@@ -47,6 +47,10 @@ function TabBar() {
     () => tabs.find((item) => item.id === activeTabId) || null,
     [tabs, activeTabId],
   );
+  const isMarkdown = useMemo(
+    () => /^(md|markdown|mdx)$/i.test(activeTab?.ext || ''),
+    [activeTab],
+  );
 
   const getTextWidth = useCallback((text) => {
     const canvas = document.createElement('canvas');
@@ -166,11 +170,13 @@ function TabBar() {
               <span className="tabbar__tab-icon">
                 <FileTypeIcon extension={tab.ext} fileName={tab.name} size={16} />
                 {isCloudTab && (
-                  <span className="tabbar__tab-cloud-badge" title="Cloud">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                      <path d="M18 10h-1.26A8 8 0 1 0 9 20h9a5 5 0 0 0 0-10z" />
-                    </svg>
-                  </span>
+                  <Tooltip title={t('sidebar.cloud')} placement="top" mouseEnterDelay={0.3}>
+                    <span className="tabbar__tab-cloud-badge">
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                        <path d="M18 10h-1.26A8 8 0 1 0 9 20h9a5 5 0 0 0 0-10z" />
+                      </svg>
+                    </span>
+                  </Tooltip>
                 )}
               </span>
 
@@ -234,20 +240,22 @@ function TabBar() {
             </svg>
           </button>
         </Tooltip>
-        {/* Toolbar toggle — bottom-panel icon: filled when visible, outline when hidden */}
-        <Tooltip title={t('tabbar.toggleToolbar')} placement="bottom" mouseEnterDelay={0.3}>
-          <button
-            className={cn('tabbar__action-btn', toolbarVisible && 'tabbar__action-btn--active')}
-            onClick={toggleToolbar}
-            type="button"
-          >
-            <svg viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-              <rect x="3" y="3" width="18" height="18" rx="2" fill="none" />
-              <line x1="3" y1="15" x2="21" y2="15" />
-              {toolbarVisible && <rect x="3" y="15" width="18" height="6" rx="0" fill="currentColor" stroke="none" />}
-            </svg>
-          </button>
-        </Tooltip>
+        {/* Toolbar toggle — only for markdown files */}
+        {isMarkdown && (
+          <Tooltip title={t('tabbar.toggleToolbar')} placement="bottom" mouseEnterDelay={0.3}>
+            <button
+              className={cn('tabbar__action-btn', toolbarVisible && 'tabbar__action-btn--active')}
+              onClick={toggleToolbar}
+              type="button"
+            >
+              <svg viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                <rect x="3" y="3" width="18" height="18" rx="2" fill="none" />
+                <line x1="3" y1="15" x2="21" y2="15" />
+                {toolbarVisible && <rect x="3" y="15" width="18" height="6" rx="0" fill="currentColor" stroke="none" />}
+              </svg>
+            </button>
+          </Tooltip>
+        )}
         {/* Bookmark */}
         <Tooltip title={t('tabbar.bookmark')} placement="bottom" mouseEnterDelay={0.3}>
           <button
@@ -261,19 +269,21 @@ function TabBar() {
             </svg>
           </button>
         </Tooltip>
-        {/* Split view */}
-        <Tooltip title={t('tabbar.splitView')} placement="bottom" mouseEnterDelay={0.3}>
-          <button
-            className={cn('tabbar__action-btn', viewMode === 'split' && 'tabbar__action-btn--active')}
-            onClick={toggleSplit}
-            type="button"
-          >
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <rect x="3" y="3" width="18" height="18" rx="2" />
-              <line x1="12" y1="3" x2="12" y2="21" />
-            </svg>
-          </button>
-        </Tooltip>
+        {/* Split view — only for markdown files */}
+        {isMarkdown && (
+          <Tooltip title={t('tabbar.splitView')} placement="bottom" mouseEnterDelay={0.3}>
+            <button
+              className={cn('tabbar__action-btn', viewMode === 'split' && 'tabbar__action-btn--active')}
+              onClick={toggleSplit}
+              type="button"
+            >
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <rect x="3" y="3" width="18" height="18" rx="2" />
+                <line x1="12" y1="3" x2="12" y2="21" />
+              </svg>
+            </button>
+          </Tooltip>
+        )}
       </div>
     </div>
   );

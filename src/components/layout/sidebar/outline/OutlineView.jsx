@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import useEditorStore from '@store/useEditorStore';
 import { useEditorBufferContent } from '@hooks/useEditorBufferContent';
 import './outline.scss';
@@ -78,6 +79,7 @@ function ListBadge({ type }) {
 }
 
 function OutlineView() {
+  const { t } = useTranslation();
   const activeTabId = useEditorStore((s) => s.activeTabId);
   const fallback = useMemo(() => {
     const tab = useEditorStore.getState().tabs.find((t) => t.id === activeTabId);
@@ -169,10 +171,10 @@ function OutlineView() {
   }
 
   if (!activeTabId) {
-    return <div className="outline__empty">No file open</div>;
+    return <div className="outline__empty">{t('sidebar.outline.noFile')}</div>;
   }
   if (items.length === 0) {
-    return <div className="outline__empty">No structure found</div>;
+    return <div className="outline__empty">{t('sidebar.outline.empty')}</div>;
   }
 
   return (

@@ -231,39 +231,45 @@ function RecentList({ onOpenStats }) {
             const isBookmarked = bookmarkedPaths.includes(f.path);
             const isCloud = !!f.cloud;
             const titleText = isCloud
-              ? `${f.name} (cloud — Save As on first save)`
+              ? t('sidebar.cloudFileHint', { name: f.name })
               : f.path;
             return (
-              <div
-                key={f.path}
-                className={cn('sidebar__recent-item', isBookmarked && 'sidebar__recent-item--bookmarked')}
-                onClick={() => openFileFromPath(f.path, f.name)}
-                title={titleText}
-              >
-                <span className="sidebar__recent-icon">
-                  <FileTypeIcon extension={f.ext} fileName={f.name} />
-                  {isCloud && (
-                    <span className="sidebar__recent-cloud-badge" title="Cloud">
-                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                        <path d="M18 10h-1.26A8 8 0 1 0 9 20h9a5 5 0 0 0 0-10z" />
-                      </svg>
-                    </span>
-                  )}
-                </span>
-                <span className="sidebar__recent-name">{f.name}</span>
-                {isBookmarked && (
-                  <span className="sidebar__recent-bookmark" title={t('tabbar.bookmark')}>
-                    <svg viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" strokeWidth="2" width="12" height="12"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z" /></svg>
-                  </span>
-                )}
-                <span
-                  className="sidebar__recent-del"
-                  onClick={(e) => handleRemove(e, f)}
-                  title={t('sidebar.recent.remove')}
+              <Tooltip title={titleText} placement="right" mouseEnterDelay={0.5}>
+                <div
+                  key={f.path}
+                  className={cn('sidebar__recent-item', isBookmarked && 'sidebar__recent-item--bookmarked')}
+                  onClick={() => openFileFromPath(f.path, f.name)}
                 >
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>
-                </span>
-              </div>
+                  <span className="sidebar__recent-icon">
+                    <FileTypeIcon extension={f.ext} fileName={f.name} />
+                    {isCloud && (
+                      <Tooltip title={t('sidebar.cloud')} placement="top" mouseEnterDelay={0.3}>
+                        <span className="sidebar__recent-cloud-badge">
+                          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                            <path d="M18 10h-1.26A8 8 0 1 0 9 20h9a5 5 0 0 0 0-10z" />
+                          </svg>
+                        </span>
+                      </Tooltip>
+                    )}
+                  </span>
+                  <span className="sidebar__recent-name">{f.name}</span>
+                  {isBookmarked && (
+                    <Tooltip title={t('tabbar.bookmark')} placement="top" mouseEnterDelay={0.3}>
+                      <span className="sidebar__recent-bookmark">
+                        <svg viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" strokeWidth="2" width="12" height="12"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z" /></svg>
+                      </span>
+                    </Tooltip>
+                  )}
+                  <Tooltip title={t('sidebar.recent.remove')} placement="top" mouseEnterDelay={0.3}>
+                    <span
+                      className="sidebar__recent-del"
+                      onClick={(e) => handleRemove(e, f)}
+                    >
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>
+                    </span>
+                  </Tooltip>
+                </div>
+              </Tooltip>
             );
           })}
         </div>
@@ -340,7 +346,9 @@ function Sidebar({ onOpenSettings, onOpenStats, onOpenLogin }) {
       <footer className="sidebar__footer">
         <UserMenu onOpenLogin={onOpenLogin} />
         <Tag className="sidebar__version" bordered={false}>v0.1.0</Tag>
-        <span className="sidebar__status-dot" title="Connected" />
+        <Tooltip title={t('sidebar.connected')} placement="top" mouseEnterDelay={0.3}>
+          <span className="sidebar__status-dot" />
+        </Tooltip>
         <div style={{ marginLeft: 'auto', display: 'flex', gap: 2, alignItems: 'center' }}>
           <Tooltip title={t('sidebar.footer.themeSwitch')} placement="top" mouseEnterDelay={0.3}>
             <Button

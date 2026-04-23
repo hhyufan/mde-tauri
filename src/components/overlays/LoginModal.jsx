@@ -64,13 +64,14 @@ function LoginModal({ open, onClose, onLoggedIn }) {
           onFinish={handleSubmit}
           autoComplete="off"
           preserve={false}
+          validateTrigger="onSubmit"
         >
           <Form.Item
             label={t('auth.email')}
             name="email"
             rules={[
-              { required: true, message: t('auth.email') },
-              { type: 'email', message: t('auth.email') },
+              { required: true, message: t('auth.emailRequired') },
+              { type: 'email', message: t('auth.emailInvalid') },
             ]}
           >
             <Input placeholder="you@example.com" autoFocus />
@@ -81,8 +82,8 @@ function LoginModal({ open, onClose, onLoggedIn }) {
               label={t('auth.username')}
               name="username"
               rules={[
-                { required: true, message: t('auth.username') },
-                { min: 2, message: t('auth.username') },
+                { required: true, message: t('auth.usernameRequired') },
+                { min: 2, message: t('auth.usernameTooShort') },
               ]}
             >
               <Input placeholder={t('auth.usernamePlaceholder')} />
@@ -93,8 +94,8 @@ function LoginModal({ open, onClose, onLoggedIn }) {
             label={t('auth.password')}
             name="password"
             rules={[
-              { required: true, message: t('auth.password') },
-              { min: 6, message: t('auth.password') },
+              { required: true, message: t('auth.passwordRequired') },
+              { min: 6, message: t('auth.passwordTooShort') },
             ]}
           >
             <Input.Password placeholder="••••••" />
