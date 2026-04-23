@@ -3,6 +3,7 @@ import { showMainWindow } from '@utils/tauriApi';
 import useThemeStore from '@store/useThemeStore';
 import useEditorStore from '@store/useEditorStore';
 import useAuthStore from '@store/useAuthStore';
+import useFileStore from '@store/useFileStore';
 import { useFileManager } from '@hooks/useFileManager';
 import { syncEngine } from '@/services/syncEngine';
 import Sidebar from '@layout/sidebar/Sidebar';
@@ -36,13 +37,22 @@ function App() {
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [statsOpen, setStatsOpen] = useState(false);
   const [loginOpen, setLoginOpen] = useState(false);
-  const { saveCurrentFile, openFileDialog } = useFileManager();
+  const { saveCurrentFile, openFileDialog, loadDirectory } = useFileManager();
 
   useEffect(() => {
     initTheme();
     loadToken();
     syncEngine.ensureLocalReset();
     showMainWindow().catch(console.error);
+
+    // currentDir is persisted across restarts, but the file listing (files[])
+    // is not — it's volatile OS state. Re-load the directory silently so the
+    // explorer tree is populated immediately without the user having to manually
+    // refresh or re-open the folder.
+    const savedDir = useFileStore.getState().currentDir;
+    if (savedDir) {
+      loadDirectory(savedDir);
+    }
   }, []);
 
   useEffect(() => {
