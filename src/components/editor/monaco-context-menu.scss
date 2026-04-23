@@ -1,0 +1,63 @@
+.monaco-context-menu {
+  position: fixed;
+  z-index: 9999;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  box-shadow: var(--shadow-lg);
+  padding: 4px 0;
+  min-width: 200px;
+  font-size: 13px;
+  font-family: var(--font-app);
+  user-select: none;
+  animation: ctx-menu-in 0.08s ease;
+
+  @keyframes ctx-menu-in {
+    from {
+      opacity: 0;
+      transform: scale(0.97) translateY(-4px);
+    }
+    to {
+      opacity: 1;
+      transform: scale(1) translateY(0);
+    }
+  }
+
+  &__item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 5px 14px;
+    gap: 28px;
+    cursor: pointer;
+    color: var(--text);
+    transition: background 0.1s;
+
+    &:hover {
+      background: var(--hover);
+    }
+
+    &:active {
+      background: var(--active);
+    }
+  }
+
+  &__label {
+    flex: 1;
+    white-space: nowrap;
+  }
+
+  &__shortcut {
+    color: var(--text-sec);
+    font-size: 11px;
+    white-space: nowrap;
+    flex-shrink: 0;
+    font-family: var(--font-editor);
+  }
+
+  &__sep {
+    height: 1px;
+    background: var(--border-light);
+    margin: 4px 0;
+  }
+}

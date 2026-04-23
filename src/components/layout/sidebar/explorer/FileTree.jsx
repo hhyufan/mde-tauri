@@ -80,26 +80,29 @@ function FileTree() {
     }
   }, []);
 
-  const handleBcWheel = useCallback((e) => {
-    const el = bcScrollRef.current;
-    if (!el) return;
-    if (Math.abs(e.deltaX) > Math.abs(e.deltaY)) return; // let native horizontal scroll pass
-    e.preventDefault();
-    el.scrollLeft += e.deltaY;
-    updateBcScrollbar();
-  }, [updateBcScrollbar]);
-
   const { onThumbMouseDown: bcOnThumbMouseDown } = useHorizontalDragScroll(bcScrollRef, updateBcScrollbar);
 
   useEffect(() => {
     const el = bcScrollRef.current;
     if (!el) return;
     el.addEventListener('scroll', updateBcScrollbar, { passive: true });
+    // React's synthetic onWheel is always registered as passive, so
+    // preventDefault() triggers a warning. Attach a native non-passive
+    // wheel listener here so vertical wheel scrolls the breadcrumb
+    // horizontally without propagating to the page.
+    const onWheel = (e) => {
+      if (Math.abs(e.deltaX) > Math.abs(e.deltaY)) return;
+      e.preventDefault();
+      el.scrollLeft += e.deltaY;
+      updateBcScrollbar();
+    };
+    el.addEventListener('wheel', onWheel, { passive: false });
     const ro = new ResizeObserver(updateBcScrollbar);
     ro.observe(el);
     updateBcScrollbar();
     return () => {
       el.removeEventListener('scroll', updateBcScrollbar);
+      el.removeEventListener('wheel', onWheel);
       ro.disconnect();
     };
   }, [updateBcScrollbar, currentDir]);
@@ -306,7 +309,6 @@ function FileTree() {
           <div
             className="file-tree__breadcrumb-scroll"
             ref={bcScrollRef}
-            onWheel={handleBcWheel}
           >
             {shouldCollapse ? (
               /* Collapsed: first > ... > last */

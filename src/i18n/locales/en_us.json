@@ -215,5 +215,17 @@
   "toolbar.image": "Image",
   "toolbar.taskList": "Task list",
   "toolbar.rule": "Horizontal rule",
-  "toolbar.collapse": "Collapse toolbar"
+  "toolbar.collapse": "Collapse toolbar",
+
+  "editor.menu.undo": "Undo",
+  "editor.menu.redo": "Redo",
+  "editor.menu.cut": "Cut",
+  "editor.menu.copy": "Copy",
+  "editor.menu.paste": "Paste",
+  "editor.menu.selectAll": "Select All",
+  "editor.menu.find": "Find",
+  "editor.menu.replace": "Replace",
+  "editor.menu.formatDocument": "Format Document",
+  "editor.menu.changeAllOccurrences": "Change All Occurrences",
+  "editor.menu.commandPalette": "Command Palette"
 }

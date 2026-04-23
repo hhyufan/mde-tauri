@@ -1,4 +1,4 @@
-import { useEffect, useRef, useImperativeHandle, forwardRef, useState } from 'react';
+import { useEffect, useRef, useImperativeHandle, forwardRef, useState, useCallback } from 'react';
 import * as monaco from 'monaco-editor';
 import '@/monaco-worker';
 import useEditorStore from '@store/useEditorStore';
@@ -6,6 +6,8 @@ import useConfigStore from '@store/useConfigStore';
 import { getFileLanguage } from '@utils/fileLanguage';
 import { initMonacoShiki, isMonacoShikiReady, getMonacoThemeName } from '@utils/monacoShiki';
 import { setBuffer, getBuffer, hasBuffer } from '@utils/editorBuffer';
+import MonacoContextMenu from './MonacoContextMenu';
+import { setMonacoLocale } from '@utils/monacoLocale';
 import './monaco-editor.scss';
 
 const MonacoEditorComponent = forwardRef(function MonacoEditorComponent({ className, onAutoSave }, ref) {
@@ -23,6 +25,7 @@ const MonacoEditorComponent = forwardRef(function MonacoEditorComponent({ classN
   const setCursorPosition = useEditorStore((s) => s.setCursorPosition);
   const setCharacterCount = useEditorStore((s) => s.setCharacterCount);
 
+  const language = useConfigStore((s) => s.language);
   const fontSize = useConfigStore((s) => s.fontSize);
   const fontFamilyBase = useConfigStore((s) => s.fontFamily);
   const lineHeight = useConfigStore((s) => s.lineHeight);
@@ -34,6 +37,27 @@ const MonacoEditorComponent = forwardRef(function MonacoEditorComponent({ classN
   const fontFamily = `'${fontFamilyBase}', 'Fira Code', Consolas, monospace`;
 
   const [highlighterReady, setHighlighterReady] = useState(isMonacoShikiReady());
+  const [contextMenu, setContextMenu] = useState({ visible: false, x: 0, y: 0 });
+
+  const handleContextMenu = useCallback((e) => {
+    e.preventDefault();
+    const menuWidth = 220;
+    const menuHeight = 340;
+    const x = Math.min(e.clientX, window.innerWidth - menuWidth - 8);
+    const y = Math.min(e.clientY, window.innerHeight - menuHeight - 8);
+    setContextMenu({ visible: true, x, y });
+  }, []);
+
+  const closeContextMenu = useCallback(() => {
+    setContextMenu({ visible: false, x: 0, y: 0 });
+  }, []);
+
+  // Keep Monaco's built-in UI locale in sync with the app language setting.
+  // The NLS proxy intercepts localize() at render-time, so the next time the
+  // user opens a Monaco widget (Find, Command Palette, â€? the new locale applies.
+  useEffect(() => {
+    setMonacoLocale(language);
+  }, [language]);
 
   useImperativeHandle(ref, () => ({
     getEditor: () => editorRef.current,
@@ -104,7 +128,7 @@ const MonacoEditorComponent = forwardRef(function MonacoEditorComponent({ classN
       glyphMargin: false,
       folding: true,
       links: true,
-      contextmenu: true,
+      contextmenu: false,
       overviewRulerBorder: false,
       renderLineHighlight: 'none',
       unusualLineTerminators: 'off',
@@ -156,7 +180,7 @@ const MonacoEditorComponent = forwardRef(function MonacoEditorComponent({ classN
       const tabId = currentTabIdRef.current;
       if (!tabId) return;
       const value = editor.getValue();
-      // 1. Update the editor buffer synchronously â€” preview/outline
+      // 1. Update the editor buffer synchronously â€?preview/outline
       //    consumers will pick this up on their own debounce.
       setBuffer(tabId, value);
       // 2. Mark dirty + character count + auto-save are throttled so
@@ -317,7 +341,22 @@ const MonacoEditorComponent = forwardRef(function MonacoEditorComponent({ classN
     }
   }, [wordWrap, tabSize, lineNumbers, minimap]);
 
-  return <div ref={containerRef} className={`monaco-editor-container ${className || ''}`} />;
+  return (
+    <>
+      <div
+        ref={containerRef}
+        className={`monaco-editor-container ${className || ''}`}
+        onContextMenu={handleContextMenu}
+      />
+      <MonacoContextMenu
+        visible={contextMenu.visible}
+        x={contextMenu.x}
+        y={contextMenu.y}
+        onClose={closeContextMenu}
+        editorRef={editorRef}
+      />
+    </>
+  );
 });
 
 export default MonacoEditorComponent;

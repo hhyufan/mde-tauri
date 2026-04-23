@@ -108,7 +108,7 @@ function SearchModal({ open, onClose }) {
       footer={null}
       width={560}
       closable={false}
-      destroyOnClose
+      destroyOnHidden
       maskClosable
       styles={{ body: { padding: 0 }, content: { padding: 0 } }}
       style={{ top: 80 }}

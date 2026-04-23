@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
+﻿import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useHorizontalDragScroll } from '@hooks/useHorizontalDragScroll';
 import { useTranslation } from 'react-i18next';
 import { Dropdown, Tooltip } from 'antd';
@@ -84,26 +84,29 @@ function Footer() {
     }
   }, []);
 
-  const handleBcWheel = useCallback((e) => {
-    const el = bcScrollRef.current;
-    if (!el) return;
-    if (Math.abs(e.deltaX) > Math.abs(e.deltaY)) return;
-    e.preventDefault();
-    el.scrollLeft += e.deltaY;
-    updateBcScrollbar();
-  }, [updateBcScrollbar]);
-
   const { onThumbMouseDown: bcOnThumbMouseDown } = useHorizontalDragScroll(bcScrollRef, updateBcScrollbar);
 
   useEffect(() => {
     const el = bcScrollRef.current;
     if (!el) return;
     el.addEventListener('scroll', updateBcScrollbar, { passive: true });
+    // React's synthetic onWheel is always registered as passive, so
+    // preventDefault() triggers a warning. Attach a native non-passive
+    // wheel listener here so vertical wheel scrolls the breadcrumb
+    // horizontally without propagating to the page.
+    const onWheel = (e) => {
+      if (Math.abs(e.deltaX) > Math.abs(e.deltaY)) return;
+      e.preventDefault();
+      el.scrollLeft += e.deltaY;
+      updateBcScrollbar();
+    };
+    el.addEventListener('wheel', onWheel, { passive: false });
     const ro = new ResizeObserver(updateBcScrollbar);
     ro.observe(el);
     updateBcScrollbar();
     return () => {
       el.removeEventListener('scroll', updateBcScrollbar);
+      el.removeEventListener('wheel', onWheel);
       ro.disconnect();
     };
   }, [updateBcScrollbar, pathSegments]);
@@ -227,7 +230,6 @@ function Footer() {
             <div
               className="footer__breadcrumb-path"
               ref={bcScrollRef}
-              onWheel={handleBcWheel}
             >
               {pathSegments.map((segment, index) => {
                 const isOpen = openDropdown === index && !!directoryContents[index];
@@ -244,7 +246,7 @@ function Footer() {
                         trigger={['click']}
                         placement="topLeft"
                         arrow={false}
-                        dropdownRender={renderDropdown(index)}
+                        popupRender={renderDropdown(index)}
                         onOpenChange={(open) => {
                           if (!open) setOpenDropdown(null);
                         }}

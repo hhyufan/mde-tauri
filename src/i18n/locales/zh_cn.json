@@ -215,5 +215,17 @@
   "toolbar.image": "图片",
   "toolbar.taskList": "任务列表",
   "toolbar.rule": "分隔线",
-  "toolbar.collapse": "收起工具栏"
+  "toolbar.collapse": "收起工具栏",
+
+  "editor.menu.undo": "撤销",
+  "editor.menu.redo": "重做",
+  "editor.menu.cut": "剪切",
+  "editor.menu.copy": "复制",
+  "editor.menu.paste": "粘贴",
+  "editor.menu.selectAll": "全选",
+  "editor.menu.find": "查找",
+  "editor.menu.replace": "替换",
+  "editor.menu.formatDocument": "格式化文档",
+  "editor.menu.changeAllOccurrences": "更改所有匹配项",
+  "editor.menu.commandPalette": "命令面板"
 }

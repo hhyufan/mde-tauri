@@ -93,7 +93,7 @@ function StatsPanel({ open, onClose }) {
       footer={null}
       width={680}
       centered
-      destroyOnClose
+      destroyOnHidden
       maskClosable
       rootClassName="mde-stats-modal-root"
     >

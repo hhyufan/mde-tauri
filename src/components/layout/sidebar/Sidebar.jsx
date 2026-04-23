@@ -90,7 +90,7 @@ function ExplorerToolbar() {
           trigger={['click']}
           placement="bottomRight"
           arrow={false}
-          dropdownRender={renderSortDropdown({ sortBy, sortOrder, setSortBy, setSortOrder, t, close: closeSort })}
+          popupRender={renderSortDropdown({ sortBy, sortOrder, setSortBy, setSortOrder, t, close: closeSort })}
         >
           <span>
             <ToolbarButton title={t('sidebar.explorer.sort')}>

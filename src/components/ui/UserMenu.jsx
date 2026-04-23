@@ -46,7 +46,7 @@ function UserMenu({ onOpenLogin }) {
         trigger={['click']}
         placement="topLeft"
         arrow={false}
-        dropdownRender={renderDropdown}
+        popupRender={renderDropdown}
       >
         <button className="user-menu__trigger" type="button">
           <span className="user-menu__avatar">

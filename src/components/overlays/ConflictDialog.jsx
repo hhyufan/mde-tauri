@@ -225,7 +225,7 @@ function ConflictDialog({ open, conflicts, onResolve, onClose }) {
       centered
       closable={false}
       maskClosable={false}
-      destroyOnClose
+      destroyOnHidden
       rootClassName="mde-conflict-modal-root"
       styles={{ body: { padding: 0 }, content: { padding: 0 } }}
     >

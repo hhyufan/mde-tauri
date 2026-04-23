@@ -133,7 +133,7 @@ function SettingsModal({ open: openProp, onClose }) {
       footer={null}
       width={760}
       centered
-      destroyOnClose
+      destroyOnHidden
       maskClosable
       closable
       rootClassName="mde-settings-modal-root"

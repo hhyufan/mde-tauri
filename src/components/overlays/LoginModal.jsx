@@ -37,7 +37,7 @@ function LoginModal({ open, onClose, onLoggedIn }) {
       footer={null}
       width={400}
       centered
-      destroyOnClose
+      destroyOnHidden
       maskClosable
       rootClassName="mde-login-modal-root"
     >
