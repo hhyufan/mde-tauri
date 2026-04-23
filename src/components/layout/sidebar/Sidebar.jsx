@@ -1,5 +1,6 @@
 import { useState, useRef, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
+import { Dropdown, Tooltip, Button, Tag } from 'antd';
 import useEditorStore from '@store/useEditorStore';
 import useAuthStore from '@store/useAuthStore';
 import useThemeStore from '@store/useThemeStore';
@@ -20,36 +21,50 @@ import './sidebar.scss';
 
 function ToolbarButton({ title, onClick, children }) {
   return (
-    <div className="stb" title={title} onClick={onClick}>
-      {children}
-    </div>
+    <Tooltip title={title} placement="bottom" mouseEnterDelay={0.3}>
+      <div className="stb" onClick={onClick}>
+        {children}
+      </div>
+    </Tooltip>
   );
 }
 
-function SortDropdown({ open, onClose }) {
-  const { t } = useTranslation();
-  const { sortBy, sortOrder, setSortBy, setSortOrder } = useFileStore();
-  if (!open) return null;
-  return (
-    <div className="sort-dropdown" onClick={(e) => e.stopPropagation()} onMouseLeave={onClose}>
-      <div className={cn('sort-item', sortOrder === 'asc' && 'sort-item--active')} onClick={() => { setSortOrder('asc'); onClose(); }}>
+function renderSortDropdown({ sortBy, sortOrder, setSortBy, setSortOrder, t, close }) {
+  return () => (
+    <div className="sort-dropdown" onClick={(e) => e.stopPropagation()}>
+      <div
+        className={cn('sort-item', sortOrder === 'asc' && 'sort-item--active')}
+        onClick={() => { setSortOrder('asc'); close(); }}
+      >
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M3 6l4 4 4-4" /><path d="M7 10V2" /><path d="M21 12H11" /><path d="M21 6H11" /><path d="M21 18H11" /></svg>
         {t('sort.ascending')}
       </div>
-      <div className={cn('sort-item', sortOrder === 'desc' && 'sort-item--active')} onClick={() => { setSortOrder('desc'); onClose(); }}>
+      <div
+        className={cn('sort-item', sortOrder === 'desc' && 'sort-item--active')}
+        onClick={() => { setSortOrder('desc'); close(); }}
+      >
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M3 14l4 4 4-4" /><path d="M7 18V2" /><path d="M21 12H11" /><path d="M21 6H11" /><path d="M21 18H11" /></svg>
         {t('sort.descending')}
       </div>
       <div className="sort-divider" />
-      <div className={cn('sort-item', sortBy === 'name' && 'sort-item--active')} onClick={() => { setSortBy('name'); onClose(); }}>
+      <div
+        className={cn('sort-item', sortBy === 'name' && 'sort-item--active')}
+        onClick={() => { setSortBy('name'); close(); }}
+      >
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M4 7V4h16v3" /><path d="M9 20h6" /><path d="M12 4v16" /></svg>
         {t('sort.byName')}
       </div>
-      <div className={cn('sort-item', sortBy === 'time' && 'sort-item--active')} onClick={() => { setSortBy('time'); onClose(); }}>
+      <div
+        className={cn('sort-item', sortBy === 'time' && 'sort-item--active')}
+        onClick={() => { setSortBy('time'); close(); }}
+      >
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10" /><polyline points="12 6 12 12 16 14" /></svg>
         {t('sort.byTime')}
       </div>
-      <div className={cn('sort-item', sortBy === 'size' && 'sort-item--active')} onClick={() => { setSortBy('size'); onClose(); }}>
+      <div
+        className={cn('sort-item', sortBy === 'size' && 'sort-item--active')}
+        onClick={() => { setSortBy('size'); close(); }}
+      >
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="4" y="4" width="16" height="16" rx="2" /><path d="M9 9h6v6H9z" /></svg>
         {t('sort.bySize')}
       </div>
@@ -59,17 +74,30 @@ function SortDropdown({ open, onClose }) {
 
 function ExplorerToolbar() {
   const { t } = useTranslation();
-  const [sortOpen, setSortOpen] = useState(false);
+  const { sortBy, sortOrder, setSortBy, setSortOrder } = useFileStore();
   const { saveCurrentFile, openFolderDialog, createFileWithDialog } = useFileManager();
+
+  const [sortOpen, setSortOpen] = useState(false);
+  const closeSort = useCallback(() => setSortOpen(false), []);
 
   return (
     <div className="sidebar__toolbar">
       <span className="sidebar__toolbar-label">{t('sidebar.explorer.title')}</span>
       <div style={{ position: 'relative' }}>
-        <ToolbarButton title={t('sidebar.explorer.sort')} onClick={() => setSortOpen(!sortOpen)}>
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M3 6h18M3 12h12M3 18h6" /></svg>
-        </ToolbarButton>
-        <SortDropdown open={sortOpen} onClose={() => setSortOpen(false)} />
+        <Dropdown
+          open={sortOpen}
+          onOpenChange={setSortOpen}
+          trigger={['click']}
+          placement="bottomRight"
+          arrow={false}
+          dropdownRender={renderSortDropdown({ sortBy, sortOrder, setSortBy, setSortOrder, t, close: closeSort })}
+        >
+          <span>
+            <ToolbarButton title={t('sidebar.explorer.sort')}>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M3 6h18M3 12h12M3 18h6" /></svg>
+            </ToolbarButton>
+          </span>
+        </Dropdown>
       </div>
       <ToolbarButton title={t('sidebar.explorer.newFile')} onClick={createFileWithDialog}>
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 5v14M5 12h14" /></svg>
@@ -206,7 +234,12 @@ function RecentList({ onOpenStats }) {
               ? `${f.name} (cloud — Save As on first save)`
               : f.path;
             return (
-              <div key={f.path} className={cn('sidebar__recent-item', isBookmarked && 'sidebar__recent-item--bookmarked')} onClick={() => openFileFromPath(f.path, f.name)} title={titleText}>
+              <div
+                key={f.path}
+                className={cn('sidebar__recent-item', isBookmarked && 'sidebar__recent-item--bookmarked')}
+                onClick={() => openFileFromPath(f.path, f.name)}
+                title={titleText}
+              >
                 <span className="sidebar__recent-icon">
                   <FileTypeIcon extension={f.ext} fileName={f.name} />
                   {isCloud && (
@@ -223,7 +256,11 @@ function RecentList({ onOpenStats }) {
                     <svg viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" strokeWidth="2" width="12" height="12"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z" /></svg>
                   </span>
                 )}
-                <span className="sidebar__recent-del" onClick={(e) => handleRemove(e, f)} title={t('sidebar.recent.remove')}>
+                <span
+                  className="sidebar__recent-del"
+                  onClick={(e) => handleRemove(e, f)}
+                  title={t('sidebar.recent.remove')}
+                >
                   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>
                 </span>
               </div>
@@ -302,27 +339,40 @@ function Sidebar({ onOpenSettings, onOpenStats, onOpenLogin }) {
 
       <footer className="sidebar__footer">
         <UserMenu onOpenLogin={onOpenLogin} />
-        <span className="sidebar__version">v0.1.0</span>
+        <Tag className="sidebar__version" bordered={false}>v0.1.0</Tag>
         <span className="sidebar__status-dot" title="Connected" />
         <div style={{ marginLeft: 'auto', display: 'flex', gap: 2, alignItems: 'center' }}>
-          <button
-            ref={themeButtonRef}
-            className="sidebar__footer-btn"
-            onClick={handleThemeSwitch}
-            title={t('sidebar.footer.themeSwitch')}
-          >
-            {theme === 'dark' ? (
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="5" /><line x1="12" y1="1" x2="12" y2="3" /><line x1="12" y1="21" x2="12" y2="23" /><line x1="4.22" y1="4.22" x2="5.64" y2="5.64" /><line x1="18.36" y1="18.36" x2="19.78" y2="19.78" /><line x1="1" y1="12" x2="3" y2="12" /><line x1="21" y1="12" x2="23" y2="12" /><line x1="4.22" y1="19.78" x2="5.64" y2="18.36" /><line x1="18.36" y1="5.64" x2="19.78" y2="4.22" /></svg>
-            ) : (
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" /></svg>
-            )}
-          </button>
-          <button className="sidebar__footer-btn" onClick={() => notify('info', t('notification.upToDate'))} title={t('sidebar.footer.checkUpdates')}>
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="23 4 23 10 17 10" /><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10" /></svg>
-          </button>
-          <button className="sidebar__footer-btn" onClick={() => onOpenSettings?.()} title={t('sidebar.footer.settings')}>
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="3" /><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z" /></svg>
-          </button>
+          <Tooltip title={t('sidebar.footer.themeSwitch')} placement="top" mouseEnterDelay={0.3}>
+            <Button
+              ref={themeButtonRef}
+              type="text"
+              className="sidebar__footer-btn"
+              onClick={handleThemeSwitch}
+              icon={
+                theme === 'dark' ? (
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="5" /><line x1="12" y1="1" x2="12" y2="3" /><line x1="12" y1="21" x2="12" y2="23" /><line x1="4.22" y1="4.22" x2="5.64" y2="5.64" /><line x1="18.36" y1="18.36" x2="19.78" y2="19.78" /><line x1="1" y1="12" x2="3" y2="12" /><line x1="21" y1="12" x2="23" y2="12" /><line x1="4.22" y1="19.78" x2="5.64" y2="18.36" /><line x1="18.36" y1="5.64" x2="19.78" y2="4.22" /></svg>
+                ) : (
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" /></svg>
+                )
+              }
+            />
+          </Tooltip>
+          <Tooltip title={t('sidebar.footer.checkUpdates')} placement="top" mouseEnterDelay={0.3}>
+            <Button
+              type="text"
+              className="sidebar__footer-btn"
+              onClick={() => notify('info', t('notification.upToDate'))}
+              icon={<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="23 4 23 10 17 10" /><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10" /></svg>}
+            />
+          </Tooltip>
+          <Tooltip title={t('sidebar.footer.settings')} placement="top" mouseEnterDelay={0.3}>
+            <Button
+              type="text"
+              className="sidebar__footer-btn"
+              onClick={() => onOpenSettings?.()}
+              icon={<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="3" /><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z" /></svg>}
+            />
+          </Tooltip>
         </div>
       </footer>
     </aside>

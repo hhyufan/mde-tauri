@@ -1,3 +1,58 @@
+/* Poppins */
+@font-face {
+  font-family: 'Poppins';
+  src: url('../font/Poppins-Regular.woff2') format('woff2');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Poppins';
+  src: url('../font/Poppins-SemiBold.woff2') format('woff2');
+  font-weight: 600;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Poppins';
+  src: url('../font/Poppins-Italic.woff2') format('woff2');
+  font-weight: 400;
+  font-style: italic;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Poppins';
+  src: url('../font/Poppins-SemiBoldItalic.woff2') format('woff2');
+  font-weight: 600;
+  font-style: italic;
+  font-display: swap;
+}
+
+/* JetBrains Mono */
+@font-face {
+  font-family: 'JetBrains Mono';
+  src: url('../font/JetBrainsMono-VariableFont_wght.woff2') format('woff2');
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'JetBrains Mono';
+  src: url('../font/JetBrainsMono-Italic-VariableFont_wght.woff2') format('woff2');
+  font-style: italic;
+  font-display: swap;
+}
+
+/* Source Han Sans SC */
+@font-face {
+  font-family: 'Source-HanSan';
+  src: url('../font/SourceHanSansSC-Regular.woff2') format('woff2');
+  font-display: swap;
+}
+
 :root {
   --bg: #f5f5f7;
   --surface: #fff;
@@ -20,8 +75,8 @@
   --radius-sm: 6px;
   --shadow: 0 4px 12px rgba(60, 64, 67, 0.12);
   --shadow-lg: 0 8px 24px rgba(60, 64, 67, 0.18);
-  --font-app: 'Poppins', system-ui, -apple-system, sans-serif;
-  --font-editor: 'JetBrains Mono', 'Fira Code', monospace;
+  --font-app: 'Poppins', 'Source-HanSan', system-ui, -apple-system, sans-serif;
+  --font-editor: 'JetBrains Mono', 'Source-HanSan', monospace;
   --duration-theme-switch: 300ms;
 }
 
@@ -62,12 +117,21 @@ html[data-theme='dark'] {
 
 html {
   color: var(--text);
+  font-family: var(--font-app);
   font-size: 16px;
   font-weight: 400;
   font-synthesis: none;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+}
+
+// Form elements don't inherit font-family by default in all browsers
+input,
+button,
+select,
+textarea {
+  font-family: inherit;
 }
 
 html,

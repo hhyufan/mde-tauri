@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { Modal, Tabs, Form, Input, Button } from 'antd';
 import useAuthStore from '@store/useAuthStore';
 import useNotificationStore from '@store/useNotificationStore';
 import './login-modal.scss';
@@ -7,16 +8,12 @@ import './login-modal.scss';
 function LoginModal({ open, onClose, onLoggedIn }) {
   const { t } = useTranslation();
   const [mode, setMode] = useState('login');
-  const [email, setEmail] = useState('');
-  const [username, setUsername] = useState('');
-  const [password, setPassword] = useState('');
   const { login, register, loading } = useAuthStore();
   const notify = useNotificationStore((s) => s.notify);
+  const [form] = Form.useForm();
 
-  if (!open) return null;
-
-  async function handleSubmit(e) {
-    e.preventDefault();
+  async function handleSubmit(values) {
+    const { email, username, password } = values;
     try {
       if (mode === 'login') {
         await login(email, password);
@@ -34,77 +31,89 @@ function LoginModal({ open, onClose, onLoggedIn }) {
   }
 
   return (
-    <div className="login-overlay" onClick={onClose}>
-      <div className="login-modal" onClick={(e) => e.stopPropagation()}>
-        <button className="login-modal__close" onClick={onClose}>
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width="14" height="14"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>
-        </button>
-
+    <Modal
+      open={open}
+      onCancel={onClose}
+      footer={null}
+      width={400}
+      centered
+      destroyOnClose
+      maskClosable
+      rootClassName="mde-login-modal-root"
+    >
+      <div className="login-modal__inner">
         <div className="login-modal__header">
           <div className="login-modal__logo">M</div>
           <h2>{t('auth.title')}</h2>
         </div>
 
-        <div className="login-modal__tabs">
-          <button
-            className={`login-modal__tab ${mode === 'login' ? 'login-modal__tab--active' : ''}`}
-            onClick={() => setMode('login')}
-          >
-            {t('auth.login')}
-          </button>
-          <button
-            className={`login-modal__tab ${mode === 'register' ? 'login-modal__tab--active' : ''}`}
-            onClick={() => setMode('register')}
-          >
-            {t('auth.register')}
-          </button>
-        </div>
+        <Tabs
+          activeKey={mode}
+          onChange={(key) => setMode(key)}
+          centered
+          items={[
+            { key: 'login', label: t('auth.login') },
+            { key: 'register', label: t('auth.register') },
+          ]}
+        />
 
-        <form className="login-modal__form" onSubmit={handleSubmit}>
-          <label>
-            <span>{t('auth.email')}</span>
-            <input
-              type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              required
-              autoFocus
-              placeholder="you@example.com"
-            />
-          </label>
+        <Form
+          form={form}
+          layout="vertical"
+          requiredMark={false}
+          onFinish={handleSubmit}
+          autoComplete="off"
+          preserve={false}
+        >
+          <Form.Item
+            label={t('auth.email')}
+            name="email"
+            rules={[
+              { required: true, message: t('auth.email') },
+              { type: 'email', message: t('auth.email') },
+            ]}
+          >
+            <Input placeholder="you@example.com" autoFocus />
+          </Form.Item>
 
           {mode === 'register' && (
-            <label>
-              <span>{t('auth.username')}</span>
-              <input
-                type="text"
-                value={username}
-                onChange={(e) => setUsername(e.target.value)}
-                required
-                minLength={2}
-                placeholder={t('auth.usernamePlaceholder')}
-              />
-            </label>
+            <Form.Item
+              label={t('auth.username')}
+              name="username"
+              rules={[
+                { required: true, message: t('auth.username') },
+                { min: 2, message: t('auth.username') },
+              ]}
+            >
+              <Input placeholder={t('auth.usernamePlaceholder')} />
+            </Form.Item>
           )}
 
-          <label>
-            <span>{t('auth.password')}</span>
-            <input
-              type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              required
-              minLength={6}
-              placeholder="••••••"
-            />
-          </label>
+          <Form.Item
+            label={t('auth.password')}
+            name="password"
+            rules={[
+              { required: true, message: t('auth.password') },
+              { min: 6, message: t('auth.password') },
+            ]}
+          >
+            <Input.Password placeholder="••••••" />
+          </Form.Item>
 
-          <button className="login-modal__submit" type="submit" disabled={loading}>
-            {loading ? t('auth.loading') : mode === 'login' ? t('auth.login') : t('auth.register')}
-          </button>
-        </form>
+          <Form.Item style={{ marginBottom: 0, marginTop: 4 }}>
+            <Button
+              type="primary"
+              htmlType="submit"
+              block
+              loading={loading}
+              size="large"
+            >
+              {mode === 'login' ? t('auth.login') : t('auth.register')}
+            </Button>
+          </Form.Item>
+        </Form>
       </div>
-    </div>
+    </Modal>
   );
 }
 

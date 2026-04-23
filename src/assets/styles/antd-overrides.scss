@@ -1,0 +1,525 @@
+// Global antd v5 visual overrides so antd components blend into the existing
+// BEM-based design system without altering visual appearance.
+
+// ── Layout pass-through ─────────────────────────────────────────────────────
+// <App> from antd wraps children in a .ant-app div. Its default styles don't
+// set a height, which breaks the #root -> .ant-app -> .app height chain and
+// causes the main layout to either collapse or leave black space below.
+// Keep it transparent and full-size so the existing layout works unchanged.
+.ant-app {
+  width: 100%;
+  height: 100%;
+  color: inherit;
+  background: transparent;
+}
+
+// ── Button ──────────────────────────────────────────────────────────────────
+.ant-btn {
+  box-shadow: none !important;
+  border-radius: var(--radius-sm);
+  font-family: inherit;
+
+  &:focus-visible {
+    outline: none;
+    box-shadow: 0 0 0 2px var(--accent-bg) !important;
+  }
+
+  &.ant-btn-text {
+    color: var(--text-sec);
+
+    &:hover,
+    &:focus {
+      color: var(--text) !important;
+      background: var(--hover) !important;
+    }
+
+    &.ant-btn-dangerous {
+      color: var(--error);
+    }
+  }
+
+  &.ant-btn-primary:not(:disabled) {
+    background: var(--accent);
+    color: #fff;
+
+    &:hover {
+      background: var(--accent);
+      filter: brightness(1.08);
+    }
+  }
+
+  &.ant-btn-default {
+    background: var(--surface);
+    border-color: var(--border);
+    color: var(--text);
+
+    &:hover {
+      border-color: var(--accent);
+      color: var(--accent) !important;
+      background: var(--surface);
+    }
+  }
+}
+
+// ── Input / Select / InputNumber ────────────────────────────────────────────
+.ant-input,
+.ant-input-affix-wrapper,
+.ant-input-number,
+.ant-input-number-affix-wrapper,
+.ant-select:not(.ant-select-customize-input) .ant-select-selector,
+.ant-picker {
+  background: var(--surface);
+  border-color: var(--border);
+  color: var(--text);
+  border-radius: var(--radius-sm);
+  font-family: var(--font-app);
+
+  &::placeholder {
+    color: var(--text-dim);
+  }
+}
+
+.ant-input-affix-wrapper,
+.ant-input-number-affix-wrapper {
+  .ant-input {
+    background: transparent;
+  }
+}
+
+.ant-input:focus,
+.ant-input-focused,
+.ant-input-affix-wrapper-focused,
+.ant-input-number-focused,
+.ant-select-focused:not(.ant-select-disabled) .ant-select-selector,
+.ant-picker-focused {
+  border-color: var(--accent) !important;
+  box-shadow: none !important;
+}
+
+.ant-select-dropdown {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-lg);
+
+  .ant-select-item {
+    color: var(--text);
+    border-radius: var(--radius-sm);
+    padding: 6px 10px;
+    font-family: var(--font-app);
+
+    &.ant-select-item-option-active {
+      background: var(--hover);
+    }
+
+    &.ant-select-item-option-selected {
+      background: var(--accent-light);
+      color: var(--accent);
+      font-weight: 500;
+    }
+  }
+}
+
+// ── Switch ──────────────────────────────────────────────────────────────────
+.ant-switch {
+  background: var(--text-dim);
+
+  &.ant-switch-checked {
+    background: var(--accent) !important;
+  }
+}
+
+// ── Modal ───────────────────────────────────────────────────────────────────
+.ant-modal-root {
+  .ant-modal-mask {
+    background: rgba(0, 0, 0, 0.35);
+    backdrop-filter: blur(2px);
+  }
+
+  .ant-modal {
+    font-family: var(--font-app);
+  }
+
+  .ant-modal-content {
+    background: var(--surface);
+    color: var(--text);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow-lg);
+    padding: 0;
+  }
+
+  .ant-modal-header {
+    background: transparent;
+    margin: 0;
+    padding: 0;
+  }
+
+  .ant-modal-title {
+    color: var(--text);
+    font-family: inherit;
+    margin: 0;
+  }
+
+  .ant-modal-body {
+    color: var(--text);
+    padding: 0;
+  }
+
+  .ant-modal-close {
+    color: var(--text-sec);
+
+    &:hover {
+      background: var(--hover);
+      color: var(--text);
+    }
+  }
+}
+
+// Let custom BEM overlays keep their own look when hosted inside antd Modal
+// (LoginModal, SettingsModal, etc. wrap their content in the original BEM
+// roots and do not need antd's default padding / header).
+.mde-naked-modal {
+  .ant-modal-content {
+    background: transparent;
+    box-shadow: none;
+    padding: 0;
+  }
+  .ant-modal-body {
+    padding: 0;
+  }
+}
+
+// Per-modal padding/spacing helpers
+.mde-login-modal-root .ant-modal-content {
+  padding: 28px 32px 24px;
+}
+
+.login-modal__inner .ant-tabs-nav {
+  margin-bottom: 18px;
+}
+
+.mde-stats-modal-root {
+  .ant-modal-content {
+    padding: 0;
+  }
+  .ant-modal-header {
+    padding: 16px 20px;
+    border-bottom: 1px solid var(--border);
+    margin-bottom: 0;
+  }
+  .ant-modal-body {
+    padding: 0;
+  }
+}
+
+.mde-search-modal-root .ant-modal-content {
+  padding: 0;
+  overflow: hidden;
+}
+
+.mde-settings-modal-root {
+  .ant-modal-content {
+    padding: 0;
+    overflow: hidden;
+  }
+  .ant-modal-body {
+    padding: 0;
+  }
+  // Neutralise the legacy .settings-modal fixed width/height so the inner
+  // layout fills the antd Modal dialog exactly.
+  .settings-modal {
+    width: 100%;
+    max-width: none;
+    height: 540px;
+    max-height: 80vh;
+    background: transparent;
+    border-radius: 0;
+    box-shadow: none;
+  }
+  // antd Menu used as the settings nav — flatten it visually so items match
+  // the existing .settings-modal__nav-item look.
+  .settings-modal__nav.ant-menu {
+    padding: 8px;
+    border-inline-end: 1px solid var(--border) !important;
+    background: transparent;
+
+    .ant-menu-item {
+      height: auto;
+      line-height: 1.4;
+      padding: 10px 12px !important;
+      margin: 2px 0;
+      border-radius: var(--radius-sm);
+      font-size: 13px;
+      font-family: var(--font-app);
+      color: var(--text-sec);
+
+      &:hover {
+        background: var(--hover) !important;
+        color: var(--text) !important;
+      }
+
+      &.ant-menu-item-selected {
+        background: var(--accent-bg) !important;
+        color: var(--accent) !important;
+        font-weight: 500;
+
+        &::after {
+          display: none;
+        }
+      }
+    }
+  }
+}
+
+.mde-conflict-modal-root .ant-modal-content {
+  padding: 0;
+  overflow: hidden;
+}
+
+// Sidebar version Tag — small grey pill that predated antd Tag. Override
+// antd Tag defaults so font-size / color match the existing SCSS.
+.ant-tag.sidebar__version {
+  margin-inline-end: 0;
+  font-family: var(--font-editor);
+  font-size: 10px;
+  line-height: 14px;
+  color: var(--text-sec);
+  background: var(--hover);
+  border-color: transparent;
+  padding: 2px 6px;
+  border-radius: 4px;
+}
+
+// When antd Button is used as a small icon slot inside our legacy BEM chrome
+// (sidebar footer buttons, stb toolbar buttons), force square sizing and
+// neutralise antd's default min-width/padding.
+.ant-btn.sidebar__footer-btn {
+  width: 26px;
+  height: 26px;
+  min-width: 26px;
+  padding: 0;
+
+  > .ant-btn-icon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    line-height: 0;
+
+    svg {
+      width: 14px;
+      height: 14px;
+    }
+  }
+}
+
+// ── Dropdown / Menu ─────────────────────────────────────────────────────────
+.ant-dropdown {
+  .ant-dropdown-menu {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow-lg);
+    padding: 4px;
+  }
+
+  .ant-dropdown-menu-item,
+  .ant-dropdown-menu-submenu-title {
+    color: var(--text);
+    border-radius: var(--radius-sm);
+    padding: 6px 10px;
+    font-size: 12px;
+    font-family: var(--font-app);
+
+    &:hover {
+      background: var(--hover) !important;
+    }
+
+    &.ant-dropdown-menu-item-selected {
+      background: var(--accent-light) !important;
+      color: var(--accent);
+    }
+
+    &.ant-dropdown-menu-item-danger {
+      color: var(--error);
+
+      &:hover {
+        background: rgba(255, 59, 48, 0.08) !important;
+        color: var(--error) !important;
+      }
+    }
+  }
+}
+
+// ── Tooltip ─────────────────────────────────────────────────────────────────
+.ant-tooltip .ant-tooltip-inner {
+  font-size: 11px;
+  padding: 4px 8px;
+  min-height: unset;
+  border-radius: var(--radius-sm);
+  color: var(--text);
+}
+
+html[data-theme='light'] {
+  .ant-tooltip .ant-tooltip-inner {
+    background: #ffffff;
+    color: var(--text);
+    border: 1px solid var(--border-light);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+  }
+  .ant-tooltip .ant-tooltip-arrow::before,
+  .ant-tooltip .ant-tooltip-arrow::after {
+    background: #ffffff !important;
+  }
+}
+
+html[data-theme='dark'] {
+  .ant-tooltip .ant-tooltip-inner {
+    background: var(--surface);
+    color: var(--text);
+    border: 1px solid var(--border);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
+  }
+  .ant-tooltip .ant-tooltip-arrow::before,
+  .ant-tooltip .ant-tooltip-arrow::after {
+    background: var(--surface) !important;
+  }
+}
+
+// ── Tabs ────────────────────────────────────────────────────────────────────
+.ant-tabs {
+  color: var(--text);
+  font-family: var(--font-app);
+
+  .ant-tabs-tab {
+    color: var(--text-sec);
+    padding: 8px 12px;
+
+    &:hover {
+      color: var(--text);
+    }
+  }
+
+  .ant-tabs-tab-active .ant-tabs-tab-btn {
+    color: var(--accent) !important;
+  }
+
+  .ant-tabs-ink-bar {
+    background: var(--accent);
+  }
+
+  .ant-tabs-nav::before {
+    border-bottom-color: var(--border-light);
+  }
+}
+
+// ── Tree ────────────────────────────────────────────────────────────────────
+.ant-tree {
+  background: transparent;
+  color: var(--text);
+  font-size: 12px;
+  font-family: var(--font-app);
+
+  .ant-tree-node-content-wrapper {
+    border-radius: var(--radius-sm);
+
+    &:hover {
+      background: var(--hover) !important;
+    }
+
+    &.ant-tree-node-selected {
+      background: var(--accent-light) !important;
+      color: var(--accent);
+    }
+  }
+
+  .ant-tree-switcher {
+    color: var(--text-sec);
+  }
+}
+
+// ── Form ────────────────────────────────────────────────────────────────────
+.ant-form-item {
+  margin-bottom: 14px;
+
+  .ant-form-item-label > label {
+    color: var(--text-sec);
+    font-size: 12px;
+    font-family: var(--font-app);
+  }
+}
+
+// Keep antd's ad-hoc message/notification popups (used inside custom
+// components as small helpers) on the same font family as the app.
+.ant-notification,
+.ant-message {
+  font-family: var(--font-app);
+}
+
+// ── Empty / Spin / Alert tone alignment ─────────────────────────────────────
+.ant-empty-description {
+  color: var(--text-sec);
+}
+
+.ant-spin-dot-item {
+  background: var(--accent);
+}
+
+.ant-alert {
+  border-radius: var(--radius-sm);
+}
+
+// ── Avatar ──────────────────────────────────────────────────────────────────
+.ant-avatar {
+  background: var(--accent);
+  color: #fff;
+  font-weight: 600;
+}
+
+// ── Segmented ───────────────────────────────────────────────────────────────
+.ant-segmented {
+  background: var(--hover);
+  padding: 3px;
+  border-radius: var(--radius-sm);
+  font-family: var(--font-app);
+
+  .ant-segmented-item-selected {
+    background: var(--surface);
+    color: var(--text);
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.08);
+  }
+}
+
+// ── Card ────────────────────────────────────────────────────────────────────
+.ant-card {
+  background: var(--surface);
+  border-color: var(--border-light);
+  border-radius: var(--radius);
+  color: var(--text);
+}
+
+// ── Table (used inside StatsPanel) ──────────────────────────────────────────
+.ant-table-wrapper .ant-table {
+  background: transparent;
+  color: var(--text);
+  font-size: 12px;
+  font-family: var(--font-app);
+
+  .ant-table-thead > tr > th {
+    background: var(--hover);
+    color: var(--text-sec);
+    font-weight: 500;
+    border-bottom-color: var(--border-light);
+  }
+
+  .ant-table-tbody > tr {
+    background: transparent;
+
+    > td {
+      border-bottom-color: var(--border-light);
+    }
+
+    &:hover > td {
+      background: var(--hover) !important;
+    }
+  }
+}

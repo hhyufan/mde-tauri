@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { Alert } from 'antd';
 import mermaid from 'mermaid';
 
 mermaid.initialize({
@@ -42,7 +43,13 @@ function MermaidRenderer({ code, isDark }) {
   if (error) {
     return (
       <div className="md-preview__mermaid md-preview__mermaid--error">
-        <span>Mermaid Error:</span> {error}
+        <Alert
+          type="error"
+          showIcon
+          message="Mermaid Error"
+          description={error}
+          style={{ background: 'transparent', border: 'none', padding: 0 }}
+        />
       </div>
     );
   }

@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { Tooltip } from 'antd';
 import useFileStore from '@store/useFileStore';
 import useEditorStore from '@store/useEditorStore';
 import { useFileManager } from '@hooks/useFileManager';
@@ -213,56 +214,79 @@ function FileTree() {
     );
   }
 
+  const navBtn = (title, className, onClick, disabled, icon) => (
+    <Tooltip title={title} placement="bottom" mouseEnterDelay={0.3}>
+      <button
+        className={className}
+        onClick={onClick}
+        disabled={disabled}
+        type="button"
+      >
+        {icon}
+      </button>
+    </Tooltip>
+  );
+
   return (
     <div className="file-tree">
       {/* Navigation bar */}
       <div className="file-tree__nav">
-        <button
-          className={cn('file-tree__nav-btn', !canGoBack && 'file-tree__nav-btn--disabled')}
-          onClick={handleGoBack}
-          title={t('sidebar.explorer.back')}
-          disabled={!canGoBack}
-        >
+        {navBtn(
+          t('sidebar.explorer.back'),
+          cn('file-tree__nav-btn', !canGoBack && 'file-tree__nav-btn--disabled'),
+          handleGoBack,
+          !canGoBack,
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
             <line x1="19" y1="12" x2="5" y2="12" /><polyline points="12 19 5 12 12 5" />
-          </svg>
-        </button>
-        <button
-          className={cn('file-tree__nav-btn', !canGoForward && 'file-tree__nav-btn--disabled')}
-          onClick={handleGoForward}
-          title={t('sidebar.explorer.forward')}
-          disabled={!canGoForward}
-        >
+          </svg>,
+        )}
+        {navBtn(
+          t('sidebar.explorer.forward'),
+          cn('file-tree__nav-btn', !canGoForward && 'file-tree__nav-btn--disabled'),
+          handleGoForward,
+          !canGoForward,
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
             <line x1="5" y1="12" x2="19" y2="12" /><polyline points="12 5 19 12 12 19" />
-          </svg>
-        </button>
-        <button className="file-tree__nav-btn" onClick={handleGoUp} title={t('sidebar.explorer.up')}>
+          </svg>,
+        )}
+        {navBtn(
+          t('sidebar.explorer.up'),
+          'file-tree__nav-btn',
+          handleGoUp,
+          false,
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
             <line x1="12" y1="19" x2="12" y2="5" /><polyline points="5 12 12 5 19 12" />
-          </svg>
-        </button>
+          </svg>,
+        )}
         <div className="file-tree__nav-sep" />
-        <button className="file-tree__nav-btn" onClick={() => loadDirectory(currentDir)} title={t('sidebar.explorer.refresh')}>
+        {navBtn(
+          t('sidebar.explorer.refresh'),
+          'file-tree__nav-btn',
+          () => loadDirectory(currentDir),
+          false,
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
             <polyline points="23 4 23 10 17 10" /><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10" />
-          </svg>
-        </button>
-        <button className="file-tree__nav-btn" onClick={() => openInExplorer(currentDir)} title={t('sidebar.explorer.openInExplorer')}>
+          </svg>,
+        )}
+        {navBtn(
+          t('sidebar.explorer.openInExplorer'),
+          'file-tree__nav-btn',
+          () => openInExplorer(currentDir),
+          false,
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
             <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z" />
-          </svg>
-        </button>
+          </svg>,
+        )}
         <div className="file-tree__nav-sep" />
-        <button
-          className="file-tree__nav-btn file-tree__nav-btn--close"
-          onClick={handleCloseFolder}
-          title={t('sidebar.explorer.closeFolder')}
-        >
+        {navBtn(
+          t('sidebar.explorer.closeFolder'),
+          'file-tree__nav-btn file-tree__nav-btn--close',
+          handleCloseFolder,
+          false,
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
             <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
-          </svg>
-        </button>
+          </svg>,
+        )}
       </div>
 
       {/* Breadcrumb */}
@@ -299,13 +323,14 @@ function FileTree() {
                   <svg className="file-tree__breadcrumb-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                     <polyline points="9 18 15 12 9 6" />
                   </svg>
-                  <span
-                    className="file-tree__breadcrumb-ellipsis"
-                    title={t('sidebar.explorer.expandBreadcrumb')}
-                    onClick={() => setBreadcrumbExpanded(true)}
-                  >
-                    …
-                  </span>
+                  <Tooltip title={t('sidebar.explorer.expandBreadcrumb')} placement="bottom" mouseEnterDelay={0.3}>
+                    <span
+                      className="file-tree__breadcrumb-ellipsis"
+                      onClick={() => setBreadcrumbExpanded(true)}
+                    >
+                      …
+                    </span>
+                  </Tooltip>
                 </span>
                 <span className="file-tree__breadcrumb-item">
                   <svg className="file-tree__breadcrumb-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -351,15 +376,17 @@ function FileTree() {
 
         {/* Collapse button — shown when expanded and path was long */}
         {breadcrumbParts.length > 3 && breadcrumbExpanded && (
-          <button
-            className="file-tree__breadcrumb-collapse"
-            title={t('sidebar.explorer.collapseBreadcrumb')}
-            onClick={() => setBreadcrumbExpanded(false)}
-          >
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width="10" height="10">
-              <polyline points="18 15 12 9 6 15" />
-            </svg>
-          </button>
+          <Tooltip title={t('sidebar.explorer.collapseBreadcrumb')} placement="bottom" mouseEnterDelay={0.3}>
+            <button
+              className="file-tree__breadcrumb-collapse"
+              onClick={() => setBreadcrumbExpanded(false)}
+              type="button"
+            >
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width="10" height="10">
+                <polyline points="18 15 12 9 6 15" />
+              </svg>
+            </button>
+          </Tooltip>
         )}
       </div>
 

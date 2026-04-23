@@ -1,4 +1,18 @@
 import { useState } from 'react';
+import { Modal, Menu, Switch, Select, Input, InputNumber, Button, Space } from 'antd';
+import {
+  SettingOutlined,
+  BgColorsOutlined,
+  EditOutlined,
+  CloudOutlined,
+  PlusOutlined,
+  MinusOutlined,
+  SyncOutlined,
+  CloudDownloadOutlined,
+  ExportOutlined,
+  ImportOutlined,
+  LogoutOutlined,
+} from '@ant-design/icons';
 import { open, save } from '@tauri-apps/plugin-dialog';
 import { readTextFile, writeTextFile } from '@tauri-apps/plugin-fs';
 import { useTranslation } from 'react-i18next';
@@ -15,19 +29,15 @@ import {
 import './settings-modal.scss';
 
 const NAV_ICONS = {
-  general: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width="16" height="16"><circle cx="12" cy="12" r="3" /><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z" /></svg>,
-  appearance: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width="16" height="16"><circle cx="13.5" cy="6.5" r="2.5" /><circle cx="19" cy="13" r="2" /><circle cx="15.5" cy="19.5" r="1.5" /><circle cx="6" cy="12" r="3" /><path d="M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10c.9 0 1.5-.7 1.5-1.5 0-.4-.1-.7-.4-1-.2-.3-.4-.6-.4-1 0-.8.7-1.5 1.5-1.5H16c3.3 0 6-2.7 6-6 0-5.5-4.5-9-10-9z" /></svg>,
-  editor: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width="16" height="16"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" /><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" /></svg>,
-  cloud: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width="16" height="16"><path d="M18 10h-1.26A8 8 0 1 0 9 20h9a5 5 0 0 0 0-10z" /></svg>,
+  general: <SettingOutlined />,
+  appearance: <BgColorsOutlined />,
+  editor: <EditOutlined />,
+  cloud: <CloudOutlined />,
 };
-const NAV_ITEMS = [
-  { id: 'general' },
-  { id: 'appearance' },
-  { id: 'editor' },
-  { id: 'cloud' },
-];
 
-function SettingsModal({ open, onClose }) {
+const NAV_KEYS = ['general', 'appearance', 'editor', 'cloud'];
+
+function SettingsModal({ open: openProp, onClose }) {
   const { t, i18n } = useTranslation();
   const [activeNav, setActiveNav] = useState('general');
   const [cloudBusy, setCloudBusy] = useState(false);
@@ -35,8 +45,6 @@ function SettingsModal({ open, onClose }) {
   const { theme, setTheme } = useThemeStore();
   const { isLoggedIn, user, logout } = useAuthStore();
   const notify = useNotificationStore((s) => s.notify);
-
-  if (!open) return null;
 
   function handleChange(key, value) {
     config.setConfig(key, value);
@@ -112,9 +120,27 @@ function SettingsModal({ open, onClose }) {
     }
   }
 
+  const menuItems = NAV_KEYS.map((key) => ({
+    key,
+    icon: NAV_ICONS[key],
+    label: t(`settings.nav.${key}`),
+  }));
+
   return (
-    <div className="settings-overlay" onClick={onClose}>
-      <div className="settings-modal" onClick={(e) => e.stopPropagation()}>
+    <Modal
+      open={openProp}
+      onCancel={onClose}
+      footer={null}
+      width={760}
+      centered
+      destroyOnClose
+      maskClosable
+      closable
+      rootClassName="mde-settings-modal-root"
+      styles={{ body: { padding: 0 }, content: { padding: 0 } }}
+      title={null}
+    >
+      <div className="settings-modal">
         <div className="settings-modal__header">
           <div className="settings-modal__header-left">
             <div className="settings-modal__header-icon">
@@ -125,24 +151,17 @@ function SettingsModal({ open, onClose }) {
               <span className="settings-modal__header-sub">{t(`settings.nav.${activeNav}`)}</span>
             </div>
           </div>
-          <button className="settings-modal__close" onClick={onClose} title="Esc">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width="14" height="14"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>
-          </button>
         </div>
 
         <div className="settings-modal__body">
-          <nav className="settings-modal__nav">
-            {NAV_ITEMS.map((item) => (
-              <button
-                key={item.id}
-                className={`settings-modal__nav-item ${activeNav === item.id ? 'settings-modal__nav-item--active' : ''}`}
-                onClick={() => setActiveNav(item.id)}
-              >
-                <span className="settings-modal__nav-icon">{NAV_ICONS[item.id]}</span>
-                <span>{t(`settings.nav.${item.id}`)}</span>
-              </button>
-            ))}
-          </nav>
+          <Menu
+            className="settings-modal__nav"
+            mode="inline"
+            selectedKeys={[activeNav]}
+            onClick={({ key }) => setActiveNav(key)}
+            items={menuItems}
+            style={{ width: 180 }}
+          />
 
           <div className="settings-modal__content">
             {activeNav === 'general' && (
@@ -152,20 +171,22 @@ function SettingsModal({ open, onClose }) {
                   label={t('settings.general.language')}
                   desc={t('settings.general.languageDesc')}
                 >
-                  <select
+                  <Select
+                    style={{ width: 160 }}
                     value={config.language}
-                    onChange={(e) => handleChange('language', e.target.value)}
-                  >
-                    <option value="en">English</option>
-                    <option value="zh">中文</option>
-                  </select>
+                    onChange={(v) => handleChange('language', v)}
+                    options={[
+                      { value: 'en', label: 'English' },
+                      { value: 'zh', label: '中文' },
+                    ]}
+                  />
                 </SettingRow>
                 <SettingRow
                   label={t('settings.general.workspacePath')}
                   desc={t('settings.general.workspacePathDesc')}
                 >
-                  <input
-                    type="text"
+                  <Input
+                    style={{ width: 260 }}
                     value={config.workspacePath}
                     onChange={(e) => handleChange('workspacePath', e.target.value)}
                     placeholder="/path/to/workspace"
@@ -176,7 +197,7 @@ function SettingsModal({ open, onClose }) {
                   label={t('settings.general.startup')}
                   desc={t('settings.general.startupDesc')}
                 >
-                  <ToggleSwitch
+                  <Switch
                     checked={config.autoSave}
                     onChange={(v) => handleChange('autoSave', v)}
                   />
@@ -215,25 +236,30 @@ function SettingsModal({ open, onClose }) {
                   label={t('settings.appearance.fontSize')}
                   desc={t('settings.appearance.fontSizeDesc')}
                 >
-                  <div className="setting-number-row">
-                    <button
-                      className="setting-number-btn"
-                      type="button"
-                      onClick={() => handleChange('fontSize', Math.max(10, (config.fontSize || 14) - 1))}
-                    >−</button>
-                    <input
-                      type="number"
-                      min={10}
-                      max={24}
-                      value={config.fontSize}
-                      onChange={(e) => handleChange('fontSize', Number(e.target.value))}
-                    />
-                    <button
-                      className="setting-number-btn"
-                      type="button"
-                      onClick={() => handleChange('fontSize', Math.min(24, (config.fontSize || 14) + 1))}
-                    >+</button>
-                  </div>
+                  <InputNumber
+                    min={10}
+                    max={24}
+                    step={1}
+                    value={config.fontSize}
+                    onChange={(v) => handleChange('fontSize', Number(v) || 14)}
+                    addonBefore={
+                      <Button
+                        type="text"
+                        size="small"
+                        icon={<MinusOutlined />}
+                        onClick={() => handleChange('fontSize', Math.max(10, (config.fontSize || 14) - 1))}
+                      />
+                    }
+                    addonAfter={
+                      <Button
+                        type="text"
+                        size="small"
+                        icon={<PlusOutlined />}
+                        onClick={() => handleChange('fontSize', Math.min(24, (config.fontSize || 14) + 1))}
+                      />
+                    }
+                    style={{ width: 180 }}
+                  />
                 </SettingRow>
               </div>
             )}
@@ -245,36 +271,40 @@ function SettingsModal({ open, onClose }) {
                   label={t('settings.editor.fontFamily')}
                   desc={t('settings.editor.fontFamilyDesc')}
                 >
-                  <select
+                  <Select
+                    style={{ width: 200 }}
                     value={config.fontFamily}
-                    onChange={(e) => handleChange('fontFamily', e.target.value)}
-                  >
-                    <option value="JetBrains Mono">JetBrains Mono</option>
-                    <option value="Fira Code">Fira Code</option>
-                    <option value="Cascadia Code">Cascadia Code</option>
-                    <option value="Consolas">Consolas</option>
-                    <option value="monospace">Monospace</option>
-                  </select>
+                    onChange={(v) => handleChange('fontFamily', v)}
+                    options={[
+                      { value: 'JetBrains Mono', label: 'JetBrains Mono' },
+                      { value: 'Fira Code', label: 'Fira Code' },
+                      { value: 'Cascadia Code', label: 'Cascadia Code' },
+                      { value: 'Consolas', label: 'Consolas' },
+                      { value: 'monospace', label: 'Monospace' },
+                    ]}
+                  />
                 </SettingRow>
                 <SettingGroup label={t('settings.group.formatting')} />
                 <SettingRow
                   label={t('settings.editor.tabSize')}
                   desc={t('settings.editor.tabSizeDesc')}
                 >
-                  <select
+                  <Select
+                    style={{ width: 100 }}
                     value={config.tabSize}
-                    onChange={(e) => handleChange('tabSize', Number(e.target.value))}
-                  >
-                    <option value={2}>2</option>
-                    <option value={4}>4</option>
-                    <option value={8}>8</option>
-                  </select>
+                    onChange={(v) => handleChange('tabSize', Number(v))}
+                    options={[
+                      { value: 2, label: '2' },
+                      { value: 4, label: '4' },
+                      { value: 8, label: '8' },
+                    ]}
+                  />
                 </SettingRow>
                 <SettingRow
                   label={t('settings.editor.wordWrap')}
                   desc={t('settings.editor.wordWrapDesc')}
                 >
-                  <ToggleSwitch
+                  <Switch
                     checked={config.wordWrap}
                     onChange={(v) => handleChange('wordWrap', v)}
                   />
@@ -284,7 +314,7 @@ function SettingsModal({ open, onClose }) {
                   label={t('settings.editor.lineNumbers')}
                   desc={t('settings.editor.lineNumbersDesc')}
                 >
-                  <ToggleSwitch
+                  <Switch
                     checked={config.lineNumbers}
                     onChange={(v) => handleChange('lineNumbers', v)}
                   />
@@ -293,7 +323,7 @@ function SettingsModal({ open, onClose }) {
                   label={t('settings.editor.minimap')}
                   desc={t('settings.editor.minimapDesc')}
                 >
-                  <ToggleSwitch
+                  <Switch
                     checked={config.minimap?.enabled ?? false}
                     onChange={(v) => handleChange('minimap', { enabled: v })}
                   />
@@ -303,7 +333,7 @@ function SettingsModal({ open, onClose }) {
                   label={t('settings.editor.autoSave')}
                   desc={t('settings.editor.autoSaveDesc')}
                 >
-                  <ToggleSwitch
+                  <Switch
                     checked={config.autoSave}
                     onChange={(v) => handleChange('autoSave', v)}
                   />
@@ -318,8 +348,8 @@ function SettingsModal({ open, onClose }) {
                   label={t('settings.cloud.serverUrl')}
                   desc={t('settings.cloud.serverUrlDesc')}
                 >
-                  <input
-                    type="text"
+                  <Input
+                    style={{ width: 260 }}
                     value={config.serverUrl}
                     onChange={(e) => handleChange('serverUrl', e.target.value)}
                     placeholder="https://www.miaogu.xyz"
@@ -329,7 +359,7 @@ function SettingsModal({ open, onClose }) {
                   label={t('settings.cloud.syncEnabled')}
                   desc={t('settings.cloud.syncEnabledDesc')}
                 >
-                  <ToggleSwitch
+                  <Switch
                     checked={config.syncEnabled}
                     onChange={(v) => handleChange('syncEnabled', v)}
                   />
@@ -340,12 +370,9 @@ function SettingsModal({ open, onClose }) {
                   desc={isLoggedIn ? user?.email : t('settings.cloud.notLoggedIn')}
                 >
                   {isLoggedIn ? (
-                    <button
-                      className="setting-row__danger-btn"
-                      onClick={logout}
-                    >
+                    <Button danger icon={<LogoutOutlined />} onClick={logout}>
                       {t('auth.logout')}
-                    </button>
+                    </Button>
                   ) : (
                     <span className="setting-row__empty">—</span>
                   )}
@@ -355,50 +382,52 @@ function SettingsModal({ open, onClose }) {
                   label={t('settings.cloud.syncSettings')}
                   desc={t('settings.cloud.syncSettingsDesc')}
                 >
-                  <div className="setting-row__actions">
-                    <button
-                      className="setting-row__action-btn"
+                  <Space>
+                    <Button
+                      icon={<SyncOutlined />}
                       onClick={handleSyncSettings}
                       disabled={!isLoggedIn || cloudBusy}
+                      loading={cloudBusy}
                     >
                       {t('sync.syncNow')}
-                    </button>
-                    <button
-                      className="setting-row__action-btn"
+                    </Button>
+                    <Button
+                      icon={<CloudDownloadOutlined />}
                       onClick={handlePullSettings}
                       disabled={!isLoggedIn || cloudBusy}
+                      loading={cloudBusy}
                     >
                       {t('settings.cloud.pullSettings')}
-                    </button>
-                  </div>
+                    </Button>
+                  </Space>
                 </SettingRow>
                 <SettingRow
                   label={t('settings.cloud.settingsJson')}
                   desc={t('settings.cloud.settingsJsonDesc')}
                 >
-                  <div className="setting-row__actions">
-                    <button
-                      className="setting-row__action-btn"
+                  <Space>
+                    <Button
+                      icon={<ExportOutlined />}
                       onClick={handleExportJson}
                       disabled={cloudBusy}
                     >
                       {t('settings.cloud.exportJson')}
-                    </button>
-                    <button
-                      className="setting-row__action-btn"
+                    </Button>
+                    <Button
+                      icon={<ImportOutlined />}
                       onClick={handleImportJson}
                       disabled={cloudBusy}
                     >
                       {t('settings.cloud.importJson')}
-                    </button>
-                  </div>
+                    </Button>
+                  </Space>
                 </SettingRow>
               </div>
             )}
           </div>
         </div>
       </div>
-    </div>
+    </Modal>
   );
 }
 
@@ -419,18 +448,6 @@ function SettingRow({ label, desc, children }) {
       </div>
       <div className="setting-row__control">{children}</div>
     </div>
-  );
-}
-
-function ToggleSwitch({ checked, onChange }) {
-  return (
-    <button
-      className={`toggle-switch ${checked ? 'toggle-switch--on' : ''}`}
-      onClick={() => onChange(!checked)}
-      type="button"
-    >
-      <span className="toggle-switch__thumb" />
-    </button>
   );
 }
 

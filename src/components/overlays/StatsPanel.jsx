@@ -1,5 +1,6 @@
 import { useEffect, useRef, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
+import { Modal, Table, Empty } from 'antd';
 import { Chart } from '@antv/g2';
 import useEditorStore from '@store/useEditorStore';
 import useAuthStore from '@store/useAuthStore';
@@ -31,6 +32,7 @@ function StatsPanel({ open, onClose }) {
 
   const wordData = useMemo(() => {
     return tabs.map((tab) => ({
+      key: tab.id,
       name: tab.name,
       words: (tab.content || '').replace(/\s+/g, ' ').trim().split(' ').filter(Boolean).length,
       chars: (tab.content || '').length,
@@ -70,79 +72,78 @@ function StatsPanel({ open, onClose }) {
     };
   }, [open, extData]);
 
-  if (!open) return null;
+  const columns = [
+    { title: t('stats.file'), dataIndex: 'name', key: 'name', ellipsis: true },
+    { title: t('stats.words'), dataIndex: 'words', key: 'words', align: 'right', width: 100 },
+    {
+      title: t('stats.chars'),
+      dataIndex: 'chars',
+      key: 'chars',
+      align: 'right',
+      width: 120,
+      render: (v) => v.toLocaleString(),
+    },
+  ];
 
   return (
-    <div className="stats-overlay" onClick={onClose}>
-      <div className="stats-panel" onClick={(e) => e.stopPropagation()}>
-        <div className="stats-panel__header">
-          <h2>{t('stats.title')}</h2>
-          <button className="stats-panel__close" onClick={onClose}>
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width="14" height="14">
-              <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
-            </svg>
-          </button>
+    <Modal
+      open={open}
+      onCancel={onClose}
+      title={t('stats.title')}
+      footer={null}
+      width={680}
+      centered
+      destroyOnClose
+      maskClosable
+      rootClassName="mde-stats-modal-root"
+    >
+      <div className="stats-panel__body">
+        <div className="stats-panel__summary">
+          <div className="stats-card">
+            <span className="stats-card__number">{tabs.length}</span>
+            <span className="stats-card__label">{t('stats.openFiles')}</span>
+          </div>
+          <div className="stats-card">
+            <span className="stats-card__number">{recentFiles.length}</span>
+            <span className="stats-card__label">{t('stats.recentFiles')}</span>
+          </div>
+          <div className="stats-card">
+            <span className="stats-card__number">
+              {wordData.reduce((sum, d) => sum + d.words, 0)}
+            </span>
+            <span className="stats-card__label">{t('stats.totalWords')}</span>
+          </div>
+          <div className="stats-card">
+            <span className="stats-card__number">
+              {wordData.reduce((sum, d) => sum + d.chars, 0).toLocaleString()}
+            </span>
+            <span className="stats-card__label">{t('stats.totalChars')}</span>
+          </div>
         </div>
 
-        <div className="stats-panel__body">
-          <div className="stats-panel__summary">
-            <div className="stats-card">
-              <span className="stats-card__number">{tabs.length}</span>
-              <span className="stats-card__label">{t('stats.openFiles')}</span>
-            </div>
-            <div className="stats-card">
-              <span className="stats-card__number">{recentFiles.length}</span>
-              <span className="stats-card__label">{t('stats.recentFiles')}</span>
-            </div>
-            <div className="stats-card">
-              <span className="stats-card__number">
-                {wordData.reduce((sum, d) => sum + d.words, 0)}
-              </span>
-              <span className="stats-card__label">{t('stats.totalWords')}</span>
-            </div>
-            <div className="stats-card">
-              <span className="stats-card__number">
-                {wordData.reduce((sum, d) => sum + d.chars, 0).toLocaleString()}
-              </span>
-              <span className="stats-card__label">{t('stats.totalChars')}</span>
-            </div>
-          </div>
-
-          <div className="stats-panel__chart-section">
-            <h3>{t('stats.fileTypeDist')}</h3>
-            {extData.length === 0 ? (
-              <p className="stats-panel__empty">{t('stats.noData')}</p>
-            ) : (
-              <div ref={chartRef} className="stats-panel__chart" />
-            )}
-          </div>
-
-          {wordData.length > 0 && (
-            <div className="stats-panel__table-section">
-              <h3>{t('stats.wordCountPerFile')}</h3>
-              <table className="stats-panel__table">
-                <thead>
-                  <tr>
-                    <th>{t('stats.file')}</th>
-                    <th>{t('stats.words')}</th>
-                    <th>{t('stats.chars')}</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {wordData.map((d, i) => (
-                    <tr key={i}>
-                      <td>{d.name}</td>
-                      <td>{d.words}</td>
-                      <td>{d.chars.toLocaleString()}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+        <div className="stats-panel__chart-section">
+          <h3>{t('stats.fileTypeDist')}</h3>
+          {extData.length === 0 ? (
+            <Empty description={t('stats.noData')} />
+          ) : (
+            <div ref={chartRef} className="stats-panel__chart" />
           )}
         </div>
+
+        {wordData.length > 0 && (
+          <div className="stats-panel__table-section">
+            <h3>{t('stats.wordCountPerFile')}</h3>
+            <Table
+              columns={columns}
+              dataSource={wordData}
+              size="small"
+              pagination={false}
+              scroll={{ y: 240 }}
+            />
+          </div>
+        )}
       </div>
-    </div>
+    </Modal>
   );
 }
 

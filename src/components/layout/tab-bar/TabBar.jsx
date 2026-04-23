@@ -1,5 +1,6 @@
 import { useRef, useCallback, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { Tooltip } from 'antd';
 import useEditorStore from '@store/useEditorStore';
 import useConfigStore from '@store/useConfigStore';
 import useAuthStore from '@store/useAuthStore';
@@ -141,11 +142,13 @@ function TabBar() {
   return (
     <div className="tabbar">
       <div className="tabbar__actions tabbar__actions--left">
-        <button title={t('tabbar.scrollLeft')} onClick={scrollLeft}>
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-            <polyline points="15 18 9 12 15 6" />
-          </svg>
-        </button>
+        <Tooltip title={t('tabbar.scrollLeft')} placement="bottom" mouseEnterDelay={0.3}>
+          <button onClick={scrollLeft} type="button">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <polyline points="15 18 9 12 15 6" />
+            </svg>
+          </button>
+        </Tooltip>
       </div>
 
       <div className="tabbar__tabs" ref={scrollRef}>
@@ -213,54 +216,64 @@ function TabBar() {
             </div>
           );
         })}
-        <button className="tabbar__new-tab" title={t('tabbar.newTab')} onClick={createFileWithDialog}>
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <line x1="12" y1="5" x2="12" y2="19" />
-            <line x1="5" y1="12" x2="19" y2="12" />
-          </svg>
-        </button>
+        <Tooltip title={t('tabbar.newTab')} placement="bottom" mouseEnterDelay={0.3}>
+          <button className="tabbar__new-tab" onClick={createFileWithDialog} type="button">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <line x1="12" y1="5" x2="12" y2="19" />
+              <line x1="5" y1="12" x2="19" y2="12" />
+            </svg>
+          </button>
+        </Tooltip>
       </div>
 
       <div className="tabbar__actions">
-        <button title={t('tabbar.scrollRight')} onClick={scrollRight}>
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-            <polyline points="9 18 15 12 9 6" />
-          </svg>
-        </button>
+        <Tooltip title={t('tabbar.scrollRight')} placement="bottom" mouseEnterDelay={0.3}>
+          <button onClick={scrollRight} type="button">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <polyline points="9 18 15 12 9 6" />
+            </svg>
+          </button>
+        </Tooltip>
         {/* Toolbar toggle — bottom-panel icon: filled when visible, outline when hidden */}
-        <button
-          className={cn('tabbar__action-btn', toolbarVisible && 'tabbar__action-btn--active')}
-          title={t('tabbar.toggleToolbar')}
-          onClick={toggleToolbar}
-        >
-          <svg viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-            <rect x="3" y="3" width="18" height="18" rx="2" fill="none" />
-            <line x1="3" y1="15" x2="21" y2="15" />
-            {toolbarVisible && <rect x="3" y="15" width="18" height="6" rx="0" fill="currentColor" stroke="none" />}
-          </svg>
-        </button>
+        <Tooltip title={t('tabbar.toggleToolbar')} placement="bottom" mouseEnterDelay={0.3}>
+          <button
+            className={cn('tabbar__action-btn', toolbarVisible && 'tabbar__action-btn--active')}
+            onClick={toggleToolbar}
+            type="button"
+          >
+            <svg viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+              <rect x="3" y="3" width="18" height="18" rx="2" fill="none" />
+              <line x1="3" y1="15" x2="21" y2="15" />
+              {toolbarVisible && <rect x="3" y="15" width="18" height="6" rx="0" fill="currentColor" stroke="none" />}
+            </svg>
+          </button>
+        </Tooltip>
         {/* Bookmark */}
-        <button
-          className={cn('tabbar__action-btn', isBookmarked && 'tabbar__action-btn--active')}
-          title={t('tabbar.bookmark')}
-          onClick={handleBookmark}
-          disabled={!activeTab?.path}
-        >
-          <svg viewBox="0 0 24 24" fill={isBookmarked ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth="2">
-            <path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z" />
-          </svg>
-        </button>
+        <Tooltip title={t('tabbar.bookmark')} placement="bottom" mouseEnterDelay={0.3}>
+          <button
+            className={cn('tabbar__action-btn', isBookmarked && 'tabbar__action-btn--active')}
+            onClick={handleBookmark}
+            disabled={!activeTab?.path}
+            type="button"
+          >
+            <svg viewBox="0 0 24 24" fill={isBookmarked ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth="2">
+              <path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z" />
+            </svg>
+          </button>
+        </Tooltip>
         {/* Split view */}
-        <button
-          className={cn('tabbar__action-btn', viewMode === 'split' && 'tabbar__action-btn--active')}
-          title={t('tabbar.splitView')}
-          onClick={toggleSplit}
-        >
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-            <rect x="3" y="3" width="18" height="18" rx="2" />
-            <line x1="12" y1="3" x2="12" y2="21" />
-          </svg>
-        </button>
+        <Tooltip title={t('tabbar.splitView')} placement="bottom" mouseEnterDelay={0.3}>
+          <button
+            className={cn('tabbar__action-btn', viewMode === 'split' && 'tabbar__action-btn--active')}
+            onClick={toggleSplit}
+            type="button"
+          >
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <rect x="3" y="3" width="18" height="18" rx="2" />
+              <line x1="12" y1="3" x2="12" y2="21" />
+            </svg>
+          </button>
+        </Tooltip>
       </div>
     </div>
   );

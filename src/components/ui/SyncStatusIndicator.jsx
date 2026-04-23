@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
+import { Tooltip } from 'antd';
 import { syncEngine } from '@/services/syncEngine';
 import useAuthStore from '@store/useAuthStore';
 import './sync-status.scss';
@@ -54,16 +55,18 @@ function SyncStatusIndicator() {
   if (!isLoggedIn) return null;
 
   const IconComponent = STATUS_ICON_MAP[status] || CloudIcon;
+  const label = t(`sync.status.${status}`);
 
   return (
-    <span
-      className={`sync-status sync-status--${status}`}
-      onClick={() => syncEngine.fullSync()}
-      title={t(`sync.status.${status}`)}
-    >
-      <span className="sync-status__icon"><IconComponent /></span>
-      <span className="sync-status__label">{t(`sync.status.${status}`)}</span>
-    </span>
+    <Tooltip title={label} placement="top" mouseEnterDelay={0.25}>
+      <span
+        className={`sync-status sync-status--${status}`}
+        onClick={() => syncEngine.fullSync()}
+      >
+        <span className="sync-status__icon"><IconComponent /></span>
+        <span className="sync-status__label">{label}</span>
+      </span>
+    </Tooltip>
   );
 }
 

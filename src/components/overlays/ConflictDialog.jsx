@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import * as monaco from 'monaco-editor';
 import '@/monaco-worker';
 import { useTranslation } from 'react-i18next';
+import { Modal, Button, Space } from 'antd';
 import useThemeStore from '@store/useThemeStore';
 import useConfigStore from '@store/useConfigStore';
 import { getFileLanguage } from '@utils/fileLanguage';
@@ -216,8 +217,19 @@ function ConflictDialog({ open, conflicts, onResolve, onClose }) {
   const pathLabel = current.path || current.name || current.fileId;
 
   return (
-    <div className="conflict-overlay" onClick={onClose}>
-      <div className="conflict-dialog" onClick={(e) => e.stopPropagation()}>
+    <Modal
+      open={open}
+      onCancel={onClose}
+      footer={null}
+      width="min(1180px, 94vw)"
+      centered
+      closable={false}
+      maskClosable={false}
+      destroyOnClose
+      rootClassName="mde-conflict-modal-root"
+      styles={{ body: { padding: 0 }, content: { padding: 0 } }}
+    >
+      <div className="conflict-dialog">
         <div className="conflict-dialog__header">
           <div className="conflict-dialog__title-wrap">
             <span className="conflict-dialog__eyebrow">Sync Conflict</span>
@@ -245,15 +257,17 @@ function ConflictDialog({ open, conflicts, onResolve, onClose }) {
         </div>
 
         <div className="conflict-dialog__actions">
-          <button className="conflict-dialog__btn" onClick={() => onResolve(current.fileId, 'local')}>
-            {t('sync.conflict.keepLocal')}
-          </button>
-          <button className="conflict-dialog__btn conflict-dialog__btn--primary" onClick={() => onResolve(current.fileId, 'remote')}>
-            {t('sync.conflict.useRemote')}
-          </button>
+          <Space>
+            <Button onClick={() => onResolve(current.fileId, 'local')}>
+              {t('sync.conflict.keepLocal')}
+            </Button>
+            <Button type="primary" onClick={() => onResolve(current.fileId, 'remote')}>
+              {t('sync.conflict.useRemote')}
+            </Button>
+          </Space>
         </div>
       </div>
-    </div>
+    </Modal>
   );
 }
 

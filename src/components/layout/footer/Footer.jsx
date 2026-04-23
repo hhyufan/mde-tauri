@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useHorizontalDragScroll } from '@hooks/useHorizontalDragScroll';
-import { createPortal } from 'react-dom';
 import { useTranslation } from 'react-i18next';
+import { Dropdown, Tooltip } from 'antd';
 import useEditorStore from '@store/useEditorStore';
 import { useFileManager } from '@hooks/useFileManager';
 import { getDirectoryContents, showInExplorer } from '@utils/tauriApi';
@@ -38,42 +38,6 @@ function ChevronIcon() {
   );
 }
 
-function DropdownPortal({ anchorRef, open, children, onClose }) {
-  const [pos, setPos] = useState(null);
-
-  useEffect(() => {
-    if (open && anchorRef.current) {
-      const rect = anchorRef.current.getBoundingClientRect();
-      setPos({
-        left: rect.left,
-        top: rect.top,
-      });
-    }
-  }, [open, anchorRef]);
-
-  useEffect(() => {
-    if (!open) return;
-    const handler = (e) => {
-      if (anchorRef.current && anchorRef.current.contains(e.target)) return;
-      onClose();
-    };
-    document.addEventListener('mousedown', handler);
-    return () => document.removeEventListener('mousedown', handler);
-  }, [open, anchorRef, onClose]);
-
-  if (!open || !pos) return null;
-
-  return createPortal(
-    <div
-      className="footer__dropdown-portal"
-      style={{ position: 'fixed', left: pos.left, top: pos.top }}
-    >
-      <div className="footer__dropdown">{children}</div>
-    </div>,
-    document.body
-  );
-}
-
 function Footer() {
   const { t } = useTranslation();
   const { toggleSidebar, viewMode, toggleEditPreview } = useEditorStore();
@@ -93,7 +57,6 @@ function Footer() {
   const [pathSegments, setPathSegments] = useState([]);
   const [directoryContents, setDirectoryContents] = useState({});
   const [openDropdown, setOpenDropdown] = useState(null);
-  const segmentRefs = useRef({});
   const bcScrollRef = useRef(null);
   const bcThumbRef = useRef(null);
 
@@ -136,7 +99,6 @@ function Footer() {
     };
   }, [updateBcScrollbar, pathSegments]);
 
-  // Scroll to end when path changes so the filename is visible
   useEffect(() => {
     const el = bcScrollRef.current;
     if (!el) return;
@@ -193,11 +155,33 @@ function Footer() {
     }
   }, [openFileFromPath]);
 
-  const closeDropdown = useCallback(() => setOpenDropdown(null), []);
-
-  const setSegmentRef = useCallback((index, el) => {
-    segmentRefs.current[index] = el;
-  }, []);
+  const renderDropdown = useCallback((index) => () => {
+    const items = directoryContents[index];
+    return (
+      <div className="footer__dropdown">
+        {items?.length === 0 ? (
+          <div className="footer__dropdown-empty">{t('footer.emptyDir')}</div>
+        ) : (
+          items?.map((item) => (
+            <div
+              key={item.path}
+              className="footer__dropdown-item"
+              onClick={() => handleFileItemClick(item)}
+            >
+              <span className="footer__dropdown-icon">
+                {item.is_dir ? (
+                  <FileTypeIcon fileName={item.name} isFolder />
+                ) : (
+                  <FileTypeIcon extension={item.ext} fileName={item.name} />
+                )}
+              </span>
+              <span className="footer__dropdown-name">{item.name}</span>
+            </div>
+          ))
+        )}
+      </div>
+    );
+  }, [directoryContents, handleFileItemClick, t]);
 
   return (
     <footer className="footer">
@@ -211,13 +195,19 @@ function Footer() {
         {showModeToggle && (
           <>
             <span className="footer__sep" />
-            <button
-              className="footer__mode-toggle"
-              onClick={toggleEditPreview}
+            <Tooltip
               title={viewMode === 'edit' ? t('footer.switchToPreview') : t('footer.switchToCode')}
+              placement="top"
+              mouseEnterDelay={0.3}
             >
-              {viewMode === 'edit' ? <EyeIcon /> : <CodeIcon />}
-            </button>
+              <button
+                className="footer__mode-toggle"
+                onClick={toggleEditPreview}
+                type="button"
+              >
+                {viewMode === 'edit' ? <EyeIcon /> : <CodeIcon />}
+              </button>
+            </Tooltip>
           </>
         )}
       </div>
@@ -230,48 +220,34 @@ function Footer() {
               ref={bcScrollRef}
               onWheel={handleBcWheel}
             >
-              {pathSegments.map((segment, index) => (
-                <span key={index} className="footer__breadcrumb-item">
-                  {index > 0 && <ChevronIcon />}
-                  <span
-                    ref={(el) => setSegmentRef(index, el)}
-                    className="footer__breadcrumb-segment"
-                    onClick={() => handleSegmentClick(index)}
-                    onContextMenu={(e) => handleContextMenu(e, index)}
-                    title={buildFullPath(pathSegments, index)}
-                  >
-                    {/^[A-Z]:\\$/i.test(segment) ? segment.substring(0, 2) : segment}
+              {pathSegments.map((segment, index) => {
+                const isOpen = openDropdown === index && !!directoryContents[index];
+                return (
+                  <span key={index} className="footer__breadcrumb-item">
+                    {index > 0 && <ChevronIcon />}
+                    <Dropdown
+                      open={isOpen}
+                      trigger={['click']}
+                      placement="topLeft"
+                      arrow={false}
+                      dropdownRender={renderDropdown(index)}
+                      onOpenChange={(open) => {
+                        if (!open) setOpenDropdown(null);
+                      }}
+                    >
+                      <span
+                        className="footer__breadcrumb-segment"
+                        onClick={() => handleSegmentClick(index)}
+                        onContextMenu={(e) => handleContextMenu(e, index)}
+                        title={buildFullPath(pathSegments, index)}
+                      >
+                        {/^[A-Z]:\\$/i.test(segment) ? segment.substring(0, 2) : segment}
+                      </span>
+                    </Dropdown>
                   </span>
-                  <DropdownPortal
-                    anchorRef={{ current: segmentRefs.current[index] }}
-                    open={openDropdown === index && !!directoryContents[index]}
-                    onClose={closeDropdown}
-                  >
-                    {directoryContents[index]?.length === 0 ? (
-                      <div className="footer__dropdown-empty">{t('footer.emptyDir')}</div>
-                    ) : (
-                      directoryContents[index]?.map((item) => (
-                        <div
-                          key={item.path}
-                          className="footer__dropdown-item"
-                          onClick={() => handleFileItemClick(item)}
-                        >
-                          <span className="footer__dropdown-icon">
-                            {item.is_dir ? (
-                              <FileTypeIcon fileName={item.name} isFolder />
-                            ) : (
-                              <FileTypeIcon extension={item.ext} fileName={item.name} />
-                            )}
-                          </span>
-                          <span className="footer__dropdown-name">{item.name}</span>
-                        </div>
-                      ))
-                    )}
-                  </DropdownPortal>
-                </span>
-              ))}
+                );
+              })}
             </div>
-            {/* Custom horizontal scrollbar */}
             <div className="footer__breadcrumb-scrollbar">
               <div
                 className="footer__breadcrumb-scrollbar-thumb"
