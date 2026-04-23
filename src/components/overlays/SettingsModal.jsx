@@ -116,8 +116,16 @@ function SettingsModal({ open, onClose }) {
     <div className="settings-overlay" onClick={onClose}>
       <div className="settings-modal" onClick={(e) => e.stopPropagation()}>
         <div className="settings-modal__header">
-          <h2>{t('settings.title')}</h2>
-          <button className="settings-modal__close" onClick={onClose}>
+          <div className="settings-modal__header-left">
+            <div className="settings-modal__header-icon">
+              {NAV_ICONS[activeNav]}
+            </div>
+            <div>
+              <h2>{t('settings.title')}</h2>
+              <span className="settings-modal__header-sub">{t(`settings.nav.${activeNav}`)}</span>
+            </div>
+          </div>
+          <button className="settings-modal__close" onClick={onClose} title="Esc">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width="14" height="14"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>
           </button>
         </div>
@@ -139,6 +147,7 @@ function SettingsModal({ open, onClose }) {
           <div className="settings-modal__content">
             {activeNav === 'general' && (
               <div className="settings-section">
+                <SettingGroup label={t('settings.group.workspace')} />
                 <SettingRow
                   label={t('settings.general.language')}
                   desc={t('settings.general.languageDesc')}
@@ -152,17 +161,8 @@ function SettingsModal({ open, onClose }) {
                   </select>
                 </SettingRow>
                 <SettingRow
-                  label={t('settings.general.startup')}
-                  desc={t('settings.general.startupDesc')}
-                >
-                  <ToggleSwitch
-                    checked={config.autoSave}
-                    onChange={(v) => handleChange('autoSave', v)}
-                  />
-                </SettingRow>
-                <SettingRow
                   label={t('settings.general.workspacePath')}
-                  desc=""
+                  desc={t('settings.general.workspacePathDesc')}
                 >
                   <input
                     type="text"
@@ -171,37 +171,92 @@ function SettingsModal({ open, onClose }) {
                     placeholder="/path/to/workspace"
                   />
                 </SettingRow>
+                <SettingGroup label={t('settings.group.behavior')} />
+                <SettingRow
+                  label={t('settings.general.startup')}
+                  desc={t('settings.general.startupDesc')}
+                >
+                  <ToggleSwitch
+                    checked={config.autoSave}
+                    onChange={(v) => handleChange('autoSave', v)}
+                  />
+                </SettingRow>
               </div>
             )}
 
             {activeNav === 'appearance' && (
               <div className="settings-section">
+                <SettingGroup label={t('settings.group.theme')} />
                 <SettingRow
                   label={t('settings.appearance.colorTheme')}
                   desc={t('settings.appearance.colorThemeDesc')}
                 >
-                  <select value={theme} onChange={(e) => setTheme(e.target.value)}>
-                    <option value="light">Light</option>
-                    <option value="dark">Dark</option>
-                  </select>
+                  <div className="setting-theme-picker">
+                    <button
+                      className={`setting-theme-btn ${theme === 'light' ? 'setting-theme-btn--active' : ''}`}
+                      onClick={() => setTheme('light')}
+                      type="button"
+                    >
+                      <span className="setting-theme-btn__swatch setting-theme-btn__swatch--light" />
+                      Light
+                    </button>
+                    <button
+                      className={`setting-theme-btn ${theme === 'dark' ? 'setting-theme-btn--active' : ''}`}
+                      onClick={() => setTheme('dark')}
+                      type="button"
+                    >
+                      <span className="setting-theme-btn__swatch setting-theme-btn__swatch--dark" />
+                      Dark
+                    </button>
+                  </div>
                 </SettingRow>
+                <SettingGroup label={t('settings.group.typography')} />
                 <SettingRow
                   label={t('settings.appearance.fontSize')}
-                  desc=""
+                  desc={t('settings.appearance.fontSizeDesc')}
                 >
-                  <input
-                    type="number"
-                    min={10}
-                    max={24}
-                    value={config.fontSize}
-                    onChange={(e) => handleChange('fontSize', Number(e.target.value))}
-                  />
+                  <div className="setting-number-row">
+                    <button
+                      className="setting-number-btn"
+                      type="button"
+                      onClick={() => handleChange('fontSize', Math.max(10, (config.fontSize || 14) - 1))}
+                    >−</button>
+                    <input
+                      type="number"
+                      min={10}
+                      max={24}
+                      value={config.fontSize}
+                      onChange={(e) => handleChange('fontSize', Number(e.target.value))}
+                    />
+                    <button
+                      className="setting-number-btn"
+                      type="button"
+                      onClick={() => handleChange('fontSize', Math.min(24, (config.fontSize || 14) + 1))}
+                    >+</button>
+                  </div>
                 </SettingRow>
               </div>
             )}
 
             {activeNav === 'editor' && (
               <div className="settings-section">
+                <SettingGroup label={t('settings.group.font')} />
+                <SettingRow
+                  label={t('settings.editor.fontFamily')}
+                  desc={t('settings.editor.fontFamilyDesc')}
+                >
+                  <select
+                    value={config.fontFamily}
+                    onChange={(e) => handleChange('fontFamily', e.target.value)}
+                  >
+                    <option value="JetBrains Mono">JetBrains Mono</option>
+                    <option value="Fira Code">Fira Code</option>
+                    <option value="Cascadia Code">Cascadia Code</option>
+                    <option value="Consolas">Consolas</option>
+                    <option value="monospace">Monospace</option>
+                  </select>
+                </SettingRow>
+                <SettingGroup label={t('settings.group.formatting')} />
                 <SettingRow
                   label={t('settings.editor.tabSize')}
                   desc={t('settings.editor.tabSizeDesc')}
@@ -224,6 +279,7 @@ function SettingsModal({ open, onClose }) {
                     onChange={(v) => handleChange('wordWrap', v)}
                   />
                 </SettingRow>
+                <SettingGroup label={t('settings.group.display')} />
                 <SettingRow
                   label={t('settings.editor.lineNumbers')}
                   desc={t('settings.editor.lineNumbersDesc')}
@@ -242,21 +298,7 @@ function SettingsModal({ open, onClose }) {
                     onChange={(v) => handleChange('minimap', { enabled: v })}
                   />
                 </SettingRow>
-                <SettingRow
-                  label={t('settings.editor.fontFamily')}
-                  desc={t('settings.editor.fontFamilyDesc')}
-                >
-                  <select
-                    value={config.fontFamily}
-                    onChange={(e) => handleChange('fontFamily', e.target.value)}
-                  >
-                    <option value="JetBrains Mono">JetBrains Mono</option>
-                    <option value="Fira Code">Fira Code</option>
-                    <option value="Cascadia Code">Cascadia Code</option>
-                    <option value="Consolas">Consolas</option>
-                    <option value="monospace">Monospace</option>
-                  </select>
-                </SettingRow>
+                <SettingGroup label={t('settings.group.file')} />
                 <SettingRow
                   label={t('settings.editor.autoSave')}
                   desc={t('settings.editor.autoSaveDesc')}
@@ -271,6 +313,7 @@ function SettingsModal({ open, onClose }) {
 
             {activeNav === 'cloud' && (
               <div className="settings-section">
+                <SettingGroup label={t('settings.group.connection')} />
                 <SettingRow
                   label={t('settings.cloud.serverUrl')}
                   desc={t('settings.cloud.serverUrlDesc')}
@@ -291,6 +334,7 @@ function SettingsModal({ open, onClose }) {
                     onChange={(v) => handleChange('syncEnabled', v)}
                   />
                 </SettingRow>
+                <SettingGroup label={t('settings.group.account')} />
                 <SettingRow
                   label={t('settings.cloud.account')}
                   desc={isLoggedIn ? user?.email : t('settings.cloud.notLoggedIn')}
@@ -303,9 +347,10 @@ function SettingsModal({ open, onClose }) {
                       {t('auth.logout')}
                     </button>
                   ) : (
-                    <span style={{ color: 'var(--text-dim)', fontSize: 12 }}>—</span>
+                    <span className="setting-row__empty">—</span>
                   )}
                 </SettingRow>
+                <SettingGroup label={t('settings.group.sync')} />
                 <SettingRow
                   label={t('settings.cloud.syncSettings')}
                   desc={t('settings.cloud.syncSettingsDesc')}
@@ -353,6 +398,14 @@ function SettingsModal({ open, onClose }) {
           </div>
         </div>
       </div>
+    </div>
+  );
+}
+
+function SettingGroup({ label }) {
+  return (
+    <div className="settings-group">
+      <span className="settings-group__label">{label}</span>
     </div>
   );
 }

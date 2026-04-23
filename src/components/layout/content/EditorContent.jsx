@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useRef } from 'react';
+import { useCallback, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import useEditorStore from '@store/useEditorStore';
 import MonacoEditor from '@components/editor/LazyMonacoEditor';
@@ -14,6 +14,9 @@ function EditorContent() {
   const activeTabId = useEditorStore((s) => s.activeTabId);
   const viewMode = useEditorStore((s) => s.viewMode);
   const monacoRef = useRef(null);
+  const containerRef = useRef(null);
+  const isDragging = useRef(false);
+  const [splitRatio, setSplitRatio] = useState(0.5);
   const { triggerAutoSave } = useFileManager();
   const activeTabMeta = useMemo(
     () => tabs.find((item) => item.id === activeTabId) || null,
@@ -29,6 +32,31 @@ function EditorContent() {
     } else if (action.type === 'wrap') {
       editor.wrapSelection(action.before, action.after);
     }
+  }, []);
+
+  const handleDividerMouseDown = useCallback((e) => {
+    e.preventDefault();
+    isDragging.current = true;
+    document.body.style.cursor = 'col-resize';
+    document.body.style.userSelect = 'none';
+
+    const onMouseMove = (moveEvt) => {
+      if (!isDragging.current || !containerRef.current) return;
+      const rect = containerRef.current.getBoundingClientRect();
+      const ratio = (moveEvt.clientX - rect.left) / rect.width;
+      setSplitRatio(Math.max(0.15, Math.min(0.85, ratio)));
+    };
+
+    const onMouseUp = () => {
+      isDragging.current = false;
+      document.body.style.cursor = '';
+      document.body.style.userSelect = '';
+      document.removeEventListener('mousemove', onMouseMove);
+      document.removeEventListener('mouseup', onMouseUp);
+    };
+
+    document.addEventListener('mousemove', onMouseMove);
+    document.addEventListener('mouseup', onMouseUp);
   }, []);
 
   if (!activeTabMeta) {
@@ -48,7 +76,11 @@ function EditorContent() {
   return (
     <main className="editor-content">
       <ToastContainer />
-      <div className="editor-content__workspace">
+      <div
+        className="editor-content__workspace"
+        ref={containerRef}
+        style={viewMode === 'split' ? { '--split-ratio': `${splitRatio * 100}%` } : undefined}
+      >
         {viewMode === 'edit' && (
           <MonacoEditor
             key={activeTabId}
@@ -68,7 +100,11 @@ function EditorContent() {
               className="editor-content__editor editor-content__editor--half"
               onAutoSave={triggerAutoSave}
             />
-            <div className="editor-content__split-divider" />
+            <div
+              className="editor-content__split-divider"
+              onMouseDown={handleDividerMouseDown}
+              title="拖动调整分屏比例"
+            />
             <MarkdownPreview className="editor-content__preview editor-content__preview--half" />
           </>
         )}

@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import useEditorStore from '@store/useEditorStore';
 import { useEditorBufferContent } from '@hooks/useEditorBufferContent';
 import './outline.scss';
@@ -88,52 +88,91 @@ function OutlineView() {
 
   const items = useMemo(() => extractItems(content), [content]);
 
-  if (!activeTabId) {
-    return <div className="outline__empty">No file open</div>;
-  }
-  if (items.length === 0) {
-    return <div className="outline__empty">No structure found</div>;
-  }
+  const headings = useMemo(() => items.filter((it) => it.type === 'heading'), [items]);
+  const minLevel = useMemo(
+    () => (headings.length > 0 ? Math.min(...headings.map((h) => h.level)) : 1),
+    [headings],
+  );
 
-  const headings = items.filter((it) => it.type === 'heading');
-  const minLevel = headings.length > 0 ? Math.min(...headings.map((h) => h.level)) : 1;
-
-  function toggleCollapse(idx) {
-    setCollapsed((prev) => ({ ...prev, [idx]: !prev[idx] }));
-  }
-
-  // Determine which items are hidden due to a collapsed ancestor heading
-  function isHiddenByCollapse(idx) {
+  const hasChildren = useCallback((idx) => {
     const item = items[idx];
-    // Walk backward to find the nearest heading that would be an ancestor
-    for (let j = idx - 1; j >= 0; j--) {
-      const prev = items[j];
-      if (prev.type !== 'heading') continue;
-
-      if (item.type === 'heading') {
-        // A heading is hidden by any collapsed ancestor heading with lower level
-        if (prev.level < item.level && collapsed[j]) return true;
-        if (prev.level < item.level) continue;
-        break;
-      } else {
-        // A list item is hidden if its parent heading (any level) is collapsed
-        if (collapsed[j]) return true;
-        break;
-      }
-    }
-    return false;
-  }
-
-  // Check if a heading has any children (next items until same/lower level heading)
-  function hasChildren(idx) {
-    const item = items[idx];
-    if (item.type !== 'heading') return false;
+    if (!item || item.type !== 'heading') return false;
     for (let j = idx + 1; j < items.length; j++) {
       const next = items[j];
       if (next.type === 'heading' && next.level <= item.level) break;
       return true;
     }
     return false;
+  }, [items]);
+
+  // Determine which items are hidden due to a collapsed ancestor heading.
+  //
+  // Correct tree semantics: every heading/list item belongs to the nearest
+  // preceding heading of STRICTLY LOWER level, and that heading in turn
+  // belongs to the nearest preceding heading of strictly lower level than
+  // itself, and so on — this forms the ancestor chain.
+  //
+  // Algorithm: walk backward tracking `minLevel`. A previous heading is an
+  // ancestor iff its level < minLevel. When found, it narrows `minLevel`
+  // to its own level, so only strictly higher-ranked headings can match
+  // next. This correctly handles cases like:
+  //
+  //   # H1-A
+  //   ## H2-A           (collapsed)
+  //   ### H3-A
+  //   # H1-B
+  //   - list item       <- NOT hidden: its ancestor chain is only H1-B
+  //                        (H2-A is not an ancestor; it was closed by H1-B)
+  const isHiddenByCollapse = useCallback((idx) => {
+    const item = items[idx];
+    let minLevel;
+    if (item.type === 'heading') {
+      minLevel = item.level;
+    } else {
+      // List item belongs to the most recent heading (at item.parentLevel).
+      // Setting minLevel = parentLevel + 1 makes that parent heading match
+      // on the first hit so it becomes the first ancestor.
+      minLevel = (item.parentLevel || 0) + 1;
+    }
+
+    for (let j = idx - 1; j >= 0; j--) {
+      const prev = items[j];
+      if (prev.type !== 'heading') continue;
+      if (prev.level < minLevel) {
+        if (collapsed[j]) return true;
+        minLevel = prev.level;
+        if (minLevel <= 1) break;
+      }
+    }
+    return false;
+  }, [items, collapsed]);
+
+  // Wire up collapse-all / expand-all toolbar events
+  useEffect(() => {
+    const handleCollapseAll = () => {
+      const next = {};
+      items.forEach((_, i) => { if (hasChildren(i)) next[i] = true; });
+      setCollapsed(next);
+    };
+    const handleExpandAll = () => setCollapsed({});
+
+    window.addEventListener('outline:collapseAll', handleCollapseAll);
+    window.addEventListener('outline:expandAll', handleExpandAll);
+    return () => {
+      window.removeEventListener('outline:collapseAll', handleCollapseAll);
+      window.removeEventListener('outline:expandAll', handleExpandAll);
+    };
+  }, [items, hasChildren]);
+
+  function toggleCollapse(idx) {
+    setCollapsed((prev) => ({ ...prev, [idx]: !prev[idx] }));
+  }
+
+  if (!activeTabId) {
+    return <div className="outline__empty">No file open</div>;
+  }
+  if (items.length === 0) {
+    return <div className="outline__empty">No structure found</div>;
   }
 
   return (
@@ -145,7 +184,6 @@ function OutlineView() {
         if (item.type === 'heading') {
           paddingLeft = 12 + (item.level - minLevel) * 14;
         } else {
-          // list items: indent relative to parent heading + their own nesting
           paddingLeft = 12 + (item.parentLevel - minLevel + 1) * 14 + item.indent * 10;
         }
 

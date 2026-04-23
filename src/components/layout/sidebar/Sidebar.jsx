@@ -90,10 +90,16 @@ function OutlineToolbar() {
   return (
     <div className="sidebar__toolbar">
       <span className="sidebar__toolbar-label">{t('sidebar.outline.title')}</span>
-      <ToolbarButton title={t('sidebar.outline.collapseAll')}>
+      <ToolbarButton
+        title={t('sidebar.outline.collapseAll')}
+        onClick={() => window.dispatchEvent(new CustomEvent('outline:collapseAll'))}
+      >
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="4 14 10 14 10 20" /><polyline points="20 10 14 10 14 4" /><line x1="14" y1="10" x2="21" y2="3" /><line x1="3" y1="21" x2="10" y2="14" /></svg>
       </ToolbarButton>
-      <ToolbarButton title={t('sidebar.outline.expandAll')}>
+      <ToolbarButton
+        title={t('sidebar.outline.expandAll')}
+        onClick={() => window.dispatchEvent(new CustomEvent('outline:expandAll'))}
+      >
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="15 3 21 3 21 9" /><polyline points="9 21 3 21 3 15" /><line x1="21" y1="3" x2="14" y2="10" /><line x1="3" y1="21" x2="10" y2="14" /></svg>
       </ToolbarButton>
     </div>
@@ -104,39 +110,16 @@ function RecentToolbar({ onOpenStats }) {
   const { t } = useTranslation();
   const { clearRecentFiles } = useFileStore();
   return (
-    <>
-      <div className="sidebar__toolbar">
-        <span className="sidebar__toolbar-label">{t('sidebar.recent.title')}</span>
-        <ToolbarButton title={t('sidebar.explorer.sort')}>
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M3 6h18M3 12h12M3 18h6" /></svg>
-        </ToolbarButton>
-        <ToolbarButton title={t('sidebar.explorer.newFile')}>
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 5v14M5 12h14" /></svg>
-        </ToolbarButton>
-        <ToolbarButton title={t('sidebar.explorer.save')}>
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z" /><polyline points="17 21 17 13 7 13 7 21" /><polyline points="7 3 7 8 15 8" /></svg>
-        </ToolbarButton>
-        <div className="stb-sep" />
-        <ToolbarButton title={t('sidebar.explorer.analytics')} onClick={onOpenStats}>
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="18" y1="20" x2="18" y2="10" /><line x1="12" y1="20" x2="12" y2="4" /><line x1="6" y1="20" x2="6" y2="14" /></svg>
-        </ToolbarButton>
-      </div>
-      <div className="sidebar__toolbar sidebar__toolbar--secondary">
-        <ToolbarButton title="List view">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="8" y1="6" x2="21" y2="6" /><line x1="8" y1="12" x2="21" y2="12" /><line x1="8" y1="18" x2="21" y2="18" /><line x1="3" y1="6" x2="3.01" y2="6" /><line x1="3" y1="12" x2="3.01" y2="12" /><line x1="3" y1="18" x2="3.01" y2="18" /></svg>
-        </ToolbarButton>
-        <ToolbarButton title="Refresh">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="23 4 23 10 17 10" /><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10" /></svg>
-        </ToolbarButton>
-        <ToolbarButton title="Copy">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="9" y="9" width="13" height="13" rx="2" /><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" /></svg>
-        </ToolbarButton>
-        <div className="stb-sep" />
-        <ToolbarButton title={t('sidebar.recent.deleteAll')} onClick={clearRecentFiles}>
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="3 6 5 6 21 6" /><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" /></svg>
-        </ToolbarButton>
-      </div>
-    </>
+    <div className="sidebar__toolbar">
+      <span className="sidebar__toolbar-label">{t('sidebar.recent.title')}</span>
+      <ToolbarButton title={t('sidebar.explorer.analytics')} onClick={onOpenStats}>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="18" y1="20" x2="18" y2="10" /><line x1="12" y1="20" x2="12" y2="4" /><line x1="6" y1="20" x2="6" y2="14" /></svg>
+      </ToolbarButton>
+      <div className="stb-sep" />
+      <ToolbarButton title={t('sidebar.recent.deleteAll')} onClick={clearRecentFiles}>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="3 6 5 6 21 6" /><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" /></svg>
+      </ToolbarButton>
+    </div>
   );
 }
 
