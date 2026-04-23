@@ -67,6 +67,25 @@ const useFileStore = create(
           };
         }),
 
+      // Return the target path of back/forward without mutating state
+      peekBack: (state) =>
+        state.historyIndex > 0
+          ? state.dirHistory[state.historyIndex - 1]
+          : null,
+
+      peekForward: (state) =>
+        state.historyIndex < state.dirHistory.length - 1
+          ? state.dirHistory[state.historyIndex + 1]
+          : null,
+
+      clearDirectory: () =>
+        set({
+          currentDir: '',
+          files: [],
+          dirHistory: [],
+          historyIndex: -1,
+        }),
+
       setFiles: (files) => set({ files }),
 
       addRecentFile: (file) =>

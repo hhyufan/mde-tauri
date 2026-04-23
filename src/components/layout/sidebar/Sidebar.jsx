@@ -60,7 +60,7 @@ function SortDropdown({ open, onClose }) {
 function ExplorerToolbar() {
   const { t } = useTranslation();
   const [sortOpen, setSortOpen] = useState(false);
-  const { saveCurrentFile, openFolderDialog, createNewFile } = useFileManager();
+  const { saveCurrentFile, openFolderDialog, createFileWithDialog } = useFileManager();
 
   return (
     <div className="sidebar__toolbar">
@@ -71,7 +71,7 @@ function ExplorerToolbar() {
         </ToolbarButton>
         <SortDropdown open={sortOpen} onClose={() => setSortOpen(false)} />
       </div>
-      <ToolbarButton title={t('sidebar.explorer.newFile')} onClick={createNewFile}>
+      <ToolbarButton title={t('sidebar.explorer.newFile')} onClick={createFileWithDialog}>
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 5v14M5 12h14" /></svg>
       </ToolbarButton>
       <ToolbarButton title={t('sidebar.explorer.save')} onClick={saveCurrentFile}>

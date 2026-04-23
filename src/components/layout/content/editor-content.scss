@@ -62,6 +62,18 @@
   }
 }
 
+// Bottom fade — overlays the last line of the editor/preview
+.editor-content__fade {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 56px;
+  background: linear-gradient(to bottom, transparent, var(--surface));
+  pointer-events: none;
+  z-index: 5;
+}
+
 .editor-content__split-divider {
   width: 5px;
   flex-shrink: 0;

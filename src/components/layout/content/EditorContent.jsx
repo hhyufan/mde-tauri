@@ -116,6 +116,8 @@ function EditorContent() {
             onAutoSave={triggerAutoSave}
           />
         )}
+
+        <div className="editor-content__fade" />
       </div>
 
       {/* FloatingToolbar is outside workspace to avoid overflow:hidden clipping */}

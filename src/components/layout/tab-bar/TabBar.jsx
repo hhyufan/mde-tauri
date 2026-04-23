@@ -20,7 +20,6 @@ function TabBar() {
   const activeTabId = useEditorStore((s) => s.activeTabId);
   const setActiveTab = useEditorStore((s) => s.setActiveTab);
   const closeTab = useEditorStore((s) => s.closeTab);
-  const createUntitledTab = useEditorStore((s) => s.createUntitledTab);
   const renameTab = useEditorStore((s) => s.renameTab);
   const updateTabPath = useEditorStore((s) => s.updateTabPath);
   const viewMode = useEditorStore((s) => s.viewMode);
@@ -37,7 +36,7 @@ function TabBar() {
   const toggleBookmark = useFileStore((s) => s.toggleBookmark);
   const addRecentFile = useFileStore((s) => s.addRecentFile);
   const currentDir = useFileStore((s) => s.currentDir);
-  const { loadDirectory } = useFileManager();
+  const { loadDirectory, createFileWithDialog } = useFileManager();
   const scrollRef = useRef(null);
 
   const [renamingTabId, setRenamingTabId] = useState(null);
@@ -214,7 +213,7 @@ function TabBar() {
             </div>
           );
         })}
-        <button className="tabbar__new-tab" title={t('tabbar.newTab')} onClick={createUntitledTab}>
+        <button className="tabbar__new-tab" title={t('tabbar.newTab')} onClick={createFileWithDialog}>
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
             <line x1="12" y1="5" x2="12" y2="19" />
             <line x1="5" y1="12" x2="19" y2="12" />

@@ -1,8 +1,10 @@
-import { useCallback, useMemo } from 'react';
+import { useCallback, useMemo, useRef } from 'react';
 import { open, save } from '@tauri-apps/plugin-dialog';
 import {
   readFileContent,
   saveFile,
+  writeFileContent,
+  checkFileExists,
   getDirectoryContents,
   startFileWatching,
   stopFileWatching,
@@ -19,6 +21,40 @@ import { getBuffer } from '@utils/editorBuffer';
 import { debounce } from '@utils/debounce';
 import i18n from '@/i18n';
 
+function getPathSeparator(path) {
+  return path.includes('\\') ? '\\' : '/';
+}
+
+function joinPath(dirPath, fileName) {
+  if (!dirPath) return fileName;
+  const sep = getPathSeparator(dirPath);
+  return `${dirPath.replace(/[\\/]+$/, '')}${sep}${fileName}`;
+}
+
+function splitFileName(fileName) {
+  const dotIndex = fileName.lastIndexOf('.');
+  if (dotIndex <= 0) {
+    return { base: fileName, ext: '' };
+  }
+  return {
+    base: fileName.slice(0, dotIndex),
+    ext: fileName.slice(dotIndex),
+  };
+}
+
+function ensureSuggestedFileName(tab) {
+  const rawName = (tab?.name || '').trim() || 'Untitled';
+  if (rawName.includes('.')) return rawName;
+  const ext = (tab?.ext || 'md').replace(/^\.+/, '');
+  return ext ? `${rawName}.${ext}` : rawName;
+}
+
+function hasOpenExplorerDirectory() {
+  const { sidebarVisible, sidebarView } = useEditorStore.getState();
+  const currentDir = useFileStore.getState().currentDir;
+  return Boolean(currentDir && sidebarVisible && sidebarView === 'explorer');
+}
+
 export function useFileManager() {
   const {
     openFile: openTab,
@@ -31,8 +67,15 @@ export function useFileManager() {
   const { setCurrentDir, setFiles, addRecentFile } = useFileStore.getState();
   const notify = useNotificationStore.getState().notify;
   const t = i18n.t.bind(i18n);
+  const pendingUntitledSaveRef = useRef(new Set());
+  const dismissedAutoSavePromptRef = useRef(new Set());
 
   const createNewFile = useCallback(() => {
+    const currentDir = useFileStore.getState().currentDir;
+    if (currentDir) {
+      window.dispatchEvent(new CustomEvent('explorer:newFileRequest'));
+      return;
+    }
     createUntitledTab();
   }, []);
 
@@ -96,7 +139,12 @@ export function useFileManager() {
       });
       return;
     }
-    if (!tab.path) return;
+    if (!tab.path) {
+      const canSaveToExplorerDir = hasOpenExplorerDirectory();
+      if (!canSaveToExplorerDir && dismissedAutoSavePromptRef.current.has(tab.id)) return;
+      persistUntitledTab(tab, { allowDialog: !canSaveToExplorerDir, source: 'auto-save' });
+      return;
+    }
     debouncedAutoSave(tab.path, content, tab.encoding, {
       name: tab.name,
       ext: tab.ext,
@@ -104,20 +152,170 @@ export function useFileManager() {
     });
   }, [debouncedAutoSave, debouncedExternalSync]);
 
+  const sortDirectoryContents = useCallback((contents) => {
+    const { sortBy, sortOrder } = useFileStore.getState();
+    const direction = sortOrder === 'desc' ? -1 : 1;
+    return [...contents].sort((a, b) => {
+      if (a.is_dir && !b.is_dir) return -1;
+      if (!a.is_dir && b.is_dir) return 1;
+
+      let compareValue = 0;
+      if (sortBy === 'size') {
+        compareValue = (a.size || 0) - (b.size || 0);
+      } else if (sortBy === 'time') {
+        compareValue = (a.modified || 0) - (b.modified || 0);
+      } else {
+        compareValue = a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: 'base' });
+      }
+
+      if (compareValue === 0) {
+        compareValue = a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: 'base' });
+      }
+      return compareValue * direction;
+    });
+  }, []);
+
   const loadDirectory = useCallback(async (dirPath) => {
     try {
       const contents = await getDirectoryContents(dirPath);
-      const sorted = contents.sort((a, b) => {
-        if (a.is_dir && !b.is_dir) return -1;
-        if (!a.is_dir && b.is_dir) return 1;
-        return a.name.localeCompare(b.name);
-      });
-      setFiles(sorted);
+      setFiles(sortDirectoryContents(contents));
       setCurrentDir(dirPath);
     } catch (err) {
       notify('error', t('notification.error'), String(err));
     }
+  }, [sortDirectoryContents]);
+
+  // Reload the file list for a dir WITHOUT touching navigation history.
+  // Used by back/forward navigation which updates history themselves.
+  const loadFilesOnly = useCallback(async (dirPath) => {
+    try {
+      const contents = await getDirectoryContents(dirPath);
+      setFiles(sortDirectoryContents(contents));
+    } catch (err) {
+      notify('error', t('notification.error'), String(err));
+    }
+  }, [sortDirectoryContents]);
+
+  // Used by the TabBar "+" button and the Explorer toolbar "+" when no folder is open.
+  // • Explorer has a folder open  → trigger inline new-file inside the explorer.
+  // • No folder open              → show a folder-picker dialog, open that folder in
+  //                                 the explorer, then create an untitled tab.
+  const createFileWithDialog = useCallback(async () => {
+    const currentDir = useFileStore.getState().currentDir;
+    if (currentDir) {
+      window.dispatchEvent(new CustomEvent('explorer:newFileRequest'));
+      return;
+    }
+
+    try {
+      const { open: openDialog } = await import('@tauri-apps/plugin-dialog');
+      const dir = await openDialog({ directory: true });
+      if (!dir) return;
+
+      const dirPath = typeof dir === 'string' ? dir : dir.path;
+      await loadDirectory(dirPath);
+      // Wait a frame for React to re-render with the new currentDir before showing the input
+      requestAnimationFrame(() => {
+        window.dispatchEvent(new CustomEvent('explorer:newFileRequest'));
+      });
+    } catch (err) {
+      notify('error', t('notification.error'), String(err));
+    }
+  }, [loadDirectory]);
+
+  const finalizeSavedTab = useCallback(async (tab, path, source = 'manual-save') => {
+    const name = path.split(/[\\/]/).pop();
+    const ext = name.split('.').pop() || '';
+    const currentDir = useFileStore.getState().currentDir;
+    const externalFileId = tab.externalFileId;
+
+    updateTabPath(tab.id, path, name);
+    markTabSaved(path);
+    addRecentFile({ name, path, ext });
+    startFileWatching(path).catch(() => {});
+    notify('success', t('notification.fileSaved'), name);
+
+    if (externalFileId) {
+      await syncEngine.claimExternalDoc(externalFileId, path, tab.content, tab.encoding);
+    } else {
+      syncEngine.registerLocalDocument(path, {
+        name,
+        ext,
+        encoding: tab.encoding,
+        lineEnding: tab.lineEnding,
+      });
+      await syncEngine.queueLocalUpsert(path, tab.content, tab.encoding, {
+        name,
+        lineEnding: tab.lineEnding,
+        source,
+      });
+    }
+
+    if (currentDir && path.startsWith(currentDir.replace(/[\\/]+$/, ''))) {
+      await loadDirectory(currentDir);
+    }
+  }, [addRecentFile, loadDirectory, markTabSaved, notify, t, updateTabPath]);
+
+  const buildUniqueUntitledPath = useCallback(async (dirPath, fileName) => {
+    const { base, ext } = splitFileName(fileName);
+    let index = 1;
+    let candidate = joinPath(dirPath, fileName);
+    while (await checkFileExists(candidate)) {
+      index += 1;
+      candidate = joinPath(dirPath, `${base} (${index})${ext}`);
+    }
+    return candidate;
   }, []);
+
+  const persistUntitledTab = useCallback(async (tab, options = {}) => {
+    if (!tab || tab.path) return null;
+    if (pendingUntitledSaveRef.current.has(tab.id)) return null;
+
+    pendingUntitledSaveRef.current.add(tab.id);
+    try {
+      const currentDir = useFileStore.getState().currentDir;
+      const canSaveToExplorerDir = hasOpenExplorerDirectory();
+      let targetPath = '';
+
+      if (currentDir && canSaveToExplorerDir) {
+        const suggestedName = ensureSuggestedFileName(tab);
+        targetPath = await buildUniqueUntitledPath(currentDir, suggestedName);
+      } else if (options.allowDialog) {
+        const selected = await save({
+          defaultPath: ensureSuggestedFileName(tab),
+          filters: [
+            { name: 'Markdown', extensions: ['md'] },
+            { name: 'Text', extensions: ['txt'] },
+            { name: 'All Files', extensions: ['*'] },
+          ],
+        });
+        if (!selected) {
+          if (options.source === 'auto-save') {
+            dismissedAutoSavePromptRef.current.add(tab.id);
+          }
+          return null;
+        }
+        targetPath = selected;
+      } else {
+        return null;
+      }
+
+      const result = await saveFile(targetPath, tab.content, tab.encoding);
+      if (!result.success) {
+        notify('error', t('notification.error'), result.message);
+        return null;
+      }
+
+      dismissedAutoSavePromptRef.current.delete(tab.id);
+      await finalizeSavedTab(tab, targetPath, options.source === 'auto-save' ? 'auto-save' : 'save-as');
+      return targetPath;
+    } catch (err) {
+      notify('error', t('notification.error'), String(err));
+      return null;
+    } finally {
+      pendingUntitledSaveRef.current.delete(tab.id);
+    }
+  }, [buildUniqueUntitledPath, finalizeSavedTab, notify, t]);
 
   const openFileFromPath = useCallback(async (filePath, fileName) => {
     // Cloud-only bookmark: content lives in useExternalDocsStore, no
@@ -172,6 +370,35 @@ export function useFileManager() {
     }
   }, []);
 
+  const createFileInCurrentDir = useCallback(async (fileName) => {
+    const currentDir = useFileStore.getState().currentDir;
+    const trimmed = (fileName || '').trim();
+    if (!currentDir) {
+      notify('error', t('notification.error'), t('sidebar.explorer.openFolder'));
+      return { ok: false };
+    }
+    if (!trimmed || /[\\/]/.test(trimmed)) {
+      notify('error', t('notification.error'), t('sidebar.explorer.invalidFileName'));
+      return { ok: false };
+    }
+
+    try {
+      const targetPath = joinPath(currentDir, trimmed);
+      if (await checkFileExists(targetPath)) {
+        notify('error', t('notification.error'), t('sidebar.explorer.fileExists'));
+        return { ok: false };
+      }
+      await writeFileContent(targetPath, '');
+      await loadDirectory(currentDir);
+      await openFileFromPath(targetPath, trimmed);
+      notify('success', t('notification.fileCreated'), trimmed);
+      return { ok: true, path: targetPath };
+    } catch (err) {
+      notify('error', t('notification.error'), String(err));
+      return { ok: false };
+    }
+  }, [loadDirectory, notify, openFileFromPath, t]);
+
   const openFileDialog = useCallback(async () => {
     try {
       const selected = await open({
@@ -213,45 +440,8 @@ export function useFileManager() {
     }
 
     if (!tab.path) {
-      try {
-        const path = await save({
-          defaultPath: tab.name,
-          filters: [
-            { name: 'Markdown', extensions: ['md'] },
-            { name: 'Text', extensions: ['txt'] },
-            { name: 'All Files', extensions: ['*'] },
-          ],
-        });
-        if (path) {
-          const result = await saveFile(path, tab.content, tab.encoding);
-          if (result.success) {
-            const name = path.split(/[\\/]/).pop();
-            const ext = name.split('.').pop() || '';
-            const externalFileId = tab.externalFileId;
-            updateTabPath(tab.id, path, name);
-            markTabSaved(path);
-            addRecentFile({ name, path, ext });
-            notify('success', t('notification.fileSaved'), name);
-            if (externalFileId) {
-              await syncEngine.claimExternalDoc(externalFileId, path, tab.content, tab.encoding);
-            } else {
-              syncEngine.registerLocalDocument(path, {
-                name,
-                ext,
-                encoding: tab.encoding,
-                lineEnding: tab.lineEnding,
-              });
-              await syncEngine.queueLocalUpsert(path, tab.content, tab.encoding, {
-                name,
-                lineEnding: tab.lineEnding,
-                source: 'save-as',
-              });
-            }
-          }
-        }
-      } catch (err) {
-        notify('error', t('notification.error'), String(err));
-      }
+      dismissedAutoSavePromptRef.current.delete(tab.id);
+      await persistUntitledTab(tab, { allowDialog: true, source: 'manual-save' });
       return;
     }
 
@@ -283,9 +473,13 @@ export function useFileManager() {
     const tab = useEditorStore.getState().getActiveTab();
     if (!tab) return;
 
+    if (!tab.path && !tab.externalFileId) {
+      dismissedAutoSavePromptRef.current.delete(tab.id);
+    }
+
     try {
       const path = await save({
-        defaultPath: tab.name,
+        defaultPath: ensureSuggestedFileName(tab),
         filters: [
           { name: 'Markdown', extensions: ['md'] },
           { name: 'Text', extensions: ['txt'] },
@@ -347,6 +541,7 @@ export function useFileManager() {
 
   return {
     loadDirectory,
+    loadFilesOnly,
     openFileFromPath,
     openFileDialog,
     openFolderDialog,
@@ -354,6 +549,8 @@ export function useFileManager() {
     saveAsDialog,
     openInExplorer,
     createNewFile,
+    createFileWithDialog,
+    createFileInCurrentDir,
     triggerAutoSave,
   };
 }

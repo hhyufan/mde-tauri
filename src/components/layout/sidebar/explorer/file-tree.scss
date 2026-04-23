@@ -62,6 +62,19 @@
     background: var(--hover);
     color: var(--text);
   }
+
+  &--disabled {
+    opacity: 0.3;
+    cursor: not-allowed;
+    pointer-events: none;
+  }
+
+  &--close {
+    margin-left: auto;
+    &:hover {
+      color: var(--error);
+    }
+  }
 }
 
 .file-tree__nav-sep {
@@ -74,11 +87,13 @@
 .file-tree__breadcrumb {
   display: flex;
   align-items: center;
-  gap: 2px;
-  padding: 6px 12px;
+  padding: 0 12px;
   font-size: 11px;
   color: var(--text-sec);
   border-bottom: 1px solid var(--border-light);
+  position: relative;
+  min-height: 30px;
+  flex-shrink: 0;
 }
 
 .file-tree__breadcrumb-icon {
@@ -87,6 +102,45 @@
   flex-shrink: 0;
   opacity: 0.6;
   margin-right: 4px;
+}
+
+// Scrollable inner container — wrapped in a relative box for the right-fade
+.file-tree__breadcrumb-scroll-wrap {
+  flex: 1;
+  min-width: 0;
+  position: relative;
+
+  // Right-edge fog — always present, fades when scrolled to end via JS if needed
+  &::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    right: 0;
+    width: 24px;
+    height: 100%;
+    background: linear-gradient(to right, transparent, var(--sidebar));
+    pointer-events: none;
+    z-index: 1;
+  }
+}
+
+.file-tree__breadcrumb-scroll {
+  display: flex;
+  align-items: center;
+  gap: 0;
+  width: 100%;
+  overflow-x: auto;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+  padding: 6px 0 8px; // extra bottom padding makes room for scrollbar
+
+  &::-webkit-scrollbar { display: none; }
+}
+
+.file-tree__breadcrumb-item {
+  display: inline-flex;
+  align-items: center;
+  flex-shrink: 0;
 }
 
 .file-tree__breadcrumb-chevron {
@@ -99,10 +153,84 @@
 .file-tree__breadcrumb-part {
   cursor: pointer;
   transition: color 0.12s;
+  white-space: nowrap;
 
   &:hover {
     color: var(--accent);
   }
+}
+
+.file-tree__breadcrumb-ellipsis {
+  cursor: pointer;
+  color: var(--text-dim);
+  padding: 0 2px;
+  border-radius: 3px;
+  font-size: 12px;
+  line-height: 1;
+  flex-shrink: 0;
+  transition: all 0.12s;
+
+  &:hover {
+    color: var(--accent);
+    background: var(--hover);
+  }
+}
+
+.file-tree__breadcrumb-collapse {
+  flex-shrink: 0;
+  border: none;
+  background: none;
+  cursor: pointer;
+  color: var(--text-dim);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  border-radius: 3px;
+  padding: 0;
+  opacity: 0;
+  transition: opacity 0.12s, color 0.12s;
+
+  .file-tree__breadcrumb:hover & {
+    opacity: 1;
+  }
+
+  &:hover {
+    color: var(--accent);
+  }
+}
+
+// Custom scrollbar track — sits at the bottom of the breadcrumb row
+.file-tree__breadcrumb-scrollbar {
+  position: absolute;
+  bottom: 2px;
+  left: 32px; // after the icon
+  right: 12px;
+  height: 6px; // taller hit area
+  border-radius: 3px;
+  overflow: visible;
+  opacity: 0;
+  transition: opacity 0.2s;
+  pointer-events: none;
+
+  .file-tree__breadcrumb:hover & {
+    opacity: 1;
+  }
+}
+
+.file-tree__breadcrumb-scrollbar-thumb {
+  position: absolute;
+  bottom: 0;
+  height: 3px;
+  border-radius: 2px;
+  background: var(--text-dim, rgba(128,128,128,0.5));
+  transition: left 0.05s linear;
+  display: none;
+  cursor: grab;
+  pointer-events: all;
+
+  &:active { cursor: grabbing; }
 }
 
 .file-tree__list {
@@ -149,6 +277,10 @@
   &--open {
     color: var(--accent);
   }
+
+  &--creating {
+    background: var(--accent-light);
+  }
 }
 
 .file-tree__item-icon {
@@ -170,6 +302,23 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.file-tree__item-input {
+  flex: 1;
+  min-width: 0;
+  border: 1px solid var(--accent);
+  background: var(--surface);
+  color: var(--text);
+  border-radius: 6px;
+  padding: 4px 8px;
+  font-size: 12px;
+  font-family: var(--font-app);
+  outline: none;
+
+  &::placeholder {
+    color: var(--text-dim);
+  }
 }
 
 .file-tree__item-del {
