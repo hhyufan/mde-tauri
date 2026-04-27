@@ -47,6 +47,7 @@ import 'prismjs/components/prism-r';
 import 'prismjs/components/prism-dart';
 import i18n from '@/i18n';
 import useEditorStore from '@store/useEditorStore';
+import useConfigStore from '@store/useConfigStore';
 import useToastStore from '@store/useToastStore';
 import { parseFootnotes, addFootnoteJumpHandlers } from '@utils/footnoteParser';
 import MermaidRenderer from './MermaidRenderer';
@@ -169,6 +170,7 @@ const cancelIdle =
 
 function MarkdownPreview({ className }) {
   const activeTabId = useEditorStore((s) => s.activeTabId);
+  const fontSize = useConfigStore((s) => s.fontSize);
   const fallback = useMemo(() => {
     const tab = useEditorStore.getState().tabs.find((t) => t.id === activeTabId);
     return tab?.content || '';
@@ -389,6 +391,7 @@ function MarkdownPreview({ className }) {
     <div
       ref={containerRef}
       className={`md-preview ${isStale ? 'md-preview--stale' : ''} ${className || ''}`}
+      style={{ fontSize: `${fontSize || 14}px` }}
     >
       <MarkdownView content={content} components={components} />
     </div>

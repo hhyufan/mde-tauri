@@ -1,13 +1,21 @@
-import { useCallback, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Tooltip } from 'antd';
 import useEditorStore from '@store/useEditorStore';
+import useConfigStore from '@store/useConfigStore';
 import MonacoEditor from '@components/editor/LazyMonacoEditor';
 import MarkdownPreview from '@components/editor/MarkdownPreview';
 import FloatingToolbar from '@components/editor/FloatingToolbar';
 import ToastContainer from '@components/ui/Toast';
 import { useFileManager } from '@hooks/useFileManager';
 import './editor-content.scss';
+
+const MIN_FONT_SIZE = 10;
+const MAX_FONT_SIZE = 24;
+
+function clampFontSize(value) {
+  return Math.max(MIN_FONT_SIZE, Math.min(MAX_FONT_SIZE, value));
+}
 
 function EditorContent() {
   const { t } = useTranslation();
@@ -18,6 +26,7 @@ function EditorContent() {
   const containerRef = useRef(null);
   const isDragging = useRef(false);
   const [splitRatio, setSplitRatio] = useState(0.5);
+  const setConfig = useConfigStore((s) => s.setConfig);
   const { triggerAutoSave } = useFileManager();
   const activeTabMeta = useMemo(
     () => tabs.find((item) => item.id === activeTabId) || null,
@@ -59,6 +68,23 @@ function EditorContent() {
     document.addEventListener('mousemove', onMouseMove);
     document.addEventListener('mouseup', onMouseUp);
   }, []);
+
+  useEffect(() => {
+    const container = containerRef.current;
+    if (!container) return undefined;
+
+    const handleWheel = (event) => {
+      if (!(event.ctrlKey || event.metaKey) || event.deltaY === 0) return;
+
+      event.preventDefault();
+      const step = event.deltaY > 0 ? -1 : 1;
+      const currentFontSize = useConfigStore.getState().fontSize || 14;
+      setConfig('fontSize', clampFontSize(currentFontSize + step));
+    };
+
+    container.addEventListener('wheel', handleWheel, { passive: false, capture: true });
+    return () => container.removeEventListener('wheel', handleWheel, { capture: true });
+  }, [activeTabId, setConfig]);
 
   if (!activeTabMeta) {
     return (
