@@ -55,6 +55,19 @@ function ensureSuggestedFileName(tab) {
   return ext ? `${rawName}.${ext}` : rawName;
 }
 
+function getLiveTabById(tabId) {
+  if (!tabId) return null;
+  const state = useEditorStore.getState();
+  const tab = state.tabs.find((item) => item.id === tabId) || null;
+  if (!tab) return null;
+  const meta = state.tabRenderList.find((item) => item.id === tabId);
+  return {
+    ...tab,
+    content: getBuffer(tab.id, tab.content),
+    modified: meta?.modified ?? tab.modified,
+  };
+}
+
 function hasOpenExplorerDirectory() {
   const { sidebarVisible, sidebarView } = useEditorStore.getState();
   const currentDir = useFileStore.getState().currentDir;
@@ -432,9 +445,11 @@ export function useFileManager() {
     }
   }, [openFileFromPath]);
 
-  const saveCurrentFile = useCallback(async () => {
-    const tab = useEditorStore.getState().getActiveTab();
-    if (!tab) return;
+  const saveTab = useCallback(async (tabId) => {
+    const tab = tabId
+      ? getLiveTabById(tabId)
+      : useEditorStore.getState().getActiveTab();
+    if (!tab) return { ok: false };
 
     if (!tab.path && tab.externalFileId) {
       try {
@@ -445,16 +460,19 @@ export function useFileManager() {
         });
         markTabSaved(tab.id);
         notify('success', t('notification.synced'), tab.name);
+        return { ok: true, tabId: tab.id };
       } catch (err) {
         notify('error', t('notification.error'), String(err));
+        return { ok: false };
       }
-      return;
     }
 
     if (!tab.path) {
       dismissedAutoSavePromptRef.current.delete(tab.id);
-      await persistUntitledTab(tab, { allowDialog: true, source: 'manual-save' });
-      return;
+      const targetPath = await persistUntitledTab(tab, { allowDialog: true, source: 'manual-save' });
+      return targetPath
+        ? { ok: true, tabId: targetPath }
+        : { ok: false, cancelled: true };
     }
 
     try {
@@ -473,13 +491,20 @@ export function useFileManager() {
           lineEnding: tab.lineEnding,
           source: 'manual-save',
         });
+        return { ok: true, tabId: tab.id };
       } else {
         notify('error', t('notification.error'), result.message);
+        return { ok: false };
       }
     } catch (err) {
       notify('error', t('notification.error'), String(err));
+      return { ok: false };
     }
   }, []);
+
+  const saveCurrentFile = useCallback(async () => {
+    await saveTab();
+  }, [saveTab]);
 
   const saveAsDialog = useCallback(async () => {
     const tab = useEditorStore.getState().getActiveTab();
@@ -635,5 +660,6 @@ export function useFileManager() {
     openDroppedPathsInEditor,
     moveDroppedPathsToExplorer,
     triggerAutoSave,
+    saveTab,
   };
 }

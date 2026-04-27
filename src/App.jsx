@@ -6,6 +6,7 @@ import useThemeStore from '@store/useThemeStore';
 import useEditorStore from '@store/useEditorStore';
 import useAuthStore from '@store/useAuthStore';
 import useFileStore from '@store/useFileStore';
+import useConfigStore from '@store/useConfigStore';
 import { useFileManager } from '@hooks/useFileManager';
 import { syncEngine } from '@/services/syncEngine';
 import Sidebar from '@layout/sidebar/Sidebar';
@@ -18,6 +19,7 @@ import SettingsModal from '@components/overlays/SettingsModal';
 import StatsPanel from '@components/overlays/StatsPanel';
 import LoginModal from '@components/overlays/LoginModal';
 import ConflictDialog from '@components/overlays/ConflictDialog';
+import UnsavedChangesModal from '@components/overlays/UnsavedChangesModal';
 import NotificationContainer from '@components/notification/NotificationContainer';
 import useSyncStore from '@store/useSyncStore';
 import { GUEST_USER_SCOPE, isOwnedByUser } from '@store/userScope';
@@ -28,9 +30,11 @@ function App() {
   const initTheme = useThemeStore((s) => s.initTheme);
   const toggleSidebar = useEditorStore((s) => s.toggleSidebar);
   const toggleEditPreview = useEditorStore((s) => s.toggleEditPreview);
+  const tabs = useEditorStore((s) => s.tabRenderList);
   const loadToken = useAuthStore((s) => s.loadToken);
   const isLoggedIn = useAuthStore((s) => s.isLoggedIn);
   const userId = useAuthStore((s) => s.user?.id || GUEST_USER_SCOPE);
+  const autoSave = useConfigStore((s) => s.autoSave);
   const conflictEntries = useSyncStore((s) => s.conflicts);
   const conflicts = useMemo(
     () => conflictEntries.filter((item) => isOwnedByUser(item?.ownerUserId, userId)),
@@ -40,18 +44,32 @@ function App() {
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [statsOpen, setStatsOpen] = useState(false);
   const [loginOpen, setLoginOpen] = useState(false);
+  const [windowClosePromptOpen, setWindowClosePromptOpen] = useState(false);
+  const [windowCloseSaving, setWindowCloseSaving] = useState(false);
+  const [selectedUnsavedTabIds, setSelectedUnsavedTabIds] = useState([]);
   const [isDragOver, setIsDragOver] = useState(false);
   const [dragTarget, setDragTarget] = useState(null);
   const [dragOverlayRect, setDragOverlayRect] = useState(null);
   const lastDragPositionRef = useRef(null);
   const lastDropAtRef = useRef(0);
+  const allowWindowCloseRef = useRef(false);
   const {
     saveCurrentFile,
+    saveTab,
     openFileDialog,
     loadDirectory,
     openDroppedPathsInEditor,
     moveDroppedPathsToExplorer,
   } = useFileManager();
+  const unsavedTabs = useMemo(
+    () => (autoSave ? [] : tabs.filter((tab) => tab.modified)),
+    [autoSave, tabs],
+  );
+
+  const openUnsavedClosePrompt = useCallback((pendingTabs = unsavedTabs) => {
+    setSelectedUnsavedTabIds(pendingTabs.map((tab) => tab.id));
+    setWindowClosePromptOpen(true);
+  }, [unsavedTabs]);
 
   useEffect(() => {
     initTheme();
@@ -122,6 +140,62 @@ function App() {
     document.addEventListener('keydown', handleKeyDown, true);
     return () => document.removeEventListener('keydown', handleKeyDown, true);
   }, [handleKeyDown]);
+
+  const requestWindowClose = useCallback(() => {
+    if (unsavedTabs.length > 0) {
+      openUnsavedClosePrompt(unsavedTabs);
+      return;
+    }
+    allowWindowCloseRef.current = true;
+    appWindow.close();
+  }, [openUnsavedClosePrompt, unsavedTabs]);
+
+  useEffect(() => {
+    if (typeof appWindow.onCloseRequested !== 'function') return undefined;
+
+    const unlisten = appWindow.onCloseRequested((event) => {
+      if (allowWindowCloseRef.current) return;
+      const shouldPrompt = !useConfigStore.getState().autoSave
+        && useEditorStore.getState().tabRenderList.some((tab) => tab.modified);
+      if (!shouldPrompt) return;
+      event.preventDefault();
+      openUnsavedClosePrompt(useEditorStore.getState().tabRenderList.filter((tab) => tab.modified));
+    });
+
+    return () => {
+      unlisten.then((fn) => fn()).catch(console.error);
+    };
+  }, [openUnsavedClosePrompt]);
+
+  const handleSaveAndCloseWindow = useCallback(async () => {
+    const selectedIds = new Set(selectedUnsavedTabIds);
+    const tabsToSave = unsavedTabs.filter((tab) => selectedIds.has(tab.id));
+    setWindowCloseSaving(true);
+    for (const tab of tabsToSave) {
+      const result = await saveTab(tab.id);
+      if (!result?.ok) {
+        setWindowCloseSaving(false);
+        return;
+      }
+    }
+    setWindowCloseSaving(false);
+    allowWindowCloseRef.current = true;
+    appWindow.close();
+  }, [saveTab, selectedUnsavedTabIds, unsavedTabs]);
+
+  const handleDiscardAndCloseWindow = useCallback(() => {
+    allowWindowCloseRef.current = true;
+    appWindow.close();
+  }, []);
+
+  const handleToggleUnsavedTab = useCallback((tab, checked) => {
+    setSelectedUnsavedTabIds((prev) => {
+      if (checked) {
+        return prev.includes(tab.id) ? prev : [...prev, tab.id];
+      }
+      return prev.filter((id) => id !== tab.id);
+    });
+  }, []);
 
   const getDropRegion = useCallback((position) => {
     if (!position) return null;
@@ -272,7 +346,10 @@ function App() {
           onOpenLogin={() => setLoginOpen(true)}
         />
         <div className="app__main">
-          <TitleBar onOpenSearch={() => setSearchOpen(true)} />
+          <TitleBar
+            onOpenSearch={() => setSearchOpen(true)}
+            onRequestClose={requestWindowClose}
+          />
           <TabBar />
           <EditorContent />
           <Footer />
@@ -308,6 +385,16 @@ function App() {
         conflicts={conflicts}
         onResolve={(fileId, resolution) => syncEngine.resolveConflict(fileId, resolution)}
         onClose={() => {}}
+      />
+      <UnsavedChangesModal
+        open={windowClosePromptOpen}
+        tabs={unsavedTabs}
+        selectedTabIds={selectedUnsavedTabIds}
+        onToggleTab={handleToggleUnsavedTab}
+        onSaveSelected={handleSaveAndCloseWindow}
+        onDiscard={handleDiscardAndCloseWindow}
+        onCancel={() => setWindowClosePromptOpen(false)}
+        loading={windowCloseSaving}
       />
       <NotificationContainer />
     </>
