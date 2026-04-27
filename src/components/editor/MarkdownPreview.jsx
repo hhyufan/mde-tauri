@@ -171,6 +171,7 @@ const cancelIdle =
 function MarkdownPreview({ className }) {
   const activeTabId = useEditorStore((s) => s.activeTabId);
   const fontSize = useConfigStore((s) => s.fontSize);
+  const lineHeight = useConfigStore((s) => s.lineHeight);
   const fallback = useMemo(() => {
     const tab = useEditorStore.getState().tabs.find((t) => t.id === activeTabId);
     return tab?.content || '';
@@ -391,7 +392,10 @@ function MarkdownPreview({ className }) {
     <div
       ref={containerRef}
       className={`md-preview ${isStale ? 'md-preview--stale' : ''} ${className || ''}`}
-      style={{ fontSize: `${fontSize || 14}px` }}
+      style={{
+        fontSize: `${fontSize || 14}px`,
+        lineHeight: (lineHeight || 24) / (fontSize || 14),
+      }}
     >
       <MarkdownView content={content} components={components} />
     </div>

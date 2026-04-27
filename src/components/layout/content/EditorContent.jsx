@@ -12,9 +12,24 @@ import './editor-content.scss';
 
 const MIN_FONT_SIZE = 10;
 const MAX_FONT_SIZE = 24;
+const DEFAULT_FONT_SIZE = 14;
+const DEFAULT_LINE_HEIGHT = 24;
 
 function clampFontSize(value) {
   return Math.max(MIN_FONT_SIZE, Math.min(MAX_FONT_SIZE, value));
+}
+
+function getNextTypography(delta) {
+  const { fontSize, lineHeight } = useConfigStore.getState();
+  const currentFontSize = fontSize || DEFAULT_FONT_SIZE;
+  const nextFontSize = clampFontSize(currentFontSize + delta);
+  const currentLineHeight = lineHeight || DEFAULT_LINE_HEIGHT;
+  const lineHeightRatio = currentLineHeight / currentFontSize;
+
+  return {
+    fontSize: nextFontSize,
+    lineHeight: Math.round(nextFontSize * lineHeightRatio),
+  };
 }
 
 function EditorContent() {
@@ -77,9 +92,11 @@ function EditorContent() {
       if (!(event.ctrlKey || event.metaKey) || event.deltaY === 0) return;
 
       event.preventDefault();
+      event.stopPropagation();
       const step = event.deltaY > 0 ? -1 : 1;
-      const currentFontSize = useConfigStore.getState().fontSize || 14;
-      setConfig('fontSize', clampFontSize(currentFontSize + step));
+      const next = getNextTypography(step);
+      setConfig('fontSize', next.fontSize);
+      setConfig('lineHeight', next.lineHeight);
     };
 
     container.addEventListener('wheel', handleWheel, { passive: false, capture: true });
