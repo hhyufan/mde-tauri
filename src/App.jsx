@@ -1,7 +1,7 @@
 import { useEffect, useState, useCallback, useMemo, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { listen } from '@tauri-apps/api/event';
-import { showMainWindow } from '@utils/tauriApi';
+import { appWindow, showMainWindow } from '@utils/tauriApi';
 import useThemeStore from '@store/useThemeStore';
 import useEditorStore from '@store/useEditorStore';
 import useAuthStore from '@store/useAuthStore';
@@ -78,6 +78,15 @@ function App() {
   const handleKeyDown = useCallback((e) => {
     const mod = e.ctrlKey || e.metaKey;
 
+    if (e.key === 'F11') {
+      e.preventDefault();
+      if (e.repeat) return;
+      appWindow
+        .isFullscreen()
+        .then((isFullscreen) => appWindow.setFullscreen(!isFullscreen))
+        .catch(console.error);
+      return;
+    }
     if (mod && e.key === 'p') {
       e.preventDefault();
       setSearchOpen(true);
@@ -110,8 +119,8 @@ function App() {
   }, [saveCurrentFile, openFileDialog, toggleSidebar, toggleEditPreview]);
 
   useEffect(() => {
-    document.addEventListener('keydown', handleKeyDown);
-    return () => document.removeEventListener('keydown', handleKeyDown);
+    document.addEventListener('keydown', handleKeyDown, true);
+    return () => document.removeEventListener('keydown', handleKeyDown, true);
   }, [handleKeyDown]);
 
   const getDropRegion = useCallback((position) => {
