@@ -5,7 +5,9 @@ import {
   saveFile,
   writeFileContent,
   checkFileExists,
+  getFileInfo,
   getDirectoryContents,
+  renameFile,
   startFileWatching,
   stopFileWatching,
   onFileChanged,
@@ -29,6 +31,10 @@ function joinPath(dirPath, fileName) {
   if (!dirPath) return fileName;
   const sep = getPathSeparator(dirPath);
   return `${dirPath.replace(/[\\/]+$/, '')}${sep}${fileName}`;
+}
+
+function normalizePath(path) {
+  return (path || '').replace(/[\\/]+$/, '').toLowerCase();
 }
 
 function splitFileName(fileName) {
@@ -64,7 +70,13 @@ export function useFileManager() {
     createUntitledTab,
     updateTabPath,
   } = useEditorStore.getState();
-  const { setCurrentDir, setFiles, addRecentFile } = useFileStore.getState();
+  const {
+    setCurrentDir,
+    setFiles,
+    addRecentFile,
+    replaceRecentFilePath,
+    replaceBookmarkPath,
+  } = useFileStore.getState();
   const notify = useNotificationStore.getState().notify;
   const t = i18n.t.bind(i18n);
   const pendingUntitledSaveRef = useRef(new Set());
@@ -539,6 +551,75 @@ export function useFileManager() {
     }
   }, [loadDirectory]);
 
+  const openDroppedPathsInEditor = useCallback(async (paths = []) => {
+    for (const filePath of paths) {
+      try {
+        const info = await getFileInfo(filePath);
+        if (info?.is_file) {
+          await openFileFromPath(info.path, info.name);
+        }
+      } catch (err) {
+        notify('error', t('notification.error'), String(err));
+      }
+    }
+  }, [notify, openFileFromPath, t]);
+
+  const moveDroppedPathsToExplorer = useCallback(async (paths = []) => {
+    const currentDir = useFileStore.getState().currentDir;
+    if (!currentDir) {
+      notify('error', t('notification.error'), t('sidebar.explorer.openFolder'));
+      return;
+    }
+
+    for (const sourcePath of paths) {
+      try {
+        const info = await getFileInfo(sourcePath);
+        const targetPath = joinPath(currentDir, info.name);
+        const samePath = normalizePath(sourcePath) === normalizePath(targetPath);
+
+        if (!samePath) {
+          if (await checkFileExists(targetPath)) {
+            notify('error', t('notification.error'), t('sidebar.explorer.fileExists'));
+            continue;
+          }
+
+          const result = await renameFile(sourcePath, targetPath);
+          if (!result.success) {
+            notify('error', t('notification.error'), result.message);
+            continue;
+          }
+
+          if (info.is_file) {
+            const existingTab = useEditorStore.getState().getTabByPath(sourcePath);
+            if (existingTab) {
+              updateTabPath(existingTab.id, targetPath, info.name);
+              stopFileWatching(sourcePath).catch(() => {});
+              startFileWatching(targetPath).catch(() => {});
+            }
+            replaceRecentFilePath(sourcePath, targetPath, info.name);
+            replaceBookmarkPath(sourcePath, targetPath);
+          }
+        }
+
+        if (info.is_file) {
+          await openFileFromPath(targetPath, info.name);
+        }
+      } catch (err) {
+        notify('error', t('notification.error'), String(err));
+      }
+    }
+
+    await loadDirectory(currentDir);
+  }, [
+    loadDirectory,
+    notify,
+    openFileFromPath,
+    replaceBookmarkPath,
+    replaceRecentFilePath,
+    t,
+    updateTabPath,
+  ]);
+
   return {
     loadDirectory,
     loadFilesOnly,
@@ -551,6 +632,8 @@ export function useFileManager() {
     createNewFile,
     createFileWithDialog,
     createFileInCurrentDir,
+    openDroppedPathsInEditor,
+    moveDroppedPathsToExplorer,
     triggerAutoSave,
   };
 }
