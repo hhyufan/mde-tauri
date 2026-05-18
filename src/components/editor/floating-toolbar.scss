@@ -24,6 +24,16 @@
     pointer-events: auto;
     transform: translateX(-50%) translateY(0);
   }
+
+  &--custom-position {
+    right: auto;
+    bottom: auto;
+    transform: translateY(12px);
+
+    &.ft--show {
+      transform: translateY(0);
+    }
+  }
 }
 
 .ft__grip {
@@ -34,7 +44,12 @@
   justify-content: center;
   color: var(--text-dim);
   flex-shrink: 0;
-  cursor: default;
+  cursor: grab;
+  touch-action: none;
+
+  &:active {
+    cursor: grabbing;
+  }
 }
 
 .ft__sep {
@@ -145,6 +160,12 @@
 
     &--show {
       transform: translateY(0);
+    }
+
+    &--custom-position {
+      right: auto;
+      width: max-content;
+      max-width: calc(100vw - 16px);
     }
   }
 

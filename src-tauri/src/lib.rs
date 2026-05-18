@@ -1,3 +1,4 @@
+use base64::{engine::general_purpose, Engine as _};
 use encoding_rs::{Encoding, UTF_8};
 use notify::{Event, EventKind, RecursiveMode, Watcher};
 use once_cell::sync::Lazy;
@@ -35,6 +36,13 @@ struct FileOperationResult {
     encoding: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     line_ending: Option<String>,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+struct BinaryFileResult {
+    content_base64: String,
+    mime_type: String,
+    size: u64,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -109,6 +117,37 @@ async fn read_file_content(path: String) -> Result<FileOperationResult, String> 
             line_ending: None,
         }),
     }
+}
+
+fn guess_mime_from_path(path: &Path) -> &'static str {
+    match path
+        .extension()
+        .and_then(|ext| ext.to_str())
+        .unwrap_or("")
+        .to_lowercase()
+        .as_str()
+    {
+        "avif" => "image/avif",
+        "bmp" => "image/bmp",
+        "gif" => "image/gif",
+        "ico" => "image/x-icon",
+        "jpg" | "jpeg" => "image/jpeg",
+        "png" => "image/png",
+        "svg" => "image/svg+xml",
+        "webp" => "image/webp",
+        _ => "application/octet-stream",
+    }
+}
+
+#[tauri::command]
+async fn read_binary_file(path: String) -> Result<BinaryFileResult, String> {
+    let file_path = Path::new(&path);
+    let bytes = fs::read(file_path).map_err(|e| format!("Failed to read binary file: {}", e))?;
+    Ok(BinaryFileResult {
+        content_base64: general_purpose::STANDARD.encode(&bytes),
+        mime_type: guess_mime_from_path(file_path).to_string(),
+        size: bytes.len() as u64,
+    })
 }
 
 #[tauri::command]
@@ -879,6 +918,7 @@ pub fn run() {
     builder
         .invoke_handler(tauri::generate_handler![
             read_file_content,
+            read_binary_file,
             write_file_content,
             save_file,
             check_file_exists,

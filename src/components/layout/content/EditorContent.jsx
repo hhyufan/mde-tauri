@@ -10,9 +10,10 @@ import { useFileManager } from '@hooks/useFileManager';
 import { useResponsiveLayout } from '@hooks/useResponsiveLayout';
 import './editor-content.scss';
 
-// MarkdownPreview eagerly imports react-markdown, ~30 prism language grammars,
-// remark/rehype plugins and Mermaid (~600 KB). It's only rendered in
-// preview/split mode for markdown files, so defer the parse cost until then.
+// Markdown renderers stay on lazy boundaries so non-markdown files still load
+// the lightweight Monaco path. Preview mode is editable WYSIWYG; split preview
+// is a read-only renderer.
+const MilkdownMarkdownEditor = lazy(() => import('@components/editor/MilkdownMarkdownEditor'));
 const MarkdownPreview = lazy(() => import('@components/editor/MarkdownPreview'));
 
 const PreviewFallback = () => (
@@ -61,6 +62,10 @@ function EditorContent() {
   const handleToolbarInsert = useCallback((action) => {
     const editor = monacoRef.current;
     if (!editor) return;
+
+    if (typeof editor.handleToolbarAction === 'function' && editor.handleToolbarAction(action)) {
+      return;
+    }
 
     if (action.type === 'insert') {
       editor.insertText(action.text);
@@ -145,7 +150,12 @@ function EditorContent() {
         )}
         {viewMode === 'preview' && isMarkdown && (
           <Suspense fallback={<PreviewFallback />}>
-            <MarkdownPreview className="editor-content__preview" />
+            <MilkdownMarkdownEditor
+              key={activeTabId}
+              ref={monacoRef}
+              className="editor-content__preview editor-content__editor--milkdown"
+              onAutoSave={triggerAutoSave}
+            />
           </Suspense>
         )}
         {viewMode === 'split' && isMarkdown && (
@@ -180,7 +190,7 @@ function EditorContent() {
       </div>
 
       {/* FloatingToolbar is outside workspace to avoid overflow:hidden clipping */}
-      {isMarkdown && viewMode !== 'preview' && (
+      {isMarkdown && (
         <FloatingToolbar onInsert={handleToolbarInsert} />
       )}
     </main>

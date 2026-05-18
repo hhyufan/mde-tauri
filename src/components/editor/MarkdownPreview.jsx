@@ -6,6 +6,7 @@ import {
   useCallback,
   useDeferredValue,
   memo,
+  useState,
 } from 'react';
 import { useEditorBufferContent } from '@hooks/useEditorBufferContent';
 import ReactMarkdown from 'react-markdown';
@@ -15,6 +16,7 @@ import rehypeRaw from 'rehype-raw';
 import rehypeKatex from 'rehype-katex';
 import rehypeSanitize, { defaultSchema } from 'rehype-sanitize';
 import Prism from 'prismjs';
+import 'katex/dist/katex.min.css';
 import 'prismjs/components/prism-markup';
 import 'prismjs/components/prism-markup-templating';
 import 'prismjs/components/prism-css';
@@ -50,6 +52,7 @@ import useEditorStore from '@store/useEditorStore';
 import useConfigStore from '@store/useConfigStore';
 import useToastStore from '@store/useToastStore';
 import { parseFootnotes, addFootnoteJumpHandlers } from '@utils/footnoteParser';
+import { loadMarkdownImageSrc } from '@utils/markdownAssets';
 import MermaidRenderer from './MermaidRenderer';
 import './markdown-preview.scss';
 
@@ -101,6 +104,7 @@ const sanitizeSchema = {
     code: [...(defaultSchema.attributes?.code || []), 'className', 'class'],
     span: [...(defaultSchema.attributes?.span || []), 'className', 'class', 'style', 'id'],
     div: [...(defaultSchema.attributes?.div || []), 'className', 'class', 'style'],
+    img: [...(defaultSchema.attributes?.img || []), 'src', 'alt', 'title', 'width', 'height', 'className', 'class'],
     sup: ['id', 'class'],
     li: ['id'],
     ol: ['start'],
@@ -143,6 +147,32 @@ function makeHeading(tag) {
   };
 }
 
+function MarkdownImage({ src, alt, documentPath, ...props }) {
+  const [resolvedSrc, setResolvedSrc] = useState(src);
+
+  useEffect(() => {
+    let objectUrl = null;
+    let cancelled = false;
+
+    setResolvedSrc(src);
+    loadMarkdownImageSrc(src, documentPath).then((result) => {
+      if (cancelled) {
+        if (result.objectUrl) URL.revokeObjectURL(result.objectUrl);
+        return;
+      }
+      objectUrl = result.objectUrl;
+      setResolvedSrc(result.src || src);
+    });
+
+    return () => {
+      cancelled = true;
+      if (objectUrl) URL.revokeObjectURL(objectUrl);
+    };
+  }, [documentPath, src]);
+
+  return <img src={resolvedSrc} alt={alt || ''} loading="lazy" {...props} />;
+}
+
 // Heavy parse + VDOM build is isolated in its own memoized component so
 // that unrelated parent re-renders (theme toggles, scroll, focus, etc.)
 // don't trigger a fresh ReactMarkdown pass on long documents.
@@ -172,10 +202,11 @@ function MarkdownPreview({ className }) {
   const activeTabId = useEditorStore((s) => s.activeTabId);
   const fontSize = useConfigStore((s) => s.fontSize);
   const lineHeight = useConfigStore((s) => s.lineHeight);
-  const fallback = useMemo(() => {
-    const tab = useEditorStore.getState().tabs.find((t) => t.id === activeTabId);
-    return tab?.content || '';
+  const activeTab = useMemo(() => {
+    return useEditorStore.getState().tabs.find((t) => t.id === activeTabId) || null;
   }, [activeTabId]);
+  const fallback = activeTab?.content || '';
+  const documentPath = activeTab?.path || '';
   const rawContent = useEditorBufferContent(activeTabId, fallback, 240);
   const containerRef = useRef(null);
 
@@ -384,7 +415,10 @@ function MarkdownPreview({ className }) {
     sub: ({ children }) => <sub>{children}</sub>,
     abbr: ({ children, ...props }) => <abbr {...props}>{children}</abbr>,
     kbd: ({ children }) => <kbd className="md-preview__kbd">{children}</kbd>,
-  }), []);
+    img: ({ src, alt, ...props }) => (
+      <MarkdownImage src={src} alt={alt} documentPath={documentPath} {...props} />
+    ),
+  }), [documentPath]);
 
   const isStale = content !== processedContent;
 

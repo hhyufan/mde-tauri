@@ -185,6 +185,8 @@ export default defineConfig(async ({ command }) => ({
           if (pkgName === '@antv/g2') return 'antv-vendor';
           if (pkgName === 'axios') return 'axios-vendor';
           if (pkgName === 'react-markdown'
+            || pkgName.startsWith('@milkdown/')
+            || pkgName === 'katex'
             || pkgName === 'remark-gfm'
             || pkgName === 'remark-math'
             || pkgName === 'rehype-raw'
