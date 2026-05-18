@@ -5,6 +5,153 @@
     <link rel="icon" type="image/svg+xml" href="/vite.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Markdown Editor</title>
+
+    <!--
+      Critical styles — inlined so the very first paint of the WebView is the
+      user's persisted theme color, not the default white. This eliminates the
+      "white flash" during WebView2 / WKWebView / WebKitGTK startup before
+      our app's CSS bundle is parsed.
+    -->
+    <style>
+      html, body { margin: 0; padding: 0; height: 100%; overflow: hidden; }
+      html { background: #f5f5f7; }
+      html[data-theme='dark'] { background: #121212; }
+      #root { height: 100%; }
+
+      /* Visible fallback for fatal startup errors. Without this, any
+         uncaught error before React mounts (or any error during the
+         first render with no error boundary) results in a totally blank
+         screen — especially painful on Android where you can't easily
+         open devtools. */
+      #__startup_error__ {
+        display: none;
+        position: fixed;
+        inset: 0;
+        z-index: 2147483647;
+        padding: 16px;
+        overflow: auto;
+        font: 12px/1.5 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+        color: #fff;
+        background: #b71c1c;
+        white-space: pre-wrap;
+        word-break: break-word;
+        -webkit-user-select: text;
+        user-select: text;
+      }
+      #__startup_error__ h2 {
+        margin: 0 0 8px;
+        font: 600 14px/1.4 system-ui, -apple-system, "Segoe UI", sans-serif;
+      }
+    </style>
+
+    <!--
+      Earliest-possible window show.
+      `visible: false` on the Tauri window means the OS keeps it hidden until
+      we explicitly call `show_main_window`. Doing it here — *before* the React
+      bundle is parsed — shaves the React mount + first effect cycle (~50–200ms
+      on cold starts) off the perceived startup time. The user sees the themed
+      window the instant the WebView can render anything.
+    -->
+    <script>
+      (function () {
+        // ---- Startup error capture --------------------------------------
+        // Any uncaught error before React mounts (or while React is
+        // mounting with no error boundary) gets surfaced into a visible
+        // overlay. This is critical on Android where opening devtools
+        // requires USB + chrome://inspect.
+        function showStartupError(msg) {
+          try {
+            var box = document.getElementById('__startup_error__');
+            if (!box) {
+              box = document.createElement('pre');
+              box.id = '__startup_error__';
+              var heading = document.createElement('h2');
+              heading.textContent = 'Startup error';
+              box.appendChild(heading);
+              var body = document.createElement('div');
+              body.id = '__startup_error_body__';
+              box.appendChild(body);
+              (document.body || document.documentElement).appendChild(box);
+            }
+            var body = document.getElementById('__startup_error_body__');
+            var line = document.createElement('div');
+            line.textContent = String(msg);
+            body.appendChild(line);
+            box.style.display = 'block';
+          } catch (_) { /* swallow — overlay is best effort */ }
+        }
+        // Errors that should never reach the visible overlay. Monaco
+        // (and a couple of other Microsoft libs) throw `CancellationError`
+        // — name === 'Canceled' — as the standard mechanism for aborting
+        // in-flight async work whenever a model is swapped out, the user
+        // saves while a hover/format request is pending, etc. They are
+        // *not* failures, just cooperative cancellation. Same goes for
+        // any rejection whose reason is literally 'Canceled' or a thrown
+        // AbortError. Surfacing them in a red full-screen overlay would
+        // make every save look like a crash.
+        function isBenignCancellation(reason) {
+          if (!reason) return false;
+          var name = reason.name || (typeof reason === 'object' && reason.constructor && reason.constructor.name);
+          if (name === 'Canceled' || name === 'CancellationError' || name === 'AbortError') return true;
+          var msg = (reason.message || String(reason || '')).toLowerCase();
+          return msg === 'canceled' || msg === 'canceled: canceled' || msg === 'aborted';
+        }
+        window.addEventListener('error', function (e) {
+          if (isBenignCancellation(e && e.error)) return;
+          var msg = (e && (e.message || (e.error && e.error.stack))) || 'Unknown error';
+          if (e && e.filename) msg += '\n  at ' + e.filename + ':' + e.lineno + ':' + e.colno;
+          if (e && e.error && e.error.stack) msg += '\n' + e.error.stack;
+          showStartupError(msg);
+        });
+        window.addEventListener('unhandledrejection', function (e) {
+          var reason = e && e.reason;
+          if (isBenignCancellation(reason)) {
+            if (typeof e.preventDefault === 'function') e.preventDefault();
+            return;
+          }
+          var msg = reason && (reason.stack || reason.message) ? (reason.stack || reason.message) : String(reason);
+          showStartupError('Unhandled promise rejection: ' + msg);
+        });
+        // Fail-safe: if after 8 s the React root is still empty, show a
+        // hint so the user knows something is wrong rather than staring
+        // at a blank screen.
+        setTimeout(function () {
+          var root = document.getElementById('root');
+          if (root && root.childElementCount === 0 && !document.getElementById('__startup_error__')) {
+            showStartupError(
+              'App did not render within 8 s.\n' +
+              'UA: ' + (navigator && navigator.userAgent) + '\n' +
+              'Tauri internals present: ' + !!window.__TAURI_INTERNALS__
+            );
+          }
+        }, 8000);
+
+        // 1. Apply persisted theme to <html> so the inline CSS picks it up.
+        try {
+          var raw = localStorage.getItem('mde-theme');
+          var theme = raw && JSON.parse(raw)?.state?.theme;
+          if (!theme) {
+            theme = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+          }
+          document.documentElement.dataset.theme = theme;
+        } catch (_) { /* noop — fall back to light */ }
+
+        // 2. Show the OS window the moment Tauri's IPC bridge is ready.
+        // In Tauri 2.5+ initialization scripts always run first; on older
+        // versions __TAURI_INTERNALS__ may appear a few microseconds later,
+        // so we retry on rAF until it's available (or give up after a tick).
+        var attempts = 0;
+        function tryShow() {
+          var t = window.__TAURI_INTERNALS__;
+          if (t && typeof t.invoke === 'function') {
+            t.invoke('show_main_window').catch(function () {});
+            return;
+          }
+          if (attempts++ < 60) requestAnimationFrame(tryShow);
+        }
+        tryShow();
+      })();
+    </script>
   </head>
   <body>
     <div id="root"></div>

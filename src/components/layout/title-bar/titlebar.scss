@@ -78,3 +78,33 @@
   gap: 4px;
   -webkit-app-region: no-drag;
 }
+
+@media (max-width: 768px) {
+  .titlebar {
+    height: calc(52px + env(safe-area-inset-top));
+    padding: env(safe-area-inset-top) 10px 0;
+    gap: 10px;
+    -webkit-app-region: no-drag;
+  }
+
+  .titlebar--mobile {
+    background: var(--surface);
+  }
+
+  .titlebar__drag {
+    display: none;
+  }
+
+  .titlebar__btn {
+    width: 40px;
+    height: 40px;
+  }
+
+  .titlebar__search {
+    flex: 1;
+    min-width: 0;
+    height: 40px;
+    padding: 0 12px;
+    font-size: 12px;
+  }
+}

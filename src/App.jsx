@@ -1,34 +1,42 @@
-import { useEffect, useState, useCallback, useMemo, useRef } from 'react';
+import { lazy, Suspense, useEffect, useState, useCallback, useMemo, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { listen } from '@tauri-apps/api/event';
-import { appWindow, showMainWindow } from '@utils/tauriApi';
+import { appWindow } from '@utils/tauriApi';
 import useThemeStore from '@store/useThemeStore';
 import useEditorStore from '@store/useEditorStore';
 import useAuthStore from '@store/useAuthStore';
 import useFileStore from '@store/useFileStore';
 import useConfigStore from '@store/useConfigStore';
 import { useFileManager } from '@hooks/useFileManager';
+import { useResponsiveLayout } from '@hooks/useResponsiveLayout';
 import { syncEngine } from '@/services/syncEngine';
 import Sidebar from '@layout/sidebar/Sidebar';
 import TitleBar from '@layout/title-bar/TitleBar';
 import TabBar from '@layout/tab-bar/TabBar';
 import EditorContent from '@layout/content/EditorContent';
 import Footer from '@layout/footer/Footer';
-import SearchModal from '@components/overlays/SearchModal';
-import SettingsModal from '@components/overlays/SettingsModal';
-import StatsPanel from '@components/overlays/StatsPanel';
-import LoginModal from '@components/overlays/LoginModal';
-import ConflictDialog from '@components/overlays/ConflictDialog';
-import UnsavedChangesModal from '@components/overlays/UnsavedChangesModal';
 import NotificationContainer from '@components/notification/NotificationContainer';
 import useSyncStore from '@store/useSyncStore';
 import { GUEST_USER_SCOPE, isOwnedByUser } from '@store/userScope';
+import { cn } from '@utils/classNames';
 import '@styles/App.scss';
+
+// Every overlay below is invisible at startup — lazy them so their (often
+// heavy) dependency trees don't ship with the entry chunk. StatsPanel alone
+// drags in @antv/g2 (≈1.3 MB).
+const SearchModal = lazy(() => import('@components/overlays/SearchModal'));
+const SettingsModal = lazy(() => import('@components/overlays/SettingsModal'));
+const StatsPanel = lazy(() => import('@components/overlays/StatsPanel'));
+const LoginModal = lazy(() => import('@components/overlays/LoginModal'));
+const ConflictDialog = lazy(() => import('@components/overlays/ConflictDialog'));
+const UnsavedChangesModal = lazy(() => import('@components/overlays/UnsavedChangesModal'));
 
 function App() {
   const { t } = useTranslation();
   const initTheme = useThemeStore((s) => s.initTheme);
   const toggleSidebar = useEditorStore((s) => s.toggleSidebar);
+  const setSidebarVisible = useEditorStore((s) => s.setSidebarVisible);
+  const sidebarVisible = useEditorStore((s) => s.sidebarVisible);
   const toggleEditPreview = useEditorStore((s) => s.toggleEditPreview);
   const tabs = useEditorStore((s) => s.tabRenderList);
   const loadToken = useAuthStore((s) => s.loadToken);
@@ -53,6 +61,8 @@ function App() {
   const lastDragPositionRef = useRef(null);
   const lastDropAtRef = useRef(0);
   const allowWindowCloseRef = useRef(false);
+  const { isMobileLayout, isAndroid } = useResponsiveLayout();
+  const isDesktopWindow = !isMobileLayout && !isAndroid;
   const {
     saveCurrentFile,
     saveTab,
@@ -72,20 +82,29 @@ function App() {
   }, [unsavedTabs]);
 
   useEffect(() => {
+    // Theme + auth are needed for the very first render; do them inline.
     initTheme();
     loadToken();
-    syncEngine.ensureLocalReset();
-    showMainWindow().catch(console.error);
 
-    // currentDir is persisted across restarts, but the file listing (files[])
-    // is not — it's volatile OS state. Re-load the directory silently so the
-    // explorer tree is populated immediately without the user having to manually
-    // refresh or re-open the folder.
-    const savedDir = useFileStore.getState().currentDir;
-    if (savedDir) {
-      loadDirectory(savedDir);
-    }
+    // The OS window has already been shown by the inline bootstrap script in
+    // index.html — no need to invoke `show_main_window` again here.
+
+    // Anything that doesn't gate the first paint (sync engine reset, restoring
+    // the explorer tree) runs after the browser is idle so it never delays
+    // time-to-interactive.
+    const idle = window.requestIdleCallback || ((cb) => setTimeout(cb, 1));
+    idle(() => {
+      syncEngine.ensureLocalReset();
+      const savedDir = useFileStore.getState().currentDir;
+      if (savedDir) loadDirectory(savedDir);
+    });
   }, []);
+
+  useEffect(() => {
+    if (isMobileLayout) {
+      setSidebarVisible(false);
+    }
+  }, [isMobileLayout, setSidebarVisible]);
 
   useEffect(() => {
     if (isLoggedIn) {
@@ -97,6 +116,7 @@ function App() {
     const mod = e.ctrlKey || e.metaKey;
 
     if (e.key === 'F11') {
+      if (!isDesktopWindow) return;
       e.preventDefault();
       if (e.repeat) return;
       appWindow
@@ -134,7 +154,7 @@ function App() {
       setSettingsOpen(false);
       setLoginOpen(false);
     }
-  }, [saveCurrentFile, openFileDialog, toggleSidebar, toggleEditPreview]);
+  }, [isDesktopWindow, saveCurrentFile, openFileDialog, toggleSidebar, toggleEditPreview]);
 
   useEffect(() => {
     document.addEventListener('keydown', handleKeyDown, true);
@@ -146,12 +166,13 @@ function App() {
       openUnsavedClosePrompt(unsavedTabs);
       return;
     }
+    if (!isDesktopWindow) return;
     allowWindowCloseRef.current = true;
     appWindow.close();
-  }, [openUnsavedClosePrompt, unsavedTabs]);
+  }, [isDesktopWindow, openUnsavedClosePrompt, unsavedTabs]);
 
   useEffect(() => {
-    if (typeof appWindow.onCloseRequested !== 'function') return undefined;
+    if (!isDesktopWindow || typeof appWindow.onCloseRequested !== 'function') return undefined;
 
     const unlisten = appWindow.onCloseRequested((event) => {
       if (allowWindowCloseRef.current) return;
@@ -165,7 +186,7 @@ function App() {
     return () => {
       unlisten.then((fn) => fn()).catch(console.error);
     };
-  }, [openUnsavedClosePrompt]);
+  }, [isDesktopWindow, openUnsavedClosePrompt]);
 
   const handleSaveAndCloseWindow = useCallback(async () => {
     const selectedIds = new Set(selectedUnsavedTabIds);
@@ -179,14 +200,22 @@ function App() {
       }
     }
     setWindowCloseSaving(false);
+    if (!isDesktopWindow) {
+      setWindowClosePromptOpen(false);
+      return;
+    }
     allowWindowCloseRef.current = true;
     appWindow.close();
-  }, [saveTab, selectedUnsavedTabIds, unsavedTabs]);
+  }, [isDesktopWindow, saveTab, selectedUnsavedTabIds, unsavedTabs]);
 
   const handleDiscardAndCloseWindow = useCallback(() => {
+    if (!isDesktopWindow) {
+      setWindowClosePromptOpen(false);
+      return;
+    }
     allowWindowCloseRef.current = true;
     appWindow.close();
-  }, []);
+  }, [isDesktopWindow]);
 
   const handleToggleUnsavedTab = useCallback((tab, checked) => {
     setSelectedUnsavedTabIds((prev) => {
@@ -221,6 +250,8 @@ function App() {
   }, []);
 
   useEffect(() => {
+    if (isMobileLayout || isAndroid) return undefined;
+
     let disposed = false;
     const unlisteners = [];
 
@@ -247,6 +278,17 @@ function App() {
       setIsDragOver(true);
     };
 
+    // Drag/drop listeners aren't needed for the first paint — defer their
+    // registration until idle so we don't block time-to-interactive on a
+    // batch of Tauri IPC calls (each `listen` is a roundtrip).
+    const idle = window.requestIdleCallback || ((cb) => setTimeout(cb, 1));
+    let cancelled = false;
+    const idleHandle = idle(() => {
+      if (cancelled || disposed) return;
+      registerListeners();
+    });
+
+    function registerListeners() {
     register(listen('tauri://drag-enter', (event) => {
       updateDragState(event.payload);
     }));
@@ -323,12 +365,23 @@ function App() {
         window.removeEventListener('dragleave', handleDragLeave);
       });
     }
+    } // end registerListeners
 
     return () => {
+      cancelled = true;
       disposed = true;
+      if (window.cancelIdleCallback && typeof idleHandle === 'number') {
+        window.cancelIdleCallback(idleHandle);
+      }
       unlisteners.forEach((handler) => handler());
     };
-  }, [getDropRegion, moveDroppedPathsToExplorer, openDroppedPathsInEditor]);
+  }, [
+    getDropRegion,
+    isAndroid,
+    isMobileLayout,
+    moveDroppedPathsToExplorer,
+    openDroppedPathsInEditor,
+  ]);
 
   const dragOverlayTitle = dragTarget === 'explorer'
     ? t('drag.explorerTitle', '移动到资源管理器')
@@ -339,12 +392,27 @@ function App() {
 
   return (
     <>
-      <div className={`app ${isDragOver ? 'app--drag-over' : ''}`}>
+      <div
+        className={cn(
+          'app',
+          isDragOver && 'app--drag-over',
+          isMobileLayout && 'app--mobile',
+          isAndroid && 'app--android',
+        )}
+      >
         <Sidebar
           onOpenSettings={() => setSettingsOpen(true)}
           onOpenStats={() => setStatsOpen(true)}
           onOpenLogin={() => setLoginOpen(true)}
         />
+        {isMobileLayout && sidebarVisible && (
+          <button
+            className="app__sidebar-backdrop"
+            type="button"
+            aria-label={t('topbar.toggleSidebar')}
+            onClick={() => setSidebarVisible(false)}
+          />
+        )}
         <div className="app__main">
           <TitleBar
             onOpenSearch={() => setSearchOpen(true)}
@@ -376,26 +444,32 @@ function App() {
           </div>
         )}
       </div>
-      <SearchModal open={searchOpen} onClose={() => setSearchOpen(false)} />
-      <SettingsModal open={settingsOpen} onClose={() => setSettingsOpen(false)} />
-      <StatsPanel open={statsOpen} onClose={() => setStatsOpen(false)} />
-      <LoginModal open={loginOpen} onClose={() => setLoginOpen(false)} onLoggedIn={() => syncEngine.fullSync()} />
-      <ConflictDialog
-        open={conflicts.length > 0}
-        conflicts={conflicts}
-        onResolve={(fileId, resolution) => syncEngine.resolveConflict(fileId, resolution)}
-        onClose={() => {}}
-      />
-      <UnsavedChangesModal
-        open={windowClosePromptOpen}
-        tabs={unsavedTabs}
-        selectedTabIds={selectedUnsavedTabIds}
-        onToggleTab={handleToggleUnsavedTab}
-        onSaveSelected={handleSaveAndCloseWindow}
-        onDiscard={handleDiscardAndCloseWindow}
-        onCancel={() => setWindowClosePromptOpen(false)}
-        loading={windowCloseSaving}
-      />
+      <Suspense fallback={null}>
+        {searchOpen && <SearchModal open={searchOpen} onClose={() => setSearchOpen(false)} />}
+        {settingsOpen && <SettingsModal open={settingsOpen} onClose={() => setSettingsOpen(false)} />}
+        {statsOpen && <StatsPanel open={statsOpen} onClose={() => setStatsOpen(false)} />}
+        {loginOpen && <LoginModal open={loginOpen} onClose={() => setLoginOpen(false)} onLoggedIn={() => syncEngine.fullSync()} />}
+        {conflicts.length > 0 && (
+          <ConflictDialog
+            open
+            conflicts={conflicts}
+            onResolve={(fileId, resolution) => syncEngine.resolveConflict(fileId, resolution)}
+            onClose={() => {}}
+          />
+        )}
+        {windowClosePromptOpen && (
+          <UnsavedChangesModal
+            open={windowClosePromptOpen}
+            tabs={unsavedTabs}
+            selectedTabIds={selectedUnsavedTabIds}
+            onToggleTab={handleToggleUnsavedTab}
+            onSaveSelected={handleSaveAndCloseWindow}
+            onDiscard={handleDiscardAndCloseWindow}
+            onCancel={() => setWindowClosePromptOpen(false)}
+            loading={windowCloseSaving}
+          />
+        )}
+      </Suspense>
       <NotificationContainer />
     </>
   );

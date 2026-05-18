@@ -9,6 +9,7 @@ import { deleteFile as deleteFileApi } from '@utils/tauriApi';
 import useNotificationStore from '@store/useNotificationStore';
 import { cn } from '@utils/classNames';
 import FileTypeIcon from '@components/ui/FileTypeIcon';
+import { isSafUri, safDisplayName } from '@utils/tauriApi';
 import './file-tree.scss';
 
 function buildBreadcrumbPath(currentDir, index) {
@@ -118,6 +119,7 @@ function FileTree() {
   }, [currentDir, updateBcScrollbar]);
 
   // ── Navigation ───────────────────────────────────────────────────────────
+  const currentDirIsSaf = isSafUri(currentDir);
   const canGoBack = historyIndex > 0;
   const canGoForward = historyIndex < dirHistory.length - 1;
 
@@ -137,9 +139,10 @@ function FileTree() {
 
   const handleGoUp = useCallback(() => {
     if (!currentDir) return;
+    if (currentDirIsSaf) return;
     const parentDir = getParentDir(currentDir);
     if (parentDir) loadDirectory(parentDir);
-  }, [currentDir, loadDirectory]);
+  }, [currentDir, currentDirIsSaf, loadDirectory]);
 
   const handleCloseFolder = useCallback(() => {
     useFileStore.getState().clearDirectory();
@@ -202,7 +205,9 @@ function FileTree() {
   }, [files, sortBy, sortOrder]);
 
   // ── Breadcrumb ────────────────────────────────────────────────────────────
-  const breadcrumbParts = currentDir ? currentDir.split(/[\\/]/).filter(Boolean) : [];
+  const breadcrumbParts = currentDir
+    ? (currentDirIsSaf ? [safDisplayName(currentDir)] : currentDir.split(/[\\/]/).filter(Boolean))
+    : [];
   const shouldCollapse = breadcrumbParts.length > 3 && !breadcrumbExpanded;
 
   // ── Empty state ───────────────────────────────────────────────────────────
@@ -256,7 +261,7 @@ function FileTree() {
           t('sidebar.explorer.up'),
           'file-tree__nav-btn',
           handleGoUp,
-          false,
+          currentDirIsSaf,
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
             <line x1="12" y1="19" x2="12" y2="5" /><polyline points="5 12 12 5 19 12" />
           </svg>,
@@ -357,7 +362,7 @@ function FileTree() {
                   )}
                   <span
                     className="file-tree__breadcrumb-part"
-                    onClick={() => loadDirectory(buildBreadcrumbPath(currentDir, i))}
+                    onClick={() => loadDirectory(currentDirIsSaf ? currentDir : buildBreadcrumbPath(currentDir, i))}
                   >
                     {part}
                   </span>

@@ -16,14 +16,24 @@ tauri-build = { version = "2.0.0", features = [] }
 default = []
 
 [dependencies]
-tauri = { version = "2.0.0", features = ["protocol-asset"] }
-tauri-plugin-opener = "2.5"
+# We deliberately *don't* enable Tauri's `protocol-asset` feature: the asset
+# protocol spins up an HTTP-style file server inside the WebView at startup,
+# but the frontend never calls `convertFileSrc` / `asset://` — so the feature
+# is pure cold-start cost. Removing it skips that whole subsystem and shrinks
+# the binary too.
+#
+# IMPORTANT: keep Tauri's default feature set on (`wry`, `compression`,
+# `common-controls-v6`, `dynamic-acl`, `x11`). Disabling them silently breaks
+# the IPC bridge — `dynamic-acl` is needed for runtime ACL evaluation when
+# `removeUnusedCommands` is enabled, and without `compression` large IPC
+# payloads can fail to round-trip. Both manifest as "the close button does
+# nothing" / "Tooltip translations stop updating" with no visible error.
+tauri = { version = "2.0.0", features = [] }
 tauri-plugin-fs = "2"
 tauri-plugin-dialog = "2"
 tauri-plugin-store = "2"
 serde = { version = "1.0.0", features = ["derive"] }
 serde_json = "1.0.0"
-tokio = { version = "1.0.0", features = ["full"] }
 encoding_rs = "0.8"
 notify = "6.1"
 once_cell = "1.19"
@@ -32,3 +42,37 @@ thiserror = "1.0"
 
 [target.'cfg(windows)'.dependencies]
 windows-sys = { version = "0.52", features = ["Win32_System_Console", "Win32_Foundation"] }
+
+# ---------------------------------------------------------------------------
+# Profiles tuned for fastest cold-start.
+# Release uses fat LTO + a single codegen unit so LLVM can inline aggressively
+# across crates; opt-level = 3 favours runtime speed (we care about *startup*,
+# not minimum binary size). panic = "abort" cuts the unwinding tables so the
+# process image is smaller and OS load is faster. strip eliminates leftover
+# symbols. The "*" override forces every dependency (incl. tauri/wry) to be
+# rebuilt with the same flags rather than the default "release with overrides".
+# ---------------------------------------------------------------------------
+[profile.dev]
+incremental = true
+opt-level = 0
+
+[profile.release]
+codegen-units = 1
+lto = "fat"
+opt-level = 3
+panic = "abort"
+strip = true
+debug = false
+incremental = false
+
+[profile.release.package."*"]
+opt-level = 3
+codegen-units = 1
+
+# Build scripts run only at compile time, but slow build scripts mean every
+# clean release rebuild pays an unnecessary cost. Compile them with the fast
+# default settings instead of inheriting `release`'s heavy LTO pass.
+[profile.release.build-override]
+opt-level = 0
+codegen-units = 256
+debug = false

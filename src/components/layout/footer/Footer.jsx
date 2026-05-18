@@ -4,10 +4,11 @@ import { useTranslation } from 'react-i18next';
 import { Dropdown, Tooltip } from 'antd';
 import useEditorStore from '@store/useEditorStore';
 import { useFileManager } from '@hooks/useFileManager';
-import { getDirectoryContents, showInExplorer } from '@utils/tauriApi';
+import { getDirectoryContents, isSafUri, safDisplayName, showInExplorer } from '@utils/tauriApi';
 import { splitPath, buildFullPath } from '@utils/pathUtils';
 import SyncStatusIndicator from '@components/ui/SyncStatusIndicator';
 import FileTypeIcon from '@components/ui/FileTypeIcon';
+import { isAndroidRuntime } from '@utils/platform';
 import './footer.scss';
 
 const MARKDOWN_EXT = /^(md|markdown|mdx)$/i;
@@ -68,6 +69,7 @@ function Footer() {
   const [openDropdown, setOpenDropdown] = useState(null);
   const bcScrollRef = useRef(null);
   const bcThumbRef = useRef(null);
+  const isAndroid = isAndroidRuntime();
 
   // ── Breadcrumb scroll ─────────────────────────────────────────────────────
   const updateBcScrollbar = useCallback(() => {
@@ -122,7 +124,7 @@ function Footer() {
 
   useEffect(() => {
     if (activeTab?.path) {
-      setPathSegments(splitPath(activeTab.path));
+      setPathSegments(isSafUri(activeTab.path) ? [safDisplayName(activeTab.path)] : splitPath(activeTab.path));
       setDirectoryContents({});
     } else {
       setPathSegments([]);
@@ -134,6 +136,7 @@ function Footer() {
       setOpenDropdown(null);
       return;
     }
+    if (activeTab?.path && isSafUri(activeTab.path)) return;
     const dirPath = buildFullPath(pathSegments, index);
     if (!dirPath) return;
     try {
@@ -152,13 +155,14 @@ function Footer() {
 
   const handleContextMenu = useCallback(async (e, index) => {
     e.preventDefault();
+    if (isAndroid) return;
     const dirPath = buildFullPath(pathSegments, index);
     if (dirPath) {
       try {
         await showInExplorer(dirPath);
       } catch (_) { /* silent */ }
     }
-  }, [pathSegments]);
+  }, [isAndroid, pathSegments]);
 
   const handleFileItemClick = useCallback(async (item) => {
     setOpenDropdown(null);

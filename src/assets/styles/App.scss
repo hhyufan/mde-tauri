@@ -11,6 +11,11 @@
   flex-direction: column;
   overflow: hidden;
   background: var(--surface);
+  min-width: 0;
+}
+
+.app__sidebar-backdrop {
+  display: none;
 }
 
 .drag-overlay {
@@ -83,5 +88,31 @@
   to {
     opacity: 1;
     transform: scale(1);
+  }
+}
+
+@media (max-width: 768px) {
+  .app {
+    height: 100dvh;
+    overflow: hidden;
+  }
+
+  .app__main {
+    width: 100%;
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+
+  .app__sidebar-backdrop {
+    position: fixed;
+    inset: 0;
+    z-index: 30;
+    display: block;
+    border: 0;
+    background: rgba(0, 0, 0, 0.36);
+    backdrop-filter: blur(2px);
+  }
+
+  .app--mobile .drag-overlay {
+    display: none;
   }
 }

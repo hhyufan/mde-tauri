@@ -369,3 +369,64 @@
     color: var(--text);
   }
 }
+
+@media (max-width: 768px) {
+  .sidebar {
+    position: fixed;
+    inset: 0 auto 0 0;
+    width: min(86vw, 320px);
+    min-width: 0;
+    z-index: 40;
+    box-shadow: 18px 0 48px rgba(0, 0, 0, 0.26);
+    transform: translateX(0);
+    transition: transform 0.22s ease, opacity 0.22s ease;
+    padding-top: env(safe-area-inset-top);
+
+    &--hidden {
+      margin-left: 0;
+      opacity: 0;
+      pointer-events: none;
+      transform: translateX(-100%);
+    }
+  }
+
+  .sidebar__header {
+    min-height: 56px;
+  }
+
+  .sidebar__tab {
+    min-height: 40px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .sidebar__toolbar {
+    min-height: 48px;
+  }
+
+  .stb {
+    width: 36px;
+    height: 36px;
+  }
+
+  .sidebar__recent-item {
+    min-height: 48px;
+  }
+
+  .sidebar__recent-del {
+    opacity: 1;
+    width: 28px;
+    height: 28px;
+  }
+
+  .sidebar__footer {
+    min-height: 48px;
+    padding-bottom: calc(6px + env(safe-area-inset-bottom));
+  }
+
+  .sidebar__footer-btn {
+    width: 34px;
+    height: 34px;
+  }
+}

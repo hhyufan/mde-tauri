@@ -5,10 +5,11 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::fs;
 use std::path::Path;
+#[cfg(not(target_os = "android"))]
 use std::process::Command;
 use std::sync::{Arc, Mutex};
 use std::time::{SystemTime, UNIX_EPOCH};
-use tauri::{AppHandle, Emitter, Manager};
+use tauri::{async_runtime, AppHandle, Emitter, Manager};
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 struct FileInfo {
@@ -487,6 +488,14 @@ async fn stop_file_watching(file_path: String) -> Result<bool, String> {
 
 #[tauri::command]
 async fn execute_file(file_path: String) -> Result<String, String> {
+    #[cfg(target_os = "android")]
+    {
+        let _ = file_path;
+        return Err("Executing local files is not supported on Android".to_string());
+    }
+
+    #[cfg(not(target_os = "android"))]
+    {
     let path = Path::new(&file_path);
     if !path.exists() {
         return Err("File does not exist".to_string());
@@ -505,10 +514,19 @@ async fn execute_file(file_path: String) -> Result<String, String> {
         },
         _ => Err(format!("Unsupported file type: {}", extension)),
     }
+    }
 }
 
 #[tauri::command]
 async fn run_code_snippet(code: String, language: String) -> Result<String, String> {
+    #[cfg(target_os = "android")]
+    {
+        let _ = (code, language);
+        return Err("Running code snippets is not supported on Android".to_string());
+    }
+
+    #[cfg(not(target_os = "android"))]
+    {
     match language.as_str() {
         "javascript" | "js" => {
             match Command::new("node").arg("-e").arg(&code).output() {
@@ -535,6 +553,7 @@ async fn run_code_snippet(code: String, language: String) -> Result<String, Stri
             }
         }
         _ => Err(format!("Unsupported language: {}", language)),
+    }
     }
 }
 
@@ -671,9 +690,11 @@ async fn search_files(
 
     if search_content {
         // Phase 1: collect markdown paths synchronously (stat calls only, fast).
-        // Run in spawn_blocking to avoid occupying a Tokio worker thread.
+        // Run on Tauri's blocking pool so we don't park an async worker thread.
+        // Using `tauri::async_runtime` instead of a separate `tokio` dependency
+        // means no second runtime/thread-pool is spun up at app startup.
         let root_clone = root_path.clone();
-        let md_paths = tokio::task::spawn_blocking(move || {
+        let md_paths = async_runtime::spawn_blocking(move || {
             let mut paths = Vec::new();
             collect_md_paths(&root_clone, &mut paths);
             paths
@@ -681,16 +702,17 @@ async fn search_files(
         .await
         .map_err(|e| e.to_string())?;
 
-        // Phase 2: read every file concurrently with async I/O, then search its lines.
+        // Phase 2: read every file in parallel on the blocking pool. `std::fs`
+        // inside `spawn_blocking` is just as concurrent as `tokio::fs` (which
+        // ultimately dispatches to the same blocking pool) and avoids pulling
+        // in tokio's `fs` feature.
         let handles: Vec<_> = md_paths
             .into_iter()
             .map(|path| {
                 let q = Arc::clone(&query_lower);
-                tokio::spawn(async move {
-                    match tokio::fs::read_to_string(&path).await {
-                        Ok(content) => search_content_lines(&path, &content, &q),
-                        Err(_) => vec![],
-                    }
+                async_runtime::spawn_blocking(move || match fs::read_to_string(&path) {
+                    Ok(content) => search_content_lines(&path, &content, &q),
+                    Err(_) => vec![],
                 })
             })
             .collect();
@@ -714,7 +736,7 @@ async fn search_files(
     } else {
         // Filename search: no content reads, but still move off async thread.
         let q = query_lower.to_string();
-        let results = tokio::task::spawn_blocking(move || {
+        let results = async_runtime::spawn_blocking(move || {
             let mut out = Vec::new();
             walk_names(&root_path, &q, &mut out, limit);
             out
@@ -727,6 +749,14 @@ async fn search_files(
 
 #[tauri::command]
 async fn show_in_explorer(path: String) -> Result<String, String> {
+    #[cfg(target_os = "android")]
+    {
+        let _ = path;
+        return Err("Opening the system file manager is not supported on Android".to_string());
+    }
+
+    #[cfg(not(target_os = "android"))]
+    {
     let target_path = Path::new(&path);
     if !target_path.exists() {
         return Err("Path does not exist".to_string());
@@ -777,6 +807,30 @@ async fn show_in_explorer(path: String) -> Result<String, String> {
     {
         Err("Operation not supported on this platform".to_string())
     }
+    }
+}
+
+/// Returns the per-app "Documents" folder, creating it if needed.
+///
+/// This is the only directory we can guarantee is writable on Android
+/// without runtime permissions or the Storage Access Framework. On
+/// Android Tauri maps `app_data_dir()` to `Context.getFilesDir()`, i.e.
+/// `/data/data/<package>/files` — always writable by the app, invisible
+/// to other apps, and wiped on uninstall. On desktop platforms it
+/// resolves to the platform-conventional app data directory (e.g.
+/// `%APPDATA%\com.mde.app` on Windows), which keeps behavior consistent.
+#[tauri::command]
+async fn get_app_documents_dir(app: AppHandle) -> Result<String, String> {
+    let app_data_dir = app
+        .path()
+        .app_data_dir()
+        .map_err(|e| format!("Failed to resolve app data dir: {}", e))?;
+    let docs = app_data_dir.join("Documents");
+    if !docs.exists() {
+        fs::create_dir_all(&docs)
+            .map_err(|e| format!("Failed to create documents dir: {}", e))?;
+    }
+    Ok(docs.to_string_lossy().to_string())
 }
 
 #[tauri::command]
@@ -802,24 +856,27 @@ async fn show_main_window(app: AppHandle) -> Result<(), String> {
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
-    tauri::Builder::default()
-        .plugin(tauri_plugin_opener::init())
+    #[allow(unused_mut)]
+    let mut builder = tauri::Builder::default()
         .plugin(tauri_plugin_fs::init())
         .plugin(tauri_plugin_dialog::init())
-        .plugin(tauri_plugin_store::Builder::default().build())
-        .setup(|app| {
-            #[cfg(not(target_os = "android"))]
-            {
-                if let Some(main_window) = app.get_webview_window("main") {
-                    #[cfg(debug_assertions)]
-                    {
-                        main_window.open_devtools();
-                    }
-                    app.manage(main_window);
-                }
+        .plugin(tauri_plugin_store::Builder::default().build());
+
+    // Opening devtools is the *only* startup work we still want, and only in
+    // debug builds. In release we skip `setup()` entirely — that closure is
+    // on the hot path to first paint, so leaving it empty would still allocate
+    // a Box<dyn FnOnce> and run a no-op on every cold start.
+    #[cfg(all(debug_assertions, not(target_os = "android")))]
+    {
+        builder = builder.setup(|app| {
+            if let Some(main_window) = app.get_webview_window("main") {
+                main_window.open_devtools();
             }
             Ok(())
-        })
+        });
+    }
+
+    builder
         .invoke_handler(tauri::generate_handler![
             read_file_content,
             write_file_content,
@@ -836,7 +893,9 @@ pub fn run() {
             search_files,
             show_in_explorer,
             show_main_window,
+            get_app_documents_dir,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }
+

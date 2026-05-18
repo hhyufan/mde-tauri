@@ -125,3 +125,36 @@
     color: var(--text);
   }
 }
+
+@media (max-width: 768px) {
+  .ft {
+    left: 8px;
+    right: 8px;
+    bottom: calc(56px + env(safe-area-inset-bottom));
+    width: auto;
+    max-width: none;
+    transform: translateY(12px);
+    overflow-x: auto;
+    border-radius: 14px;
+    height: 44px;
+    scrollbar-width: none;
+
+    &::-webkit-scrollbar {
+      display: none;
+    }
+
+    &--show {
+      transform: translateY(0);
+    }
+  }
+
+  .ft__grip,
+  .ft__btn {
+    width: 44px;
+    height: 44px;
+  }
+
+  .ft__heading-panel {
+    bottom: 48px;
+  }
+}

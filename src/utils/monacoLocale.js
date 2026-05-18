@@ -1,7 +1,19 @@
-// Uses the ESM shim aliased via vite.config.js. The shim exposes named exports
-// (unlike the upstream CJS proxy, which esbuild flattens to `export default`).
-import { setLocaleData } from 'monaco-editor-nls-adapter/proxy';
 import zhHans from 'monaco-editor-nls-adapter/locales/zh-hans.json';
+
+const globalObj =
+  typeof globalThis !== 'undefined'
+    ? globalThis
+    : typeof window !== 'undefined'
+      ? window
+      : // eslint-disable-next-line no-undef
+        global;
+
+function setAdapterLocaleData(data, locale = 'custom') {
+  globalObj.__MONACO_NLS_ADAPTER_STATE__ =
+    globalObj.__MONACO_NLS_ADAPTER_STATE__ || { data: null, name: '' };
+  globalObj.__MONACO_NLS_ADAPTER_STATE__.data = data;
+  globalObj.__MONACO_NLS_ADAPTER_STATE__.name = locale;
+}
 
 /**
  * Read the persisted language from Zustand's localStorage entry (mde-config).
@@ -19,6 +31,14 @@ function readPersistedLang() {
   return 'en';
 }
 
+function readRuntimeLang() {
+  const runtimeLang =
+    globalObj.i18next?.language
+    || globalObj.i18n?.language
+    || document.documentElement.lang;
+  return /^zh/i.test(runtimeLang || '') ? 'zh' : null;
+}
+
 /**
  * Switch Monaco Editor's built-in UI language.
  * Passing 'zh' loads the Simplified-Chinese locale; anything else resets to English.
@@ -30,10 +50,10 @@ function readPersistedLang() {
  */
 export function setMonacoLocale(lang) {
   if (lang === 'zh') {
-    setLocaleData(zhHans, 'zh-hans');
+    setAdapterLocaleData(zhHans, 'zh-hans');
   } else {
     // Passing null causes every localize() call to fall back to its defaultMessage (English).
-    setLocaleData(null, 'en');
+    setAdapterLocaleData(null, 'en');
   }
 }
 
@@ -42,6 +62,6 @@ export function setMonacoLocale(lang) {
  * Reads the user's saved language preference and sets Monaco's locale accordingly.
  */
 export function initMonacoLocale() {
-  const lang = readPersistedLang();
+  const lang = readRuntimeLang() || readPersistedLang();
   setMonacoLocale(lang);
 }

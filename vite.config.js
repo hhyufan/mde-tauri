@@ -94,11 +94,14 @@ const nlsDiagnostic = {
 
 const host = process.env.TAURI_DEV_HOST;
 
-export default defineConfig(async () => ({
+export default defineConfig(async ({ command }) => ({
   plugins: [
     stripMonacoBrokenSourcemaps,
     monacoNlsPlugin,
-    nlsDiagnostic,
+    // The NLS diagnostic plugin is purely a development-time sanity check —
+    // exclude it from production builds so it adds zero cost to the bundled
+    // pipeline.
+    ...(command === 'serve' ? [nlsDiagnostic] : []),
     react(),
   ],
 
@@ -126,9 +129,27 @@ export default defineConfig(async () => ({
   },
 
   build: {
+    // Tauri 2 only ships modern engines (WebView2 Evergreen, WKWebView,
+    // WebKitGTK 4.1) — keep the bundle truly modern and skip transpiling
+    // class fields, top-level await, etc.
     target: 'esnext',
+    // Disable BOTH the polyfill and the auto-injected `<link rel="modulepreload">`
+    // tags. Reasoning:
+    //   1) The polyfill is unnecessary on Tauri's modern WebViews.
+    //   2) Vite preloads the dependencies of *every* dynamic import (e.g. it
+    //      eagerly preloads monaco-vendor because LazyMonacoEditor exists).
+    //      In a Tauri app the assets are read from disk over a custom
+    //      protocol, so there's no network latency to hide — modulepreload
+    //      only adds fetch+parse cost for code that may never run during
+    //      this session (the user might never open the editor). For our
+    //      heaviest chunk (monaco-vendor ≈ 3.3 MB) this saved up to a full
+    //      second of V8 parse time off the cold-start path.
+    modulePreload: false,
+    // CSS for lazy chunks (Monaco, etc.) shouldn't block first paint.
+    cssCodeSplit: true,
     minify: 'terser',
     chunkSizeWarningLimit: 5000,
+    reportCompressedSize: false,
     terserOptions: {
       compress: {
         drop_console: false,
@@ -137,30 +158,59 @@ export default defineConfig(async () => ({
     },
     rollupOptions: {
       output: {
-        manualChunks: {
-          'react-vendor': ['react', 'react-dom'],
-          'antd-vendor': ['antd', '@ant-design/icons'],
-          'monaco-vendor': ['monaco-editor'],
-          'highlight-vendor': ['shiki', '@shikijs/monaco'],
-          'markdown-vendor': [
-            'react-markdown',
-            'remark-gfm',
-            'remark-math',
-            'rehype-raw',
-            'rehype-highlight',
-            'rehype-katex',
-            'rehype-sanitize',
-          ],
-          'antv-vendor': ['@antv/g2'],
-          'axios-vendor': ['axios'],
-          'i18n-vendor': ['react-i18next', 'i18next', 'i18next-browser-languagedetector'],
-          'tauri-vendor': [
-            '@tauri-apps/api',
-            '@tauri-apps/plugin-fs',
-            '@tauri-apps/plugin-dialog',
-            '@tauri-apps/plugin-opener',
-            '@tauri-apps/plugin-store',
-          ],
+        // Keep the entry chunk as small as possible. Heavy deps go into
+        // their own vendor chunks so they only download/parse on demand.
+        //
+        // Use a function instead of Rollup's object form so Vite's internal
+        // preload helper does not accidentally get placed into monaco-vendor.
+        // If the entry imports that helper from monaco-vendor, Monaco executes
+        // at app startup before `monacoLocaleBoot` can seed the NLS dictionary.
+        manualChunks(id) {
+          if (id.includes('\x00vite/preload-helper')) return 'vite-preload-helper';
+          if (!id.includes('node_modules')) return undefined;
+
+          // Path normalization — avoid greedy `id.includes('react')` matches
+          // that previously sucked in random "react-*" siblings (e.g.
+          // react-html-attributes) into react-vendor. Those drag in their
+          // own dependencies on antd, which then makes react-vendor
+          // statically import antd-vendor — a circular ESM cycle that the
+          // Android WebView surfaces as `Cannot read properties of
+          // undefined (reading 'createContext')` because antd-vendor is
+          // forced to evaluate before react-vendor finishes initializing.
+          const norm = id.replace(/\\/g, '/');
+          const pkgMatch = norm.match(/node_modules\/(@[^/]+\/[^/]+|[^/]+)/);
+          const pkgName = pkgMatch ? pkgMatch[1] : '';
+
+          if (norm.includes('monaco-editor')) return 'monaco-vendor';
+          if (pkgName === '@antv/g2') return 'antv-vendor';
+          if (pkgName === 'axios') return 'axios-vendor';
+          if (pkgName === 'react-markdown'
+            || pkgName === 'remark-gfm'
+            || pkgName === 'remark-math'
+            || pkgName === 'rehype-raw'
+            || pkgName === 'rehype-highlight'
+            || pkgName === 'rehype-katex'
+            || pkgName === 'rehype-sanitize') return 'markdown-vendor';
+          if (pkgName === 'shiki' || pkgName === '@shikijs/monaco') return 'highlight-vendor';
+          if (pkgName === '@tauri-apps/api'
+            || pkgName === '@tauri-apps/plugin-fs'
+            || pkgName === '@tauri-apps/plugin-dialog'
+            || pkgName === '@tauri-apps/plugin-store') return 'tauri-vendor';
+          if (pkgName === 'react-i18next'
+            || pkgName === 'i18next'
+            || pkgName === 'i18next-browser-languagedetector') return 'i18n-vendor';
+          if (pkgName === 'antd' || pkgName === '@ant-design/icons' || pkgName === '@ant-design/cssinjs') return 'antd-vendor';
+          // ONLY the real React runtime + things React depends on. Anything
+          // else with "react" in its package name (react-i18next,
+          // react-markdown, react-html-attributes, react-material-vscode-icons,
+          // react-diff-viewer, …) falls through to be handled by the
+          // matching rule above or auto-chunked by Rollup.
+          if (pkgName === 'react'
+            || pkgName === 'react-dom'
+            || pkgName === 'scheduler'
+            || pkgName === 'use-sync-external-store'
+            || pkgName === 'object-assign') return 'react-vendor';
+          return undefined;
         },
       },
     },

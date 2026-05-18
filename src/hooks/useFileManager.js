@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useRef } from 'react';
+import { useCallback, useEffect, useMemo, useRef } from 'react';
 import { open, save } from '@tauri-apps/plugin-dialog';
 import {
   readFileContent,
@@ -12,7 +12,17 @@ import {
   stopFileWatching,
   onFileChanged,
   showInExplorer,
+  getAppDocumentsDir,
+  isSafUri,
+  safDisplayName,
 } from '@utils/tauriApi';
+import {
+  isAndroidSafAvailable,
+  pickFolder as safPickFolder,
+  pickFile as safPickFile,
+  childExists as safChildExists,
+  createFileUnder as safCreateFileUnder,
+} from '@utils/androidSaf';
 import useEditorStore from '@store/useEditorStore';
 import useFileStore from '@store/useFileStore';
 import useConfigStore from '@store/useConfigStore';
@@ -21,6 +31,7 @@ import useExternalDocsStore from '@store/useExternalDocsStore';
 import { syncEngine, isCloudPath, fileIdFromCloudPath } from '@/services/syncEngine';
 import { getBuffer } from '@utils/editorBuffer';
 import { debounce } from '@utils/debounce';
+import { isAndroidRuntime } from '@utils/platform';
 import i18n from '@/i18n';
 
 function getPathSeparator(path) {
@@ -29,6 +40,10 @@ function getPathSeparator(path) {
 
 function joinPath(dirPath, fileName) {
   if (!dirPath) return fileName;
+  // SAF tree URIs are not slash-joinable — child URIs are obtained via
+  // DocumentsContract, not by string concatenation. Call sites that need
+  // a real child URI must use the SAF-aware helpers in this file instead.
+  if (isSafUri(dirPath)) return `${dirPath}/${encodeURIComponent(fileName)}`;
   const sep = getPathSeparator(dirPath);
   return `${dirPath.replace(/[\\/]+$/, '')}${sep}${fileName}`;
 }
@@ -92,8 +107,28 @@ export function useFileManager() {
   } = useFileStore.getState();
   const notify = useNotificationStore.getState().notify;
   const t = i18n.t.bind(i18n);
+  const isAndroid = isAndroidRuntime();
   const pendingUntitledSaveRef = useRef(new Set());
   const dismissedAutoSavePromptRef = useRef(new Set());
+  const androidDocsDirRef = useRef(null);
+  const androidBootstrappedRef = useRef(false);
+
+  // Resolve (and cache) the per-app Documents folder. On Android this is
+  // `/data/data/com.mde.app/files/Documents` — the only location that's
+  // writable without runtime permissions or SAF. On desktop this is the
+  // platform-conventional appdata folder; we never call it there because
+  // the user can pick any path via dialogs.
+  const ensureAndroidDocsDir = useCallback(async () => {
+    if (androidDocsDirRef.current) return androidDocsDirRef.current;
+    try {
+      const dir = await getAppDocumentsDir();
+      androidDocsDirRef.current = dir;
+      return dir;
+    } catch (err) {
+      notify('error', t('notification.error'), String(err));
+      return null;
+    }
+  }, [notify, t]);
 
   const createNewFile = useCallback(() => {
     const currentDir = useFileStore.getState().currentDir;
@@ -103,6 +138,34 @@ export function useFileManager() {
     }
     createUntitledTab();
   }, []);
+
+  // On Android there is no folder-picker dialog and the public storage
+  // directories require permissions/SAF that Tauri's default plugins
+  // don't expose. Auto-mount the per-app Documents directory as the
+  // current working folder the first time the hook initializes — the
+  // explorer panel then becomes immediately useful and "Save" can target
+  // a real, persistent path without any extra UI.
+  useEffect(() => {
+    if (!isAndroid || androidBootstrappedRef.current) return;
+    androidBootstrappedRef.current = true;
+
+    (async () => {
+      const dir = await ensureAndroidDocsDir();
+      if (!dir) return;
+      const { currentDir } = useFileStore.getState();
+      if (!currentDir) {
+        try {
+          const contents = await getDirectoryContents(dir);
+          useFileStore.getState().setFiles(contents);
+          useFileStore.getState().setCurrentDir(dir);
+        } catch (_) {
+          // best-effort — directory exists because the Rust command
+          // creates it; if we still fail here, the user can retry
+          // manually via the explorer toolbar.
+        }
+      }
+    })();
+  }, [ensureAndroidDocsDir, isAndroid]);
 
   const debouncedAutoSave = useMemo(
     () => debounce(async (filePath, content, encoding, meta = {}) => {
@@ -232,6 +295,38 @@ export function useFileManager() {
       return;
     }
 
+    if (isAndroid) {
+      // Prefer the SAF folder picker so the user can choose any directory
+      // (Documents, Downloads, an SD card mount, a cloud DocumentsProvider…).
+      // Fall back to the per-app Documents folder if SAF isn't reachable
+      // (e.g. the bridge failed to inject), which preserves the previous
+      // behaviour rather than dropping the user onto an untitled tab.
+      if (isAndroidSafAvailable()) {
+        try {
+          const treeUri = await safPickFolder();
+          if (!treeUri) return;
+          await loadDirectory(treeUri);
+          requestAnimationFrame(() => {
+            window.dispatchEvent(new CustomEvent('explorer:newFileRequest'));
+          });
+          return;
+        } catch (err) {
+          notify('error', t('notification.error'), String(err));
+          return;
+        }
+      }
+      const dir = await ensureAndroidDocsDir();
+      if (!dir) {
+        createUntitledTab();
+        return;
+      }
+      await loadDirectory(dir);
+      requestAnimationFrame(() => {
+        window.dispatchEvent(new CustomEvent('explorer:newFileRequest'));
+      });
+      return;
+    }
+
     try {
       const { open: openDialog } = await import('@tauri-apps/plugin-dialog');
       const dir = await openDialog({ directory: true });
@@ -246,7 +341,7 @@ export function useFileManager() {
     } catch (err) {
       notify('error', t('notification.error'), String(err));
     }
-  }, [loadDirectory]);
+  }, [createUntitledTab, ensureAndroidDocsDir, isAndroid, loadDirectory, notify, t]);
 
   const finalizeSavedTab = useCallback(async (tab, path, source = 'manual-save') => {
     const name = path.split(/[\\/]/).pop();
@@ -257,7 +352,7 @@ export function useFileManager() {
     updateTabPath(tab.id, path, name);
     markTabSaved(path);
     addRecentFile({ name, path, ext });
-    startFileWatching(path).catch(() => {});
+    if (!isAndroid) startFileWatching(path).catch(() => {});
     notify('success', t('notification.fileSaved'), name);
 
     if (externalFileId) {
@@ -279,10 +374,33 @@ export function useFileManager() {
     if (currentDir && path.startsWith(currentDir.replace(/[\\/]+$/, ''))) {
       await loadDirectory(currentDir);
     }
-  }, [addRecentFile, loadDirectory, markTabSaved, notify, t, updateTabPath]);
+  }, [addRecentFile, isAndroid, loadDirectory, markTabSaved, notify, t, updateTabPath]);
 
   const buildUniqueUntitledPath = useCallback(async (dirPath, fileName) => {
     const { base, ext } = splitFileName(fileName);
+
+    // SAF tree URIs can't be string-joined into child URIs. Probe child
+    // names with `safChildExists` (cheap — single ContentResolver query
+    // per probe), then create an empty document with the unique name so
+    // we get back a real `content://…/document/…` URI to hand to saveFile.
+    if (isSafUri(dirPath)) {
+      let candidate = fileName;
+      let index = 1;
+      while (safChildExists(dirPath, candidate)) {
+        index += 1;
+        candidate = `${base} (${index})${ext}`;
+      }
+      try {
+        const childUri = await safCreateFileUnder(dirPath, candidate);
+        return childUri || joinPath(dirPath, candidate);
+      } catch (_) {
+        // Worst case the caller's subsequent saveFile() will surface the
+        // real error, but keeping a usable fallback prevents the save
+        // flow from getting stuck in a loop.
+        return joinPath(dirPath, candidate);
+      }
+    }
+
     let index = 1;
     let candidate = joinPath(dirPath, fileName);
     while (await checkFileExists(candidate)) {
@@ -305,6 +423,15 @@ export function useFileManager() {
       if (currentDir && canSaveToExplorerDir) {
         const suggestedName = ensureSuggestedFileName(tab);
         targetPath = await buildUniqueUntitledPath(currentDir, suggestedName);
+      } else if (isAndroid) {
+        // No native save dialog on Android. Fall back to the per-app
+        // Documents folder + an auto-deduplicated filename so the user's
+        // first Ctrl+S / save tap actually persists the draft instead of
+        // bouncing off a notification toast.
+        const dir = await ensureAndroidDocsDir();
+        if (!dir) return null;
+        const suggestedName = ensureSuggestedFileName(tab);
+        targetPath = await buildUniqueUntitledPath(dir, suggestedName);
       } else if (options.allowDialog) {
         const selected = await save({
           defaultPath: ensureSuggestedFileName(tab),
@@ -340,7 +467,7 @@ export function useFileManager() {
     } finally {
       pendingUntitledSaveRef.current.delete(tab.id);
     }
-  }, [buildUniqueUntitledPath, finalizeSavedTab, notify, t]);
+  }, [buildUniqueUntitledPath, ensureAndroidDocsDir, finalizeSavedTab, isAndroid, notify, t]);
 
   const openFileFromPath = useCallback(async (filePath, fileName) => {
     // Cloud-only bookmark: content lives in useExternalDocsStore, no
@@ -386,14 +513,14 @@ export function useFileManager() {
           lineEnding: result.line_ending || 'LF',
         });
         addRecentFile({ name: fileName, path: filePath, ext });
-        startFileWatching(filePath).catch(() => {});
+        if (!isAndroid) startFileWatching(filePath).catch(() => {});
       } else {
         notify('error', t('notification.error'), result.message);
       }
     } catch (err) {
       notify('error', t('notification.error'), String(err));
     }
-  }, []);
+  }, [isAndroid]);
 
   const createFileInCurrentDir = useCallback(async (fileName) => {
     const currentDir = useFileStore.getState().currentDir;
@@ -408,6 +535,26 @@ export function useFileManager() {
     }
 
     try {
+      // SAF: create the document via the bridge so we get a real child URI
+      // back; sticking to a single createDocument call also lets the
+      // DocumentsProvider enforce its own naming rules (e.g. illegal chars
+      // in filename) instead of failing later in writeFile.
+      if (isSafUri(currentDir)) {
+        if (safChildExists(currentDir, trimmed)) {
+          notify('error', t('notification.error'), t('sidebar.explorer.fileExists'));
+          return { ok: false };
+        }
+        const childUri = await safCreateFileUnder(currentDir, trimmed);
+        if (!childUri) {
+          notify('error', t('notification.error'), t('sidebar.explorer.invalidFileName'));
+          return { ok: false };
+        }
+        await loadDirectory(currentDir);
+        await openFileFromPath(childUri, trimmed);
+        notify('success', t('notification.fileCreated'), trimmed);
+        return { ok: true, path: childUri };
+      }
+
       const targetPath = joinPath(currentDir, trimmed);
       if (await checkFileExists(targetPath)) {
         notify('error', t('notification.error'), t('sidebar.explorer.fileExists'));
@@ -426,6 +573,25 @@ export function useFileManager() {
 
   const openFileDialog = useCallback(async () => {
     try {
+      // On Android the Tauri dialog plugin's "open file" works but limits
+      // us to its built-in mime filters; using the SAF picker directly
+      // gives the user a richer chooser (Files / Drive / Recents) plus
+      // a persisted URI grant, so subsequent opens of the same file don't
+      // re-prompt.
+      if (isAndroid && isAndroidSafAvailable()) {
+        const uri = await safPickFile([
+          'text/markdown',
+          'text/plain',
+          'application/json',
+          'text/*',
+          'application/octet-stream',
+          '*/*',
+        ]);
+        if (!uri) return;
+        await openFileFromPath(uri, safDisplayName(uri));
+        return;
+      }
+
       const selected = await open({
         multiple: false,
         filters: [
@@ -443,7 +609,7 @@ export function useFileManager() {
     } catch (err) {
       notify('error', t('notification.error'), String(err));
     }
-  }, [openFileFromPath]);
+  }, [isAndroid, notify, openFileFromPath, t]);
 
   const saveTab = useCallback(async (tabId) => {
     const tab = tabId
@@ -468,6 +634,10 @@ export function useFileManager() {
     }
 
     if (!tab.path) {
+      // Android: persistUntitledTab now resolves to the per-app
+      // Documents folder automatically (no dialog needed). Desktop:
+      // surface a Save dialog. Either way, we end up writing real bytes
+      // to disk — no more "unsaved draft" dead-end notification.
       dismissedAutoSavePromptRef.current.delete(tab.id);
       const targetPath = await persistUntitledTab(tab, { allowDialog: true, source: 'manual-save' });
       return targetPath
@@ -500,7 +670,7 @@ export function useFileManager() {
       notify('error', t('notification.error'), String(err));
       return { ok: false };
     }
-  }, []);
+  }, [isAndroid, notify, persistUntitledTab, t]);
 
   const saveCurrentFile = useCallback(async () => {
     await saveTab();
@@ -515,14 +685,24 @@ export function useFileManager() {
     }
 
     try {
-      const path = await save({
-        defaultPath: ensureSuggestedFileName(tab),
-        filters: [
-          { name: 'Markdown', extensions: ['md'] },
-          { name: 'Text', extensions: ['txt'] },
-          { name: 'All Files', extensions: ['*'] },
-        ],
-      });
+      // Android has no native save-file dialog. Fall back to the per-app
+      // Documents folder with the suggested filename — duplicates get a
+      // " (n)" suffix so we never silently overwrite.
+      let path;
+      if (isAndroid) {
+        const dir = await ensureAndroidDocsDir();
+        if (!dir) return;
+        path = await buildUniqueUntitledPath(dir, ensureSuggestedFileName(tab));
+      } else {
+        path = await save({
+          defaultPath: ensureSuggestedFileName(tab),
+          filters: [
+            { name: 'Markdown', extensions: ['md'] },
+            { name: 'Text', extensions: ['txt'] },
+            { name: 'All Files', extensions: ['*'] },
+          ],
+        });
+      }
       if (path) {
         const result = await saveFile(path, tab.content, tab.encoding);
         if (result.success) {
@@ -553,17 +733,67 @@ export function useFileManager() {
     } catch (err) {
       notify('error', t('notification.error'), String(err));
     }
-  }, []);
+  }, [
+    addRecentFile,
+    buildUniqueUntitledPath,
+    ensureAndroidDocsDir,
+    isAndroid,
+    markTabSaved,
+    notify,
+    t,
+    updateTabPath,
+  ]);
 
   const openInExplorer = useCallback(async (path) => {
+    // Android can hand off to the system DocumentsUI via Intent.ACTION_VIEW
+    // for both content URIs (SAF) and the per-app Documents folder. The
+    // dispatch happens inside `showInExplorer` (which checks `isSafUri`),
+    // so we only need a SAF URI here. For the legacy "per-app docs" path
+    // we still bail out — DocumentsUI refuses to navigate into our
+    // private /data/data dir, and there's no useful Intent for it.
+    if (isAndroid) {
+      if (isSafUri(path)) {
+        try {
+          await showInExplorer(path);
+        } catch (err) {
+          notify('error', t('notification.error'), String(err));
+        }
+        return;
+      }
+      notify('info', t('notification.info', 'Info'), t('sidebar.explorer.openInExplorer'));
+      return;
+    }
+
     try {
       await showInExplorer(path);
     } catch (err) {
       notify('error', t('notification.error'), String(err));
     }
-  }, []);
+  }, [isAndroid, notify, t]);
 
   const openFolderDialog = useCallback(async () => {
+    if (isAndroid) {
+      // SAF folder picker — returns a persistable content:// tree URI
+      // that we use as currentDir. The Kotlin side has already taken the
+      // persistable permission flags, so this grant survives app
+      // restarts (visible in Settings → Permissions → Files).
+      if (isAndroidSafAvailable()) {
+        try {
+          const treeUri = await safPickFolder();
+          if (!treeUri) return;
+          await loadDirectory(treeUri);
+          return;
+        } catch (err) {
+          notify('error', t('notification.error'), String(err));
+          return;
+        }
+      }
+      // Bridge unavailable (older Tauri build?): fall back to per-app dir.
+      const dir = await ensureAndroidDocsDir();
+      if (dir) await loadDirectory(dir);
+      return;
+    }
+
     try {
       const { open: openDialog } = await import('@tauri-apps/plugin-dialog');
       const dir = await openDialog({ directory: true });
@@ -574,7 +804,7 @@ export function useFileManager() {
     } catch (err) {
       notify('error', t('notification.error'), String(err));
     }
-  }, [loadDirectory]);
+  }, [ensureAndroidDocsDir, isAndroid, loadDirectory, notify, t]);
 
   const openDroppedPathsInEditor = useCallback(async (paths = []) => {
     for (const filePath of paths) {
@@ -619,7 +849,7 @@ export function useFileManager() {
             if (existingTab) {
               updateTabPath(existingTab.id, targetPath, info.name);
               stopFileWatching(sourcePath).catch(() => {});
-              startFileWatching(targetPath).catch(() => {});
+              if (!isAndroid) startFileWatching(targetPath).catch(() => {});
             }
             replaceRecentFilePath(sourcePath, targetPath, info.name);
             replaceBookmarkPath(sourcePath, targetPath);
@@ -643,6 +873,7 @@ export function useFileManager() {
     replaceRecentFilePath,
     t,
     updateTabPath,
+    isAndroid,
   ]);
 
   return {

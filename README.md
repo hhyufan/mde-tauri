@@ -67,6 +67,10 @@
 
 ---
 
+```javascript
+   console.log("Hello World")
+```
+
 ## 📦 安装
 
 前往 [Releases](../../releases) 页面下载最新版本。
@@ -185,6 +189,8 @@ mde-tauri/
 | ---- | -------- | ---- |
 | Node.js | 18+ | 前后端依赖安装与构建 |
 | Rust | 1.77+ | Tauri 编译 |
+| Android Studio / SDK / NDK | Android SDK 35+ | Android APK 构建 |
+| JDK | 17+ | Gradle / Android 构建 |
 | MongoDB | 6+ | 服务端存储 |
 | WebView2 | 系统自带 | Windows 下 Tauri 运行环境 |
 
@@ -223,6 +229,26 @@ npm run tauri:build
 # 产物目录
 # src-tauri/target/release/bundle/
 ```
+
+### 4) 构建 Android APK
+
+首次构建前需要安装 Android Studio，并在 Android Studio 中安装 SDK、NDK、Build Tools；同时确保 `JAVA_HOME`、`ANDROID_HOME` 或 `ANDROID_SDK_ROOT` 指向本机环境。
+
+```bash
+# 首次生成 Android 工程
+npm run tauri:android:init
+
+# 连接真机或启动模拟器进行调试
+npm run tauri:android:dev
+
+# 生成 APK
+npm run tauri:android:build
+
+# 常见 APK 输出目录
+# src-tauri/gen/android/app/build/outputs/apk/
+```
+
+移动端版本会自动启用窄屏布局：侧栏改为抽屉、标题栏隐藏桌面窗口按钮、分屏编辑改为上下布局。Android 受系统沙盒限制，任意本机目录浏览、系统资源管理器打开、脚本执行等桌面能力会降级或不可用。
 
 ---
 

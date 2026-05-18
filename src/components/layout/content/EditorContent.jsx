@@ -1,14 +1,23 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Tooltip } from 'antd';
 import useEditorStore from '@store/useEditorStore';
 import useConfigStore from '@store/useConfigStore';
 import MonacoEditor from '@components/editor/LazyMonacoEditor';
-import MarkdownPreview from '@components/editor/MarkdownPreview';
 import FloatingToolbar from '@components/editor/FloatingToolbar';
 import ToastContainer from '@components/ui/Toast';
 import { useFileManager } from '@hooks/useFileManager';
+import { useResponsiveLayout } from '@hooks/useResponsiveLayout';
 import './editor-content.scss';
+
+// MarkdownPreview eagerly imports react-markdown, ~30 prism language grammars,
+// remark/rehype plugins and Mermaid (~600 KB). It's only rendered in
+// preview/split mode for markdown files, so defer the parse cost until then.
+const MarkdownPreview = lazy(() => import('@components/editor/MarkdownPreview'));
+
+const PreviewFallback = () => (
+  <div style={{ flex: 1, minHeight: 0 }} />
+);
 
 const MIN_FONT_SIZE = 10;
 const MAX_FONT_SIZE = 24;
@@ -43,6 +52,7 @@ function EditorContent() {
   const [splitRatio, setSplitRatio] = useState(0.5);
   const setConfig = useConfigStore((s) => s.setConfig);
   const { triggerAutoSave } = useFileManager();
+  const { isMobileLayout } = useResponsiveLayout();
   const activeTabMeta = useMemo(
     () => tabs.find((item) => item.id === activeTabId) || null,
     [tabs, activeTabId],
@@ -105,7 +115,7 @@ function EditorContent() {
 
   if (!activeTabMeta) {
     return (
-      <main className="editor-content">
+      <main className={`editor-content ${isMobileLayout ? 'editor-content--mobile' : ''}`}>
         <div className="editor-content__empty">
           <div className="editor-content__empty-logo">M</div>
           <div className="editor-content__empty-title">{t('editor.empty.title')}</div>
@@ -118,12 +128,12 @@ function EditorContent() {
   const isMarkdown = /\.(md|markdown|mdx)$/i.test(activeTabMeta.name);
 
   return (
-    <main className="editor-content">
+    <main className={`editor-content ${isMobileLayout ? 'editor-content--mobile' : ''}`}>
       <ToastContainer />
       <div
-        className="editor-content__workspace"
+        className={`editor-content__workspace ${viewMode === 'split' && isMobileLayout ? 'editor-content__workspace--mobile-split' : ''}`}
         ref={containerRef}
-        style={viewMode === 'split' ? { '--split-ratio': `${splitRatio * 100}%` } : undefined}
+        style={viewMode === 'split' && !isMobileLayout ? { '--split-ratio': `${splitRatio * 100}%` } : undefined}
       >
         {viewMode === 'edit' && (
           <MonacoEditor
@@ -134,7 +144,9 @@ function EditorContent() {
           />
         )}
         {viewMode === 'preview' && isMarkdown && (
-          <MarkdownPreview className="editor-content__preview" />
+          <Suspense fallback={<PreviewFallback />}>
+            <MarkdownPreview className="editor-content__preview" />
+          </Suspense>
         )}
         {viewMode === 'split' && isMarkdown && (
           <>
@@ -147,10 +159,12 @@ function EditorContent() {
             <Tooltip title={t('editor.splitDivider')} placement="top" mouseEnterDelay={0.5}>
               <div
                 className="editor-content__split-divider"
-                onMouseDown={handleDividerMouseDown}
+                onMouseDown={isMobileLayout ? undefined : handleDividerMouseDown}
               />
             </Tooltip>
-            <MarkdownPreview className="editor-content__preview editor-content__preview--half" />
+            <Suspense fallback={<PreviewFallback />}>
+              <MarkdownPreview className="editor-content__preview editor-content__preview--half" />
+            </Suspense>
           </>
         )}
         {!isMarkdown && viewMode !== 'edit' && (

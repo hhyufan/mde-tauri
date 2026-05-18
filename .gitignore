@@ -12,7 +12,27 @@ build/
 
 # Tauri build output
 src-tauri/target/
-src-tauri/gen/
+src-tauri/gen/*
+!src-tauri/gen/android/
+src-tauri/gen/android/*
+!src-tauri/gen/android/app/
+src-tauri/gen/android/app/*
+!src-tauri/gen/android/app/build.gradle.kts
+!src-tauri/gen/android/app/src/
+src-tauri/gen/android/app/src/*
+!src-tauri/gen/android/app/src/main/
+src-tauri/gen/android/app/src/main/*
+!src-tauri/gen/android/app/src/main/AndroidManifest.xml
+!src-tauri/gen/android/app/src/main/java/
+src-tauri/gen/android/app/src/main/java/*
+!src-tauri/gen/android/app/src/main/java/com/
+src-tauri/gen/android/app/src/main/java/com/*
+!src-tauri/gen/android/app/src/main/java/com/mde/
+src-tauri/gen/android/app/src/main/java/com/mde/*
+!src-tauri/gen/android/app/src/main/java/com/mde/app/
+src-tauri/gen/android/app/src/main/java/com/mde/app/*
+!src-tauri/gen/android/app/src/main/java/com/mde/app/MainActivity.kt
+!src-tauri/gen/android/app/src/main/java/com/mde/app/SafBridge.kt
 
 # ===========================
 # Environment variables
@@ -50,3 +70,6 @@ desktop.ini
 # ===========================
 *.local
 .cache/
+毕业设计AI稿.md
+baka.md3
+*.md3

@@ -3,7 +3,14 @@ import { useTranslation } from 'react-i18next';
 import { Spin } from 'antd';
 import { LoadingOutlined } from '@ant-design/icons';
 
-const MonacoEditor = lazy(() => import('./MonacoEditor'));
+// IMPORTANT: monacoLocaleBoot MUST run before `monaco-editor` is evaluated,
+// because Monaco captures localized strings at module scope. Chain it in
+// front of the dynamic import so it loads on the same code-split boundary
+// as Monaco itself — i.e. only when the editor is actually about to mount,
+// not at app startup.
+const MonacoEditor = lazy(() =>
+  import('@/utils/monacoLocaleBoot').then(() => import('./MonacoEditor'))
+);
 
 function LoadingFallback() {
   const { t } = useTranslation();
