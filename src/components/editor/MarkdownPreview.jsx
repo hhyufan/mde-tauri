@@ -91,6 +91,8 @@ function getLangDisplay(raw) {
 
 const sanitizeSchema = {
   ...defaultSchema,
+  clobberPrefix: '',
+  clobber: [],
   tagNames: [
     ...(defaultSchema.tagNames || []),
     'span', 'div', 'section', 'details', 'summary', 'sup', 'sub',
@@ -106,8 +108,10 @@ const sanitizeSchema = {
     div: [...(defaultSchema.attributes?.div || []), 'className', 'class', 'style'],
     img: [...(defaultSchema.attributes?.img || []), 'src', 'alt', 'title', 'width', 'height', 'className', 'class'],
     sup: ['id', 'class'],
-    li: ['id'],
-    ol: ['start'],
+    li: ['id', 'className', 'class'],
+    ul: ['className', 'class'],
+    ol: ['start', 'className', 'class'],
+    input: ['type', 'checked', 'disabled', 'className', 'class'],
   },
 };
 
@@ -386,7 +390,10 @@ function MarkdownPreview({ className }) {
             onClick={(e) => {
               e.preventDefault();
               const target = containerRef.current?.querySelector(`#${CSS.escape(href.slice(1))}`);
-              target?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+              if (!target) return;
+              target.scrollIntoView({ behavior: 'smooth', block: 'center' });
+              target.classList.add('footnote-highlight');
+              window.setTimeout(() => target.classList.remove('footnote-highlight'), 1200);
             }}
             {...props}
           >

@@ -34,7 +34,7 @@ export function parseFootnotes(content) {
       .filter((r) => definitions.has(r.raw))
       .map((r) => {
         const text = definitions.get(r.raw).replace(/\n/g, ' ').replace(/\s+/g, ' ');
-        return `<li><span id="${r.targetId}">${text} <a href="#${r.refId}">↩</a></span></li>`;
+        return `<li><span id="${r.targetId}">${text} <a href="#${r.refId}" class="footnote-backref">↩</a></span></li>`;
       })
       .join('\n');
 
@@ -52,15 +52,22 @@ export function parseFootnotes(content) {
  */
 export function addFootnoteJumpHandlers(container) {
   if (!container) return;
-  container.querySelectorAll('a[href^="#fn"]').forEach((link) => {
-    if (link.dataset.fnHandler) return;
-    link.dataset.fnHandler = '1';
-    link.addEventListener('click', (e) => {
-      e.preventDefault();
-      const href = link.getAttribute('href');
-      if (!href?.startsWith('#')) return;
-      const target = container.querySelector(`#${CSS.escape(href.slice(1))}`);
-      target?.scrollIntoView({ behavior: 'smooth', block: 'center' });
-    });
+
+  if (container.dataset.footnoteDelegatedHandler) return;
+  container.dataset.footnoteDelegatedHandler = '1';
+  container.addEventListener('click', (e) => {
+    const link = e.target.closest?.('a[href^="#fn"]');
+    if (!link || !container.contains(link)) return;
+
+    e.preventDefault();
+    e.stopPropagation();
+
+    const href = link.getAttribute('href');
+    const target = href ? container.querySelector(`#${CSS.escape(href.slice(1))}`) : null;
+    if (!target) return;
+
+    target.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    target.classList.add('footnote-highlight');
+    window.setTimeout(() => target.classList.remove('footnote-highlight'), 1200);
   });
 }

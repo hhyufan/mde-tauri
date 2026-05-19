@@ -19,7 +19,12 @@ const HEADING_OPTIONS = [
 function FtBtn({ title, className, onClick, children }) {
   return (
     <Tooltip title={title} placement="top" mouseEnterDelay={0.3}>
-      <button className={className} onClick={onClick} type="button">
+      <button
+        className={className}
+        onMouseDown={(event) => event.preventDefault()}
+        onClick={onClick}
+        type="button"
+      >
         {children}
       </button>
     </Tooltip>
@@ -165,7 +170,7 @@ function FloatingToolbar({ onInsert }) {
         </div>
         <span className="ft__sep" />
 
-        <FtBtn title={t('toolbar.bold')} className="ft__btn ft__btn--active" onClick={() => wrap('bold', '**')}><b>B</b></FtBtn>
+        <FtBtn title={t('toolbar.bold')} className="ft__btn" onClick={() => wrap('bold', '**')}><b>B</b></FtBtn>
         <FtBtn title={t('toolbar.italic')} className="ft__btn" onClick={() => wrap('italic', '*')}><i>I</i></FtBtn>
         <FtBtn title={t('toolbar.strikethrough')} className="ft__btn" onClick={() => wrap('strikethrough', '~~')}><s>S</s></FtBtn>
         <span className="ft__sep" />
@@ -178,6 +183,7 @@ function FloatingToolbar({ onInsert }) {
                 <button
                   key={h.label}
                   className="ft__heading-opt"
+                  onMouseDown={(event) => event.preventDefault()}
                   onClick={() => runAction({ type: 'insert', command: 'heading', level: Number(h.label.slice(1)), text: h.prefix })}
                 >
                   {h.label}
@@ -219,7 +225,7 @@ function FloatingToolbar({ onInsert }) {
             <polyline points="21 15 16 10 5 21" />
           </svg>
         </FtBtn>
-        <FtBtn title={t('toolbar.taskList')} className="ft__btn" onClick={() => insertBlock('- [ ] ')}>
+        <FtBtn title={t('toolbar.taskList')} className="ft__btn" onClick={() => runAction({ type: 'insert', command: 'taskList', text: '- [ ] ' })}>
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" width="16" height="16">
             <path d="M9 11l3 3L22 4" /><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11" />
           </svg>

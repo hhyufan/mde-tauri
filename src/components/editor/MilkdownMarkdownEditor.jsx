@@ -13,11 +13,14 @@ import { Milkdown, MilkdownProvider, useEditor } from '@milkdown/react';
 import { Editor, commandsCtx, defaultValueCtx, editorViewCtx, editorViewOptionsCtx, rootCtx } from '@milkdown/kit/core';
 import {
   commonmark,
+  bulletListSchema,
   createCodeBlockCommand,
+  emphasisSchema,
   imageSchema,
   insertHrCommand,
   insertImageCommand,
-  toggleEmphasisCommand,
+  listItemSchema,
+  paragraphSchema,
   toggleLinkCommand,
   toggleStrongCommand,
   wrapInBlockquoteCommand,
@@ -37,6 +40,7 @@ import { history } from '@milkdown/kit/plugin/history';
 import { listener, listenerCtx } from '@milkdown/kit/plugin/listener';
 import { codeBlockComponent, codeBlockConfig } from '@milkdown/kit/component/code-block';
 import { $ctx, $inputRule, $nodeSchema, $prose, $remark, getMarkdown, insert, replaceRange } from '@milkdown/kit/utils';
+import { toggleMark } from '@milkdown/kit/prose/commands';
 import { InputRule } from '@milkdown/kit/prose/inputrules';
 import { NodeSelection, Plugin, TextSelection } from '@milkdown/kit/prose/state';
 import { HighlightStyle, LanguageDescription, LanguageSupport, StreamLanguage, syntaxHighlighting } from '@codemirror/language';
@@ -621,6 +625,75 @@ const mathValueEditPlugin = $prose((ctx) => {
   });
 });
 
+const taskListCheckboxPlugin = $prose((ctx) => {
+  const listItemType = listItemSchema.type(ctx);
+
+  const closestTaskItem = (target) => {
+    const element = target instanceof Element ? target : target?.parentElement;
+    return element?.closest?.('li[data-item-type="task"]') || null;
+  };
+
+  const getTaskItem = (view, target) => {
+    const item = closestTaskItem(target);
+    if (!item || !view.dom.contains(item)) return null;
+
+    try {
+      const domPos = view.posAtDOM(item, 0);
+      const $pos = view.state.doc.resolve(domPos);
+      for (let depth = $pos.depth; depth > 0; depth -= 1) {
+        const node = $pos.node(depth);
+        if (node.type === listItemType && typeof node.attrs.checked === 'boolean') {
+          return { item, node, pos: $pos.before(depth) };
+        }
+      }
+    } catch {
+      return null;
+    }
+
+    return null;
+  };
+
+  const isCheckboxHotspot = (item, event) => {
+    const rect = item.getBoundingClientRect();
+    const style = window.getComputedStyle(item);
+    const paddingLeft = Number.parseFloat(style.paddingLeft) || 0;
+    const lineHeight = Number.parseFloat(style.lineHeight) || 24;
+    const x = event.clientX - rect.left;
+    const y = event.clientY - rect.top;
+    return x >= 0
+      && x <= Math.max(28, paddingLeft)
+      && y >= 0
+      && y <= Math.max(28, lineHeight);
+  };
+
+  return new Plugin({
+    props: {
+      handleDOMEvents: {
+        mousedown(view, event) {
+          if (!view.editable) return false;
+          const task = getTaskItem(view, event.target);
+          if (!task || !isCheckboxHotspot(task.item, event)) return false;
+          event.preventDefault();
+          return true;
+        },
+        click(view, event) {
+          if (!view.editable) return false;
+          const task = getTaskItem(view, event.target);
+          if (!task || !isCheckboxHotspot(task.item, event)) return false;
+          event.preventDefault();
+          event.stopPropagation();
+          view.dispatch(view.state.tr.setNodeMarkup(task.pos, undefined, {
+            ...task.node.attrs,
+            checked: task.node.attrs.checked !== true,
+          }).scrollIntoView());
+          view.focus();
+          return true;
+        },
+      },
+    },
+  });
+});
+
 const mathPlugins = [
   remarkMathPlugin,
   katexOptionsCtx,
@@ -729,10 +802,18 @@ function isInteractiveToolbarTarget(target) {
     && !!target.closest('.tools, .language-button, .preview-toggle-button, .language-picker, .lang-tag');
 }
 
+function isFootnoteBackrefTarget(target) {
+  if (!(target instanceof Element)) return false;
+  return !!target.closest('dl[data-type="footnote_definition"]');
+}
+
 function isNonEditablePreviewTarget(target) {
   return target instanceof Element
     && !isInteractiveToolbarTarget(target)
-    && !!target.closest([
+    && (
+      !!target.closest('sup[data-type="footnote_reference"]')
+      || isFootnoteBackrefTarget(target)
+      || !!target.closest([
       '.md-preview__milkdown-mermaid-inline',
       '.md-preview__milkdown-mermaid',
       '.md-preview__mermaid',
@@ -741,12 +822,35 @@ function isNonEditablePreviewTarget(target) {
       '.preview-panel',
       'img[data-mde-original-src]',
       'img[data-mde-resolved-src]',
-    ].join(', '));
+    ].join(', '))
+    );
 }
 
 function createNonEditablePreviewSelectionHandler(getEditor) {
   return function stopNonEditablePreviewSelection(event) {
     if (!isNonEditablePreviewTarget(event.target)) return;
+
+    const footnoteRef = event.target.closest?.('sup[data-type="footnote_reference"]');
+    const footnoteBackref = !footnoteRef && isFootnoteBackrefTarget(event.target)
+      ? event.target.closest('dl[data-type="footnote_definition"]')
+      : null;
+    if (footnoteRef || footnoteBackref) {
+      const root = event.currentTarget;
+      const label = footnoteRef?.dataset.label || footnoteBackref?.dataset.label || '';
+      const target = footnoteRef
+        ? root.querySelector(`dl[data-type="footnote_definition"][data-label="${CSS.escape(label)}"]`)
+        : root.querySelector(`sup[data-type="footnote_reference"][data-label="${CSS.escape(label)}"]`);
+      if (event.type === 'click' && target) {
+        target.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        target.classList.add('footnote-highlight');
+        window.setTimeout(() => target.classList.remove('footnote-highlight'), 1200);
+      }
+      event.preventDefault();
+      event.stopPropagation();
+      event.nativeEvent?.stopImmediatePropagation?.();
+      event.stopImmediatePropagation?.();
+      return;
+    }
 
     getEditor()?.action((ctx) => {
       const view = ctx.get(editorViewCtx);
@@ -996,6 +1100,7 @@ function MilkdownInner({
       })
       .use(commonmark)
       .use(gfm)
+      .use(taskListCheckboxPlugin)
       .use(mathPlugins)
       .use(history)
       .use(codeBlockComponent)
@@ -1023,7 +1128,8 @@ function MilkdownInner({
             run(toggleStrongCommand);
             break;
           case 'italic':
-            run(toggleEmphasisCommand);
+            handled = toggleMark(emphasisSchema.type(ctx), { marker: '*' })(view.state, view.dispatch.bind(view));
+            view.focus();
             break;
           case 'strikethrough':
             run(toggleStrikethroughCommand);
@@ -1045,6 +1151,16 @@ function MilkdownInner({
             break;
           case 'image':
             run(insertImageCommand, { src: 'url', alt: 'alt', title: '' });
+            break;
+          case 'taskList':
+            {
+              const paragraph = paragraphSchema.type(ctx).createAndFill();
+              const item = listItemSchema.type(ctx).create({ checked: false }, paragraph);
+              const list = bulletListSchema.type(ctx).create(null, item);
+              view.dispatch(view.state.tr.replaceSelectionWith(list).scrollIntoView());
+            }
+            handled = true;
+            view.focus();
             break;
           case 'hr':
             run(insertHrCommand);
@@ -1123,7 +1239,7 @@ function MilkdownInner({
       imageCleanupsRef.current.forEach((cleanup) => cleanup?.());
       imageCleanupsRef.current = [];
     };
-  }, [documentPath]);
+  }, [documentPath, readOnly]);
 
   useEffect(() => {
     if (!readOnly) return undefined;
