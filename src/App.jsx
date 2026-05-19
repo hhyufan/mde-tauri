@@ -1,7 +1,7 @@
 import { lazy, Suspense, useEffect, useState, useCallback, useMemo, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { listen } from '@tauri-apps/api/event';
-import { appWindow } from '@utils/tauriApi';
+import { appWindow, getCliArgs } from '@utils/tauriApi';
 import useThemeStore from '@store/useThemeStore';
 import useEditorStore from '@store/useEditorStore';
 import useAuthStore from '@store/useAuthStore';
@@ -30,6 +30,13 @@ const StatsPanel = lazy(() => import('@components/overlays/StatsPanel'));
 const LoginModal = lazy(() => import('@components/overlays/LoginModal'));
 const ConflictDialog = lazy(() => import('@components/overlays/ConflictDialog'));
 const UnsavedChangesModal = lazy(() => import('@components/overlays/UnsavedChangesModal'));
+
+const ASSOCIATED_MARKDOWN_EXTENSIONS = new Set(['md', 'markdown', 'mdown', 'mdwn', 'mkd', 'mkdn']);
+
+function isAssociatedMarkdownPath(path) {
+  const ext = String(path || '').split(/[\\/]/).pop()?.split('.').pop()?.toLowerCase();
+  return ASSOCIATED_MARKDOWN_EXTENSIONS.has(ext);
+}
 
 function App() {
   const { t } = useTranslation();
@@ -61,12 +68,14 @@ function App() {
   const lastDragPositionRef = useRef(null);
   const lastDropAtRef = useRef(0);
   const allowWindowCloseRef = useRef(false);
+  const cliArgsOpenedRef = useRef(false);
   const { isMobileLayout, isAndroid } = useResponsiveLayout();
   const isDesktopWindow = !isMobileLayout && !isAndroid;
   const {
     saveCurrentFile,
     saveTab,
     openFileDialog,
+    openFileFromPath,
     loadDirectory,
     openDroppedPathsInEditor,
     moveDroppedPathsToExplorer,
@@ -111,6 +120,30 @@ function App() {
       syncEngine.fullSync();
     }
   }, [isLoggedIn]);
+
+  useEffect(() => {
+    if (cliArgsOpenedRef.current || isAndroid) return;
+    cliArgsOpenedRef.current = true;
+
+    let cancelled = false;
+    (async () => {
+      try {
+        const args = await getCliArgs();
+        if (cancelled || !Array.isArray(args)) return;
+
+        for (const path of args.filter(isAssociatedMarkdownPath)) {
+          const name = path.split(/[\\/]/).pop() || path;
+          await openFileFromPath(path, name);
+        }
+      } catch (err) {
+        console.warn('[App] Failed to open associated file args:', err);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [isAndroid, openFileFromPath]);
 
   const handleKeyDown = useCallback((e) => {
     const mod = e.ctrlKey || e.metaKey;

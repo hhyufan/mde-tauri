@@ -63,24 +63,9 @@
     },
     "fileAssociations": [
       {
-        "ext": ["md"],
+        "ext": ["md", "markdown", "mdown", "mdwn", "mkd", "mkdn"],
         "name": "Markdown File",
         "description": "Markdown document"
-      },
-      {
-        "ext": ["txt"],
-        "name": "Text File",
-        "description": "Plain text file"
-      },
-      {
-        "ext": ["json"],
-        "name": "JSON File",
-        "description": "JSON data file"
-      },
-      {
-        "ext": ["html"],
-        "name": "HTML File",
-        "description": "HTML document"
       }
     ]
   }

@@ -277,6 +277,10 @@ export async function getAppDocumentsDir() {
   return invoke('get_app_documents_dir');
 }
 
+export async function getCliArgs() {
+  return invoke('get_cli_args');
+}
+
 export function onFileChanged(callback) {
   return listen('file-changed', (event) => callback(event.payload));
 }

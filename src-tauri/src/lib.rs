@@ -872,6 +872,43 @@ async fn get_app_documents_dir(app: AppHandle) -> Result<String, String> {
     Ok(docs.to_string_lossy().to_string())
 }
 
+fn is_markdown_file_path(path: &Path) -> bool {
+    matches!(
+        path.extension()
+            .and_then(|ext| ext.to_str())
+            .map(|ext| ext.to_ascii_lowercase())
+            .as_deref(),
+        Some("md" | "markdown" | "mdown" | "mdwn" | "mkd" | "mkdn")
+    )
+}
+
+#[tauri::command]
+async fn get_cli_args() -> Result<Vec<String>, String> {
+    let current_dir = std::env::current_dir().ok();
+    let mut files = Vec::new();
+
+    for arg in std::env::args().skip(1) {
+        if arg.is_empty() || arg == "--" || arg.starts_with('-') {
+            continue;
+        }
+
+        let path = Path::new(&arg);
+        let resolved = if path.is_absolute() {
+            path.to_path_buf()
+        } else if let Some(dir) = &current_dir {
+            dir.join(path)
+        } else {
+            path.to_path_buf()
+        };
+
+        if resolved.is_file() && is_markdown_file_path(&resolved) {
+            files.push(resolved.to_string_lossy().to_string());
+        }
+    }
+
+    Ok(files)
+}
+
 #[tauri::command]
 async fn show_main_window(app: AppHandle) -> Result<(), String> {
     #[cfg(not(target_os = "android"))]
@@ -934,6 +971,7 @@ pub fn run() {
             show_in_explorer,
             show_main_window,
             get_app_documents_dir,
+            get_cli_args,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
