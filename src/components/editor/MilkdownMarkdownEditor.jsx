@@ -43,6 +43,7 @@ import { $ctx, $inputRule, $nodeSchema, $prose, $remark, getMarkdown, insert, re
 import { toggleMark } from '@milkdown/kit/prose/commands';
 import { InputRule } from '@milkdown/kit/prose/inputrules';
 import { NodeSelection, Plugin, TextSelection } from '@milkdown/kit/prose/state';
+import { findChildren } from '@milkdown/kit/prose';
 import { HighlightStyle, LanguageDescription, LanguageSupport, StreamLanguage, syntaxHighlighting } from '@codemirror/language';
 import { EditorView as CodeMirrorView } from '@codemirror/view';
 import { tags } from '@lezer/highlight';
@@ -999,6 +1000,37 @@ function enhanceCodeBlocks(container, { readOnly, mermaidRoots }) {
   });
 }
 
+function findNodeByOutlineItem(doc, { line, text, type }) {
+  const cleanText = String(text || '').trim();
+  const candidates = findChildren(doc, (node) => {
+    if (type === 'heading') return node.type.name === 'heading';
+    if (type === 'list-ordered' || type === 'list-unordered') return node.type.name === 'listItem';
+    return false;
+  });
+
+  if (line) {
+    const exactLine = candidates.find(({ node }) => node.attrs?.line === line);
+    if (exactLine) return exactLine;
+  }
+
+  if (!cleanText) return null;
+  return candidates.find(({ node }) => node.textContent.trim().startsWith(cleanText)) || null;
+}
+
+function findDomByOutlineItem(container, { text, type }) {
+  if (!(container instanceof Element)) return null;
+  const cleanText = String(text || '').trim();
+  if (!cleanText) return null;
+
+  const selector = type === 'heading' ? 'h1, h2, h3, h4, h5, h6' : 'li';
+  const elements = container.querySelectorAll(selector);
+  for (const element of elements) {
+    if (element.textContent?.trim().startsWith(cleanText)) return element;
+  }
+
+  return null;
+}
+
 function MilkdownInner({
   activeTabId,
   className,
@@ -1260,6 +1292,38 @@ function MilkdownInner({
       observer.disconnect();
     };
   }, [readOnly, renderTick]);
+
+  useEffect(() => {
+    const handler = (e) => {
+      const wrapper = wrapperRef.current;
+      const detail = e.detail ?? {};
+      const domTarget = findDomByOutlineItem(wrapper, detail);
+      if (domTarget) {
+        domTarget.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        return;
+      }
+
+      const editor = editorRef.current;
+      if (!editor) return;
+
+      editor.action((ctx) => {
+        const view = ctx.get(editorViewCtx);
+        const target = findNodeByOutlineItem(view.state.doc, detail);
+        if (!target) return;
+
+        const dom = view.nodeDOM(target.pos);
+        if (dom instanceof Element) {
+          dom.scrollIntoView({ behavior: 'smooth', block: 'start' });
+          return;
+        }
+
+        view.dispatch(view.state.tr.setSelection(NodeSelection.create(view.state.doc, target.pos)).scrollIntoView());
+      });
+    };
+
+    window.addEventListener('outline:jump', handler);
+    return () => window.removeEventListener('outline:jump', handler);
+  }, []);
 
   useEffect(() => {
     if (readOnly) return undefined;

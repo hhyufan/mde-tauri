@@ -33,12 +33,13 @@ function extractItems(content) {
     }
 
     // Ordered list:  "1. " or "1) "
-    const om = line.match(/^(\s*)\d+[.)]\s+(.+)/);
+    const om = line.match(/^(\s*)(\d+)[.)]\s+(.+)/);
     if (om) {
       items.push({
         type: 'list-ordered',
         indent: Math.floor(om[1].length / 2),
-        text: om[2].replace(/[*_`~[\]]/g, '').trim(),
+        order: Number(om[2]),
+        text: om[3].replace(/[*_`~[\]]/g, '').trim(),
         line: i + 1,
         parentLevel: currentHeadingLevel,
       });
@@ -70,10 +71,10 @@ function HeadingBadge({ level }) {
   return <span className="outline__badge outline__badge--heading">H{level}</span>;
 }
 
-function ListBadge({ type }) {
+function ListBadge({ type, order }) {
   return (
     <span className={`outline__badge outline__badge--list`}>
-      {type === 'list-ordered' ? '1.' : '•'}
+      {type === 'list-ordered' ? `${order || 1}.` : '•'}
     </span>
   );
 }
@@ -214,7 +215,7 @@ function OutlineView() {
 
             {item.type === 'heading'
               ? <HeadingBadge level={item.level} />
-              : <ListBadge type={item.type} />}
+              : <ListBadge type={item.type} order={item.order} />}
 
             <span className="outline__text">{item.text}</span>
           </div>
