@@ -1,9 +1,9 @@
 {
   "app.name": "Markdown 编辑器",
-  "sidebar.tab.explorer": "资源管理器",
+  "sidebar.tab.explorer": "文件",
   "sidebar.tab.outline": "大纲",
   "sidebar.tab.recent": "最近",
-  "sidebar.explorer.title": "资源管理器",
+  "sidebar.explorer.title": "文件",
   "sidebar.explorer.sort": "排序",
   "sidebar.explorer.newFile": "新建文件",
   "sidebar.explorer.save": "保存",

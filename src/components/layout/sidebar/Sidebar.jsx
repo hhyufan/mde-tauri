@@ -278,6 +278,32 @@ function RecentList({ onOpenStats }) {
   );
 }
 
+function SidebarTabIcon({ id }) {
+  if (id === 'explorer') {
+    return (
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+        <path d="M3 6a2 2 0 0 1 2-2h5l2 2h7a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
+      </svg>
+    );
+  }
+  if (id === 'outline') {
+    return (
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+        <path d="M4 6h16" />
+        <path d="M4 12h10" />
+        <path d="M4 18h7" />
+      </svg>
+    );
+  }
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+      <path d="M3 12a9 9 0 1 0 3-6.7" />
+      <path d="M3 3v6h6" />
+      <path d="M12 7v5l3 2" />
+    </svg>
+  );
+}
+
 function Sidebar({ onOpenSettings, onOpenStats, onOpenLogin }) {
   const { t } = useTranslation();
   const { sidebarVisible, sidebarView, setSidebarView } = useEditorStore();
@@ -290,8 +316,7 @@ function Sidebar({ onOpenSettings, onOpenStats, onOpenLogin }) {
     { id: 'outline', label: t('sidebar.tab.outline') },
     { id: 'recent', label: t('sidebar.tab.recent') },
   ];
-  const activeIndex = tabs.findIndex((tab) => tab.id === sidebarView);
-
+  const activeIndex = Math.max(0, tabs.findIndex((tab) => tab.id === sidebarView));
   function handleThemeSwitch() {
     const element = themeButtonRef.current;
     if (!element) { toggleTheme(); return; }
@@ -316,12 +341,26 @@ function Sidebar({ onOpenSettings, onOpenStats, onOpenLogin }) {
         <h1 className="sidebar__title">{t('app.name')}</h1>
       </div>
 
-      <div className="sidebar__tabs">
-        <div className="sidebar__tab-slider" style={{ left: `${(activeIndex / tabs.length) * 100}%`, width: `${100 / tabs.length}%` }} />
+      <div className="sidebar__tabs" role="tablist" aria-label={t('sidebar.tabs')}>
+        <div
+          className="sidebar__tab-slider"
+          style={{
+            width: `calc((100% - 10px) / ${tabs.length})`,
+            transform: `translateX(${activeIndex * 100}%)`,
+          }}
+        />
         {tabs.map((tab) => (
-          <div key={tab.id} className={cn('sidebar__tab', sidebarView === tab.id && 'sidebar__tab--active')} onClick={() => setSidebarView(tab.id)}>
-            {tab.label}
-          </div>
+          <button
+            key={tab.id}
+            type="button"
+            role="tab"
+            aria-selected={sidebarView === tab.id}
+            className={cn('sidebar__tab', sidebarView === tab.id && 'sidebar__tab--active')}
+            onClick={() => setSidebarView(tab.id)}
+          >
+            <SidebarTabIcon id={tab.id} />
+            <span>{tab.label}</span>
+          </button>
         ))}
       </div>
 

@@ -1,9 +1,9 @@
 {
   "app.name": "Markdown Editor",
-  "sidebar.tab.explorer": "Explorer",
+  "sidebar.tab.explorer": "Files",
   "sidebar.tab.outline": "Outline",
   "sidebar.tab.recent": "Recent",
-  "sidebar.explorer.title": "Explorer",
+  "sidebar.explorer.title": "Files",
   "sidebar.explorer.sort": "Sort",
   "sidebar.explorer.newFile": "New file",
   "sidebar.explorer.save": "Save",
