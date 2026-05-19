@@ -9,6 +9,7 @@ import useFileStore from '@store/useFileStore';
 import useConfigStore from '@store/useConfigStore';
 import { useFileManager } from '@hooks/useFileManager';
 import { useResponsiveLayout } from '@hooks/useResponsiveLayout';
+import { useViewportInsets } from '@hooks/useViewportInsets';
 import { syncEngine } from '@/services/syncEngine';
 import Sidebar from '@layout/sidebar/Sidebar';
 import TitleBar from '@layout/title-bar/TitleBar';
@@ -69,8 +70,9 @@ function App() {
   const lastDropAtRef = useRef(0);
   const allowWindowCloseRef = useRef(false);
   const cliArgsOpenedRef = useRef(false);
-  const { isMobileLayout, isAndroid } = useResponsiveLayout();
+  const { isMobileLayout, isAndroid, isPortrait } = useResponsiveLayout();
   const isDesktopWindow = !isMobileLayout && !isAndroid;
+  useViewportInsets();
   const {
     saveCurrentFile,
     saveTab,
@@ -431,6 +433,7 @@ function App() {
           isDragOver && 'app--drag-over',
           isMobileLayout && 'app--mobile',
           isAndroid && 'app--android',
+          isPortrait && 'app--portrait',
         )}
       >
         <Sidebar

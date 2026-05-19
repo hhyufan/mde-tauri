@@ -1,0 +1,58 @@
+/* Floating quick-action bar shown above a non-empty Monaco selection on
+   touch devices (primarily Android). Positioned by JS in screen coordinates
+   via translateX(-50%) so the anchor X aligns with the selection midpoint. */
+.mobile-selection-bar {
+  position: fixed;
+  z-index: 9000;
+  transform: translateX(-50%);
+  display: inline-flex;
+  align-items: center;
+  gap: 0;
+  height: 40px;
+  padding: 0 4px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.18), 0 1px 4px rgba(0, 0, 0, 0.08);
+  font-family: var(--font-app);
+  user-select: none;
+  -webkit-user-select: none;
+  touch-action: manipulation;
+  animation: msb-in 0.12s ease-out;
+}
+
+@keyframes msb-in {
+  from {
+    opacity: 0;
+    transform: translateX(-50%) translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+  }
+}
+
+.mobile-selection-bar__btn {
+  height: 32px;
+  min-width: 56px;
+  padding: 0 12px;
+  border: none;
+  background: transparent;
+  color: var(--text);
+  font-size: 13px;
+  font-weight: 500;
+  font-family: inherit;
+  border-radius: 16px;
+  cursor: pointer;
+  transition: background 0.12s;
+
+  &:not(:last-child) {
+    margin-right: 2px;
+  }
+
+  &:hover,
+  &:active {
+    background: var(--hover);
+    color: var(--accent);
+  }
+}

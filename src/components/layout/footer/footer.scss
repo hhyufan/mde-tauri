@@ -235,6 +235,10 @@
     height: auto;
     padding: 6px 10px;
     gap: 8px;
+    // .app__main already reserves env(safe-area-inset-bottom); we only have
+    // to add room here when the IME is open (.app__main drops its own
+    // padding via html.mde--kb-open in App.scss).
+    padding-bottom: calc(6px + var(--mde-kb-inset, 0px));
   }
 
   .footer__left {

@@ -1,0 +1,48 @@
+/* Selection handles drawn at the baseline of the Monaco selection.
+   Each handle is a teardrop pointing at the selection edge: the start
+   handle has its square-cornered "tip" at top-right (selection start
+   is to its right), the end handle's tip is at top-left.
+   The hit area is enlarged via ::after so a thumb can reliably grab a
+   handle on small phone screens. */
+.monaco-selection-handle {
+  position: fixed;
+  width: 16px;
+  height: 16px;
+  background: var(--accent, #4091ff);
+  z-index: 8500;
+  cursor: grab;
+  touch-action: none;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.28);
+  // Expanded thumb hit-target — invisible, just for pointer events.
+  &::after {
+    content: '';
+    position: absolute;
+    inset: -14px;
+  }
+
+  // Start handle: body extends LEFT of the selection start; the sharp
+  // top-right corner is the tip that touches the baseline at startX.
+  &--start {
+    transform: translate(-100%, 0);
+    border-radius: 50% 0 50% 50%;
+  }
+
+  // End handle: body extends RIGHT of the selection end; the sharp
+  // top-left corner is the tip that touches the baseline at endX.
+  &--end {
+    transform: translate(0, 0);
+    border-radius: 0 50% 50% 50%;
+  }
+
+  &:active {
+    cursor: grabbing;
+    filter: brightness(1.1);
+  }
+}
+
+// While the user is actively dragging a handle, fade the floating action
+// bar so it doesn't compete for visual attention or intercept the drag.
+html.mde--selection-dragging .mobile-selection-bar {
+  opacity: 0.25;
+  pointer-events: none;
+}

@@ -19,6 +19,34 @@
   overflow: hidden;
 }
 
+// Fullscreen mobile variant — fills the dialog content area and stretches
+// the result list to fill remaining vertical space.
+.search-box--fullscreen {
+  width: 100%;
+  height: 100%;
+  border-radius: 0;
+  box-shadow: none;
+  display: flex;
+  flex-direction: column;
+
+  .search-box__results {
+    flex: 1;
+    max-height: none;
+  }
+
+  .search-box__input-wrap {
+    padding: 14px 16px;
+
+    input {
+      font-size: 16px; // avoid iOS/Android zoom-on-focus
+    }
+  }
+
+  .search-box__item {
+    padding: 10px 16px;
+  }
+}
+
 .search-box__input-wrap {
   display: flex;
   align-items: center;
@@ -35,6 +63,7 @@
 
   input {
     flex: 1;
+    min-width: 0;
     border: none;
     outline: none;
     font-size: 14px;
@@ -45,6 +74,32 @@
     &::placeholder {
       color: var(--text-dim);
     }
+  }
+}
+
+.search-box__close-btn {
+  width: 32px;
+  height: 32px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  border: none;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--text-sec);
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease;
+
+  svg {
+    width: 16px;
+    height: 16px;
+  }
+
+  &:hover,
+  &:active {
+    background: var(--hover);
+    color: var(--text);
   }
 }
 

@@ -82,6 +82,9 @@
   position: relative;
   transition: background 0.15s;
   z-index: 10;
+  // Disable browser default scroll/zoom gestures on the divider so pointer
+  // events reach our drag handler on touchscreens.
+  touch-action: none;
 
   &:hover,
   &:active {
@@ -120,25 +123,39 @@
 
   .editor-content__workspace--mobile-split {
     flex-direction: column;
-    overflow-y: auto;
+    // The whole workspace is the flex parent; children below pull their
+    // sizes from --split-ratio so dragging the divider redistributes the
+    // editor / preview heights live.
+    overflow: hidden;
   }
 
-  .editor-content__workspace--mobile-split .editor-content__editor--half,
-  .editor-content__workspace--mobile-split .editor-content__preview--half {
-    flex: 0 0 50%;
+  .editor-content__workspace--mobile-split .editor-content__editor--half {
+    flex: 0 0 var(--split-ratio, 50%);
     max-width: none;
-    min-height: 50%;
+    max-height: var(--split-ratio, 50%);
+    min-height: 0;
     width: 100%;
+  }
+
+  .editor-content__workspace--mobile-split .editor-content__preview--half {
+    flex: 1;
+    max-width: none;
+    min-height: 0;
+    width: 100%;
+    overflow-y: auto;
   }
 
   .editor-content__workspace--mobile-split .editor-content__split-divider {
     width: 100%;
-    height: 8px;
+    height: 14px;
     cursor: row-resize;
+    // Larger touch target on phones — 14px is the visible slab but the
+    // ::after grip gives the user a thumb-sized anchor.
+    touch-action: none;
 
     &::after {
-      width: 44px;
-      height: 3px;
+      width: 56px;
+      height: 4px;
     }
   }
 

@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { Modal, Menu, Switch, Select, Input, InputNumber, Button, Space } from 'antd';
+import { useResponsiveLayout } from '@hooks/useResponsiveLayout';
 import {
   SettingOutlined,
   BgColorsOutlined,
@@ -45,6 +46,12 @@ function SettingsModal({ open: openProp, onClose }) {
   const { theme, setTheme } = useThemeStore();
   const { isLoggedIn, user, logout } = useAuthStore();
   const notify = useNotificationStore((s) => s.notify);
+  const { isMobileLayout, isPortrait } = useResponsiveLayout();
+  // On phones in portrait we treat the settings dialog as a full-screen sheet
+  // (modal width === screen, no centering) so the inner two-pane layout has
+  // room to stack vertically. Landscape mobile keeps the side-by-side layout
+  // because there's enough horizontal space.
+  const fullScreen = isMobileLayout && isPortrait;
 
   function handleChange(key, value) {
     config.setConfig(key, value);
@@ -131,16 +138,17 @@ function SettingsModal({ open: openProp, onClose }) {
       open={openProp}
       onCancel={onClose}
       footer={null}
-      width={760}
-      centered
+      width={fullScreen ? '100vw' : 760}
+      centered={!fullScreen}
+      style={fullScreen ? { top: 0, paddingBottom: 0, maxWidth: '100vw' } : undefined}
       destroyOnHidden
       maskClosable
       closable
-      rootClassName="mde-settings-modal-root"
+      rootClassName={`mde-settings-modal-root${fullScreen ? ' mde-settings-modal-root--fullscreen' : ''}`}
       styles={{ body: { padding: 0 }, content: { padding: 0 } }}
       title={null}
     >
-      <div className="settings-modal">
+      <div className={`settings-modal${fullScreen ? ' settings-modal--fullscreen' : ''}`}>
         <div className="settings-modal__header">
           <div className="settings-modal__header-left">
             <div className="settings-modal__header-icon">
@@ -153,15 +161,28 @@ function SettingsModal({ open: openProp, onClose }) {
           </div>
         </div>
 
-        <div className="settings-modal__body">
+        {fullScreen && (
           <Menu
-            className="settings-modal__nav"
-            mode="inline"
+            className="settings-modal__tabs"
+            mode="horizontal"
             selectedKeys={[activeNav]}
             onClick={({ key }) => setActiveNav(key)}
             items={menuItems}
-            style={{ width: 180 }}
+            overflowedIndicator={null}
           />
+        )}
+
+        <div className="settings-modal__body">
+          {!fullScreen && (
+            <Menu
+              className="settings-modal__nav"
+              mode="inline"
+              selectedKeys={[activeNav]}
+              onClick={({ key }) => setActiveNav(key)}
+              items={menuItems}
+              style={{ width: 180 }}
+            />
+          )}
 
           <div className="settings-modal__content">
             {activeNav === 'general' && (

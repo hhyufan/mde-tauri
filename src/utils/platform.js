@@ -14,3 +14,11 @@ export function isTouchLikeDevice() {
   if (typeof window === 'undefined' || typeof navigator === 'undefined') return false;
   return window.matchMedia?.('(pointer: coarse)').matches || navigator.maxTouchPoints > 0;
 }
+
+export function isPortraitOrientation() {
+  if (typeof window === 'undefined') return false;
+  if (window.matchMedia) {
+    return window.matchMedia('(orientation: portrait)').matches;
+  }
+  return window.innerHeight >= window.innerWidth;
+}

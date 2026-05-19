@@ -93,12 +93,19 @@
 
 @media (max-width: 768px) {
   .app {
+    // 100dvh tracks the dynamic viewport (excludes browser chrome and
+    // soft-keyboard space on Android Chrome / WebView). Combined with the
+    // --mde-kb-inset fallback below, this keeps the layout reachable even
+    // on browsers that don't update dvh while the IME is shown.
     height: 100dvh;
     overflow: hidden;
   }
 
   .app__main {
     width: 100%;
+    // Reserve room for the system gesture/nav bar; the keyboard inset is
+    // applied lower in the layout (footer / floating UI) so the editor
+    // itself doesn't get squeezed when the IME opens.
     padding-bottom: env(safe-area-inset-bottom);
   }
 
@@ -115,4 +122,11 @@
   .app--mobile .drag-overlay {
     display: none;
   }
+}
+
+// When the on-screen keyboard is open, take the system nav-bar / safe-area
+// inset out of the bottom padding (the IME already pushes its own chrome up,
+// so we shouldn't double-count it).
+html.mde--kb-open .app__main {
+  padding-bottom: 0;
 }

@@ -217,6 +217,33 @@
   overflow: hidden;
 }
 
+// Full-screen search overlay for mobile portrait. Fills the screen, respects
+// safe-area insets, and reserves space for the IME so the result list stays
+// scrollable while the keyboard is open.
+.mde-search-modal-root--fullscreen {
+  .ant-modal {
+    margin: 0;
+    padding: 0;
+    max-width: 100vw;
+    top: 0 !important;
+  }
+  .ant-modal-content {
+    width: 100vw;
+    height: 100dvh;
+    border-radius: 0;
+    padding-top: env(safe-area-inset-top);
+    padding-bottom: max(env(safe-area-inset-bottom), var(--mde-kb-inset, 0px));
+    display: flex;
+    flex-direction: column;
+  }
+  .ant-modal-body {
+    flex: 1;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+  }
+}
+
 .mde-settings-modal-root {
   .ant-modal-content {
     padding: 0;
@@ -267,6 +294,81 @@
           display: none;
         }
       }
+    }
+  }
+}
+
+// Full-screen portrait mode for the settings dialog on phones. The Modal
+// fills the screen, respects safe-area insets, and the section nav flips
+// from a left sidebar to a horizontally scrollable tab row.
+.mde-settings-modal-root--fullscreen {
+  .ant-modal {
+    margin: 0;
+    padding: 0;
+    max-width: 100vw;
+    top: 0 !important;
+  }
+  .ant-modal-content {
+    width: 100vw;
+    height: 100dvh;
+    border-radius: 0;
+    padding-top: env(safe-area-inset-top);
+    padding-bottom: max(env(safe-area-inset-bottom), var(--mde-kb-inset, 0px));
+    display: flex;
+    flex-direction: column;
+  }
+  .ant-modal-body {
+    flex: 1;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+  }
+  // Push the antd close button inside the safe-area on notched devices.
+  .ant-modal-close {
+    top: calc(env(safe-area-inset-top) + 8px);
+    inset-inline-end: 8px;
+    z-index: 2;
+  }
+  .settings-modal--fullscreen {
+    width: 100%;
+    max-width: none;
+    height: 100%;
+    max-height: none;
+    flex: 1;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+  }
+  .settings-modal__tabs.ant-menu {
+    border-inline-end: none !important;
+    border-bottom: 1px solid var(--border) !important;
+    background: transparent;
+    padding: 0 8px;
+    display: flex;
+    overflow-x: auto;
+    flex-wrap: nowrap;
+    line-height: 44px;
+    scrollbar-width: none;
+
+    &::-webkit-scrollbar { display: none; }
+
+    .ant-menu-item {
+      flex: 0 0 auto;
+      padding: 0 14px !important;
+      margin: 0;
+      font-size: 13px;
+      font-family: var(--font-app);
+      color: var(--text-sec);
+
+      &.ant-menu-item-selected {
+        color: var(--accent) !important;
+        font-weight: 500;
+      }
+    }
+    // Hide antd's horizontal-mode "overflow" submenu trigger — we already
+    // scroll horizontally ourselves.
+    .ant-menu-overflow-item-rest {
+      display: none !important;
     }
   }
 }

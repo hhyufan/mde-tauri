@@ -4,6 +4,7 @@ import { Modal, Input } from 'antd';
 import { SearchOutlined } from '@ant-design/icons';
 import useFileStore from '@store/useFileStore';
 import { useFileManager } from '@hooks/useFileManager';
+import { useResponsiveLayout } from '@hooks/useResponsiveLayout';
 import { searchFiles } from '@utils/tauriApi';
 import { debounce } from '@utils/debounce';
 import FileTypeIcon from '@components/ui/FileTypeIcon';
@@ -20,6 +21,8 @@ function SearchModal({ open, onClose }) {
   const resultsRef = useRef(null);
   const currentDir = useFileStore((s) => s.currentDir);
   const { openFileFromPath } = useFileManager();
+  const { isMobileLayout } = useResponsiveLayout();
+  const fullScreen = isMobileLayout;
 
   useEffect(() => {
     if (open) {
@@ -106,15 +109,15 @@ function SearchModal({ open, onClose }) {
       open={open}
       onCancel={onClose}
       footer={null}
-      width={560}
+      width={fullScreen ? '100vw' : 560}
       closable={false}
       destroyOnHidden
       maskClosable
       styles={{ body: { padding: 0 }, content: { padding: 0 } }}
-      style={{ top: 80 }}
-      rootClassName="mde-search-modal-root"
+      style={fullScreen ? { top: 0, paddingBottom: 0, maxWidth: '100vw' } : { top: 80 }}
+      rootClassName={`mde-search-modal-root${fullScreen ? ' mde-search-modal-root--fullscreen' : ''}`}
     >
-      <div className="search-box">
+      <div className={`search-box${fullScreen ? ' search-box--fullscreen' : ''}`}>
         <div className="search-box__input-wrap">
           <SearchOutlined style={{ fontSize: 16, color: 'var(--text-sec)' }} />
           <Input
@@ -126,6 +129,20 @@ function SearchModal({ open, onClose }) {
             onKeyDown={handleKeyDown}
             allowClear
           />
+          {isMobileLayout && (
+            <button
+              type="button"
+              className="search-box__close-btn"
+              onClick={onClose}
+              aria-label={t('topbar.close')}
+              title={t('topbar.close')}
+            >
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <line x1="18" y1="6" x2="6" y2="18" />
+                <line x1="6" y1="6" x2="18" y2="18" />
+              </svg>
+            </button>
+          )}
         </div>
 
         <div className="search-box__tabs">

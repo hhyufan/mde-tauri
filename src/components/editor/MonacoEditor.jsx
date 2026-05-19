@@ -7,6 +7,9 @@ import { getFileLanguage } from '@utils/fileLanguage';
 import { initMonacoShiki, isMonacoShikiReady, getMonacoThemeName } from '@utils/monacoShiki';
 import { setBuffer, getBuffer, hasBuffer } from '@utils/editorBuffer';
 import MonacoContextMenu from './MonacoContextMenu';
+import MobileSelectionBar from './MobileSelectionBar';
+import MonacoSelectionHandles from './MonacoSelectionHandles';
+import { useResponsiveLayout } from '@hooks/useResponsiveLayout';
 import { setMonacoLocale } from '@utils/monacoLocale';
 import './monaco-editor.scss';
 
@@ -38,15 +41,20 @@ const MonacoEditorComponent = forwardRef(function MonacoEditorComponent({ classN
 
   const [highlighterReady, setHighlighterReady] = useState(isMonacoShikiReady());
   const [contextMenu, setContextMenu] = useState({ visible: false, x: 0, y: 0 });
-
-  const handleContextMenu = useCallback((e) => {
-    e.preventDefault();
-    const menuWidth = 220;
-    const menuHeight = 340;
-    const x = Math.min(e.clientX, window.innerWidth - menuWidth - 8);
-    const y = Math.min(e.clientY, window.innerHeight - menuHeight - 8);
-    setContextMenu({ visible: true, x, y });
-  }, []);
+  // We expose Monaco's instance through state (and not just a ref) so the
+  // MobileSelectionBar's effect can re-run as soon as Monaco finishes
+  // initialising; ref objects are stable so a ref-only handoff would leave
+  // the bar's listeners attached to a null editor forever.
+  const [editorInstance, setEditorInstance] = useState(null);
+  const { isAndroid, isTouchLike } = useResponsiveLayout();
+  // Show the floating selection bar on touch devices instead of the desktop
+  // right-click context menu. Android in particular has no native action bar
+  // visible above a Monaco selection because the editor consumes touch.
+  const useSelectionBar = isAndroid || isTouchLike;
+  // Refs so the editor.onContextMenu callback (registered once at init time)
+  // always sees the latest layout flag without having to re-subscribe.
+  const useSelectionBarRef = useRef(useSelectionBar);
+  useSelectionBarRef.current = useSelectionBar;
 
   const closeContextMenu = useCallback(() => {
     setContextMenu({ visible: false, x: 0, y: 0 });
@@ -54,7 +62,7 @@ const MonacoEditorComponent = forwardRef(function MonacoEditorComponent({ classN
 
   // Keep Monaco's built-in UI locale in sync with the app language setting.
   // The NLS proxy intercepts localize() at render-time, so the next time the
-  // user opens a Monaco widget (Find, Command Palette, â€? the new locale applies.
+  // user opens a Monaco widget (Find, Command Palette, ? the new locale applies.
   useEffect(() => {
     setMonacoLocale(language);
   }, [language]);
@@ -140,6 +148,7 @@ const MonacoEditorComponent = forwardRef(function MonacoEditorComponent({ classN
     });
 
     editorRef.current = editor;
+    setEditorInstance(editor);
 
     let dirtyMarkScheduled = false;
     let charCountScheduled = false;
@@ -180,7 +189,7 @@ const MonacoEditorComponent = forwardRef(function MonacoEditorComponent({ classN
       const tabId = currentTabIdRef.current;
       if (!tabId) return;
       const value = editor.getValue();
-      // 1. Update the editor buffer synchronously â€?preview/outline
+      // 1. Update the editor buffer synchronously ?preview/outline
       //    consumers will pick this up on their own debounce.
       setBuffer(tabId, value);
       // 2. Mark dirty + character count + auto-save are throttled so
@@ -195,6 +204,68 @@ const MonacoEditorComponent = forwardRef(function MonacoEditorComponent({ classN
         lineNumber: e.position.lineNumber,
         column: e.position.column,
       });
+    });
+
+    // Unified context-menu / long-press hook. Monaco's `onContextMenu`
+    // fires on desktop right-click AND on Android long-press, and the event
+    // payload carries the target position which we'd otherwise have to
+    // reconstruct from raw client coordinates via getTargetAtClientPoint().
+    //
+    // We use this single event for two flows:
+    //   - Touch (Android): auto-select the word under the finger via
+    //     smartSelect.expand; MobileSelectionBar shows itself by reacting
+    //     to the resulting selection change.
+    //   - Desktop right-click: open the existing MonacoContextMenu anchored
+    //     at the mouse position.
+    //
+    // In both cases we must call preventDefault on the underlying browser
+    // event so the WebView's native long-press behaviour (text magnifier on
+    // Android, page-level context menu on desktop) doesn't fight us.
+    editor.onContextMenu((event) => {
+      const browserEvent = event.event?.browserEvent ?? event.event;
+      browserEvent?.preventDefault?.();
+      browserEvent?.stopPropagation?.();
+
+      const targetPosition = event.target?.position;
+      const selection = editor.getSelection();
+      const selectionEmpty = !selection || selection.isEmpty();
+
+      if (useSelectionBarRef.current) {
+        // Touch path: ensure there's a selection to operate on. Place the
+        // cursor where the user pressed, then expand to the surrounding
+        // word  Monaco's smartSelect.expand does the right thing inside
+        // identifiers, strings, markdown phrases, etc.
+        if (targetPosition && selectionEmpty) {
+          editor.setPosition(targetPosition);
+          editor.focus();
+          // Use the model's word boundaries directly instead of triggering
+          // smartSelect.expand, because the smartSelect contribution isn't
+          // guaranteed to be loaded in the trimmed mobile Monaco bundle.
+          const model = editor.getModel();
+          const word = model?.getWordAtPosition(targetPosition);
+          if (word) {
+            editor.setSelection({
+              startLineNumber: targetPosition.lineNumber,
+              startColumn: word.startColumn,
+              endLineNumber: targetPosition.lineNumber,
+              endColumn: word.endColumn,
+            });
+          }
+        }
+        // No native menu shown; MobileSelectionBar's selection listener
+        // will surface the action bar above the new selection.
+        return;
+      }
+
+      // Desktop right-click path: pin the existing context menu to the
+      // mouse position, clamped to the viewport.
+      const menuWidth = 220;
+      const menuHeight = 340;
+      const rawX = browserEvent?.clientX ?? 0;
+      const rawY = browserEvent?.clientY ?? 0;
+      const x = Math.min(rawX, window.innerWidth - menuWidth - 8);
+      const y = Math.min(rawY, window.innerHeight - menuHeight - 8);
+      setContextMenu({ visible: true, x, y });
     });
 
     initMonacoShiki().then(() => {
@@ -258,6 +329,7 @@ const MonacoEditorComponent = forwardRef(function MonacoEditorComponent({ classN
       if (jumpDecorTimer) clearTimeout(jumpDecorTimer);
       editor.dispose();
       editorRef.current = null;
+      setEditorInstance(null);
     };
   }, []);
 
@@ -346,15 +418,22 @@ const MonacoEditorComponent = forwardRef(function MonacoEditorComponent({ classN
       <div
         ref={containerRef}
         className={`monaco-editor-container ${className || ''}`}
-        onContextMenu={handleContextMenu}
+        // Belt-and-braces: also kill the browser-level contextmenu on the
+        // wrapper so any long-press that bubbles past Monaco's view DOM
+        // (e.g. on the gutter / margin) doesn't surface the native menu.
+        onContextMenu={(e) => e.preventDefault()}
       />
-      <MonacoContextMenu
-        visible={contextMenu.visible}
-        x={contextMenu.x}
-        y={contextMenu.y}
-        onClose={closeContextMenu}
-        editorRef={editorRef}
-      />
+      {!useSelectionBar && (
+        <MonacoContextMenu
+          visible={contextMenu.visible}
+          x={contextMenu.x}
+          y={contextMenu.y}
+          onClose={closeContextMenu}
+          editorRef={editorRef}
+        />
+      )}
+      <MobileSelectionBar editor={editorInstance} enabled={useSelectionBar} containerRef={containerRef} />
+      <MonacoSelectionHandles editor={editorInstance} enabled={useSelectionBar} />
     </>
   );
 });
