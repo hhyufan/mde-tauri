@@ -46,11 +46,12 @@ const MonacoEditorComponent = forwardRef(function MonacoEditorComponent({ classN
   // initialising; ref objects are stable so a ref-only handoff would leave
   // the bar's listeners attached to a null editor forever.
   const [editorInstance, setEditorInstance] = useState(null);
-  const { isAndroid, isTouchLike } = useResponsiveLayout();
-  // Show the floating selection bar on touch devices instead of the desktop
-  // right-click context menu. Android in particular has no native action bar
-  // visible above a Monaco selection because the editor consumes touch.
-  const useSelectionBar = isAndroid || isTouchLike;
+  const { isAndroid, isMobileLayout, isTouchLike } = useResponsiveLayout();
+  // Only enable the mobile selection affordances on actual mobile/touch
+  // layouts (or inside the Android runtime). Hybrid desktop devices such as
+  // touch-screen Windows laptops report touch capability too, but still need
+  // the normal desktop selection + right-click context-menu flow.
+  const useSelectionBar = isAndroid || (isMobileLayout && isTouchLike);
   // Refs so the editor.onContextMenu callback (registered once at init time)
   // always sees the latest layout flag without having to re-subscribe.
   const useSelectionBarRef = useRef(useSelectionBar);
@@ -62,7 +63,7 @@ const MonacoEditorComponent = forwardRef(function MonacoEditorComponent({ classN
 
   // Keep Monaco's built-in UI locale in sync with the app language setting.
   // The NLS proxy intercepts localize() at render-time, so the next time the
-  // user opens a Monaco widget (Find, Command Palette, ù? the new locale applies.
+  // user opens a Monaco widget (Find, Command Palette, ÔøΩ? the new locale applies.
   useEffect(() => {
     setMonacoLocale(language);
   }, [language]);
@@ -189,7 +190,7 @@ const MonacoEditorComponent = forwardRef(function MonacoEditorComponent({ classN
       const tabId = currentTabIdRef.current;
       if (!tabId) return;
       const value = editor.getValue();
-      // 1. Update the editor buffer synchronously ù?preview/outline
+      // 1. Update the editor buffer synchronously ÔøΩ?preview/outline
       //    consumers will pick this up on their own debounce.
       setBuffer(tabId, value);
       // 2. Mark dirty + character count + auto-save are throttled so
@@ -233,7 +234,7 @@ const MonacoEditorComponent = forwardRef(function MonacoEditorComponent({ classN
       if (useSelectionBarRef.current) {
         // Touch path: ensure there's a selection to operate on. Place the
         // cursor where the user pressed, then expand to the surrounding
-        // word ù Monaco's smartSelect.expand does the right thing inside
+        // word ÔøΩ Monaco's smartSelect.expand does the right thing inside
         // identifiers, strings, markdown phrases, etc.
         if (targetPosition && selectionEmpty) {
           editor.setPosition(targetPosition);

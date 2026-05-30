@@ -10,7 +10,7 @@
     "preview": "vite preview",
     "tauri": "tauri",
     "tauri:dev": "tauri dev",
-    "tauri:build": "powershell -NoProfile -ExecutionPolicy Bypass -Command \"$env:CARGO_TARGET_DIR = (Resolve-Path 'src-tauri').Path + '\\target'; tauri build --bundles all\"",
+    "tauri:build": "powershell -NoProfile -ExecutionPolicy Bypass -Command \"$env:CARGO_TARGET_DIR = (Resolve-Path 'src-tauri').Path + '\\target'; tauri build --bundles msi nsis\"",
     "tauri:build:nsis": "powershell -NoProfile -ExecutionPolicy Bypass -Command \"$env:CARGO_TARGET_DIR = (Resolve-Path 'src-tauri').Path + '\\target'; tauri build --bundles nsis\"",
     "tauri:android:init": "tauri android init",
     "tauri:android:dev": "tauri android dev",
