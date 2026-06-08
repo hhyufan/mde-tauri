@@ -411,6 +411,43 @@ async fn rename_file(old_path: String, new_path: String) -> Result<FileOperation
 }
 
 /// 删除文件或目录，并向桥接层返回标准化的操作结果。
+#[cfg(target_os = "windows")]
+fn move_path_to_recycle_bin(path: &str, is_dir: bool) -> Result<(), String> {
+    let escaped = path.replace('\'', "''");
+    let command = if is_dir {
+        format!(
+            "Add-Type -AssemblyName Microsoft.VisualBasic; [Microsoft.VisualBasic.FileIO.FileSystem]::DeleteDirectory('{escaped}', [Microsoft.VisualBasic.FileIO.UIOption]::OnlyErrorDialogs, [Microsoft.VisualBasic.FileIO.RecycleOption]::SendToRecycleBin)"
+        )
+    } else {
+        format!(
+            "Add-Type -AssemblyName Microsoft.VisualBasic; [Microsoft.VisualBasic.FileIO.FileSystem]::DeleteFile('{escaped}', [Microsoft.VisualBasic.FileIO.UIOption]::OnlyErrorDialogs, [Microsoft.VisualBasic.FileIO.RecycleOption]::SendToRecycleBin)"
+        )
+    };
+
+    let output = Command::new("powershell")
+        .args([
+            "-NoProfile",
+            "-NonInteractive",
+            "-ExecutionPolicy",
+            "Bypass",
+            "-Command",
+            &command,
+        ])
+        .output()
+        .map_err(|err| format!("Failed to launch recycle-bin command: {err}"))?;
+
+    if output.status.success() {
+        return Ok(());
+    }
+
+    let stderr = String::from_utf8_lossy(&output.stderr).trim().to_string();
+    if stderr.is_empty() {
+        Err("Failed to move path to recycle bin".to_string())
+    } else {
+        Err(stderr)
+    }
+}
+
 #[tauri::command]
 async fn delete_file(path: String) -> Result<FileOperationResult, String> {
     let file_path = Path::new(&path);
@@ -426,10 +463,14 @@ async fn delete_file(path: String) -> Result<FileOperationResult, String> {
         });
     }
 
+    #[cfg(target_os = "windows")]
+    let result = move_path_to_recycle_bin(&path, file_path.is_dir());
+
+    #[cfg(not(target_os = "windows"))]
     let result = if file_path.is_dir() {
-        fs::remove_dir_all(&path)
+        fs::remove_dir_all(&path).map_err(|err| err.to_string())
     } else {
-        fs::remove_file(&path)
+        fs::remove_file(&path).map_err(|err| err.to_string())
     };
 
     match result {

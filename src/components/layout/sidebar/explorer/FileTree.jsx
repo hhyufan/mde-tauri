@@ -7,6 +7,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Tooltip } from 'antd';
+import { confirm } from '@tauri-apps/plugin-dialog';
 import useFileStore from '@store/useFileStore';
 import useEditorStore from '@store/useEditorStore';
 import { useFileManager } from '@hooks/useFileManager';
@@ -90,6 +91,28 @@ function FileTree() {
   const createInputRef = useRef(null);
   const bcScrollRef = useRef(null);
   const bcThumbRef = useRef(null);
+
+  /**
+   * 删除前先确认，避免资源管理器里的误触直接把文件移除。
+   *
+   * @param {import('@store/useFileStore').FileInfo} file 待删除的文件条目
+   * @param {import('react').MouseEvent<HTMLElement>} [event] 原始点击事件
+   * @returns {Promise<void>}
+   */
+  const handleDeleteFile = useCallback(async (file, event) => {
+    event?.stopPropagation?.();
+    const confirmed = await confirm(
+      t('sidebar.explorer.deleteFileConfirm', { name: file.name })
+    );
+    if (!confirmed) return;
+
+    try {
+      await deleteFileApi(file.path);
+      await loadDirectory(currentDir);
+    } catch (err) {
+      useNotificationStore.getState().notify('error', t('notification.error'), String(err));
+    }
+  }, [currentDir, loadDirectory, t]);
 
   // 面包屑横向滚动与自定义滚动条联动。
   /**
@@ -481,14 +504,7 @@ function FileTree() {
                 <Tooltip title={t('sidebar.explorer.deleteFile')} placement="top" mouseEnterDelay={0.3}>
                 <span
                   className="file-tree__item-del"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    deleteFileApi(file.path)
-                      .then(() => loadDirectory(currentDir))
-                      .catch((err) =>
-                        useNotificationStore.getState().notify('error', t('notification.error'), String(err))
-                      );
-                  }}
+                  onClick={(e) => { handleDeleteFile(file, e); }}
                 >
                   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                     <polyline points="3 6 5 6 21 6" />

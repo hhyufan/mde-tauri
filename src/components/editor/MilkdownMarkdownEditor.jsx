@@ -28,7 +28,6 @@ import {
   insertImageCommand,
   listItemSchema,
   paragraphSchema,
-  toggleLinkCommand,
   toggleStrongCommand,
   wrapInBlockquoteCommand,
   wrapInHeadingCommand,
@@ -1490,7 +1489,17 @@ function MilkdownInner({
             run(createCodeBlockCommand, '');
             break;
           case 'link':
-            run(toggleLinkCommand, { href: 'url', title: '' });
+            {
+              const { from, to, empty } = view.state.selection;
+              if (empty) {
+                insert('[link](url)', true)(ctx);
+              } else {
+                const selected = getMarkdown({ from, to })(ctx) || 'link';
+                replaceRange(`[${selected}](url)`, { from, to })(ctx);
+              }
+              handled = true;
+              view.focus();
+            }
             break;
           case 'image':
             run(insertImageCommand, { src: 'url', alt: 'alt', title: '' });

@@ -21,6 +21,7 @@
   "sidebar.explorer.expandBreadcrumb": "展开路径",
   "sidebar.explorer.collapseBreadcrumb": "折叠路径",
   "sidebar.explorer.deleteFile": "删除文件",
+  "sidebar.explorer.deleteFileConfirm": "确定删除“{{name}}”吗？Windows 本地文件会先尝试移到回收站。",
   "sidebar.cloud": "云端文件",
   "sidebar.cloudFileHint": "{{name}}（云端 — 首次保存时另存为）",
   "sidebar.connected": "已连接",

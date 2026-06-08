@@ -21,6 +21,7 @@
   "sidebar.explorer.expandBreadcrumb": "Expand path",
   "sidebar.explorer.collapseBreadcrumb": "Collapse path",
   "sidebar.explorer.deleteFile": "Delete file",
+  "sidebar.explorer.deleteFileConfirm": "Delete \"{{name}}\"? Local Windows files will be moved to the Recycle Bin when possible.",
   "sidebar.cloud": "Cloud file",
   "sidebar.cloudFileHint": "{{name}} (cloud — Save As on first save)",
   "sidebar.connected": "Connected",

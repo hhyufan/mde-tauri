@@ -8,7 +8,7 @@
 
 > ⚡ 基于 Rust + 系统 WebView，桌面端轻量、启动快、打包体积小。
 
----
+***
 
 ## 🚀 当前功能点（与代码同步）
 
@@ -53,7 +53,7 @@
 - **自定义标题栏**：窗口控制（最小化/最大化/关闭）与原生拖拽区域。
 - **通知系统**：Toast + Notification 双通道反馈。
 
----
+***
 
 ## ⌨️ 常用快捷键
 
@@ -65,7 +65,7 @@
 - `Ctrl+Shift+/`：编辑与预览模式切换
 - `Esc`：关闭搜索/设置/登录弹窗
 
----
+***
 
 ```javascript
    console.log("Hello World")
@@ -91,70 +91,24 @@
 - **Red Hat / Fedora**：`.rpm`
 - **通用发行版**：`.AppImage`
 
----
-
-## 📸 截图（占位）
-
-> 下面全部是占位路径（故意用假的），后续你可直接替换同名图片。
-
-### 已有占位（保留）
-
-| 浅色模式 | 深色模式 |
-| -------- | -------- |
-| ![浅色模式](images/light.png) | ![深色模式](images/dark.png) |
-
-| 编辑 + 分屏预览 | Mermaid 图表 |
-| --------------- | ------------ |
-| ![分屏](images/split.png) | ![Mermaid](images/mermaid.png) |
-
-| 资源管理器 & 大纲 | 云端同步登录 |
-| ----------------- | ------------ |
-| ![侧边栏](images/sidebar.png) | ![登录](images/login.png) |
-
-### 建议新增占位（按功能补齐）
-
-| 浮动工具栏 | 搜索（文件/内容） |
-| ---------- | ----------------- |
-| ![工具栏](images/toolbar-floating.png) | ![搜索](images/search-modal-content.png) |
-
-| 标签页重命名 | 最近文件（收藏优先） |
-| ------------ | -------------------- |
-| ![标签重命名](images/tab-rename.png) | ![最近文件](images/recent-with-bookmarks.png) |
-
-| 设置-外观/编辑器 | 设置-云同步 |
-| ---------------- | ----------- |
-| ![设置外观](images/settings-appearance-editor.png) | ![设置云同步](images/settings-cloud.png) |
-
-| 冲突对话框（本地/远端） | 同步状态指示器 |
-| ---------------------- | -------------- |
-| ![冲突处理](images/sync-conflict-dialog.png) | ![同步状态](images/sync-status-indicator.png) |
-
-| 统计面板 | 云端文档（cloud://） |
-| -------- | -------------------- |
-| ![统计面板](images/stats-panel.png) | ![云端文档](images/cloud-doc-tab.png) |
-
-| 代码块复制反馈 | 脚注跳转 |
-| -------------- | -------- |
-| ![代码复制](images/preview-copy-code.png) | ![脚注跳转](images/preview-footnote-jump.png) |
-
----
+***
 
 ## 🛠 技术栈
 
-| 层级 | 技术 |
-| ---- | ---- |
-| 桌面壳 | Tauri 2（Rust） |
-| 前端 | React 18 + Ant Design 5 + Zustand |
-| 编辑器 | Monaco Editor + Shiki |
+| 层级          | 技术                                                                         |
+| ----------- | -------------------------------------------------------------------------- |
+| 桌面壳         | Tauri 2（Rust）                                                              |
+| 前端          | React 18 + Ant Design 5 + Zustand                                          |
+| 编辑器         | Monaco Editor + Shiki                                                      |
 | Markdown 渲染 | react-markdown + remark-gfm + remark-math + rehype-katex + rehype-sanitize |
-| 图表 | Mermaid |
-| 国际化 | i18next + react-i18next |
-| 构建 | Vite 6 + Tauri CLI 2 |
-| 服务端 | NestJS 10 + Mongoose 8 |
-| 数据库 | MongoDB |
-| 认证 | JWT + Passport（Local/JWT Strategy） |
+| 图表          | Mermaid                                                                    |
+| 国际化         | i18next + react-i18next                                                    |
+| 构建          | Vite 6 + Tauri CLI 2                                                       |
+| 服务端         | NestJS 10 + Mongoose 8                                                     |
+| 数据库         | MongoDB                                                                    |
+| 认证          | JWT + Passport（Local/JWT Strategy）                                         |
 
----
+***
 
 ## 📂 项目结构（当前仓库）
 
@@ -179,20 +133,20 @@ mde-tauri/
 └── README.md
 ```
 
----
+***
 
 ## 🛠️ 开发环境
 
 ### 前置要求
 
-| 工具 | 建议版本 | 说明 |
-| ---- | -------- | ---- |
-| Node.js | 18+ | 前后端依赖安装与构建 |
-| Rust | 1.77+ | Tauri 编译 |
-| Android Studio / SDK / NDK | Android SDK 35+ | Android APK 构建 |
-| JDK | 17+ | Gradle / Android 构建 |
-| MongoDB | 6+ | 服务端存储 |
-| WebView2 | 系统自带 | Windows 下 Tauri 运行环境 |
+| 工具                         | 建议版本            | 说明                   |
+| -------------------------- | --------------- | -------------------- |
+| Node.js                    | 18+             | 前后端依赖安装与构建           |
+| Rust                       | 1.77+           | Tauri 编译             |
+| Android Studio / SDK / NDK | Android SDK 35+ | Android APK 构建       |
+| JDK                        | 17+             | Gradle / Android 构建  |
+| MongoDB                    | 6+              | 服务端存储                |
+| WebView2                   | 系统自带            | Windows 下 Tauri 运行环境 |
 
 ### 1) 启动桌面端（当前目录）
 
@@ -250,7 +204,7 @@ npm run tauri:android:build
 
 移动端版本会自动启用窄屏布局：侧栏改为抽屉、标题栏隐藏桌面窗口按钮、分屏编辑改为上下布局。Android 受系统沙盒限制，任意本机目录浏览、系统资源管理器打开、脚本执行等桌面能力会降级或不可用。
 
----
+***
 
 ## ⚙️ 配置说明
 
@@ -270,7 +224,7 @@ JWT_EXPIRES_IN=7d
 PORT=3000
 ```
 
----
+***
 
 ## 🤝 贡献指南
 
@@ -284,12 +238,12 @@ PORT=3000
 
 建议遵循 [Conventional Commits](https://www.conventionalcommits.org/)。
 
----
+***
 
 ## 📄 许可证
 
 本项目采用 MIT 许可证，详见 [LICENSE](LICENSE)。
 
----
+***
 
 **MDE** — 专注写作，把复杂交给工具。
