@@ -333,6 +333,16 @@ export async function showInExplorer(path) {
 }
 
 /**
+ * 在系统默认浏览器中打开外部链接。
+ *
+ * @param {string} url 需要打开的 http(s) 或 mailto 链接
+ * @returns {Promise<void>} 打开完成的 Promise
+ */
+export async function openExternal(url) {
+  return invoke('open_external', { url });
+}
+
+/**
  * 请求原生侧显示主窗口。
  *
  * @returns {Promise<unknown>} 原生命令返回结果

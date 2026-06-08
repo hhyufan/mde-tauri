@@ -4,7 +4,7 @@
  * 汇总应用配置相关的展示与交互入口，覆盖常规偏好、编辑器外观、
  * 云同步设置，以及设置快照的导入导出流程。
  */
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Modal, Menu, Switch, Select, Input, InputNumber, Button, Space } from 'antd';
 import { useResponsiveLayout } from '@hooks/useResponsiveLayout';
 import {
@@ -19,9 +19,14 @@ import {
   ExportOutlined,
   ImportOutlined,
   LogoutOutlined,
+  InfoCircleOutlined,
+  GithubOutlined,
+  StarFilled,
 } from '@ant-design/icons';
 import { open, save } from '@tauri-apps/plugin-dialog';
 import { readTextFile, writeTextFile } from '@tauri-apps/plugin-fs';
+import { getVersion } from '@tauri-apps/api/app';
+import { openExternal } from '@utils/tauriApi';
 import { useTranslation } from 'react-i18next';
 import useConfigStore from '@store/useConfigStore';
 import useThemeStore from '@store/useThemeStore';
@@ -40,9 +45,12 @@ const NAV_ICONS = {
   appearance: <BgColorsOutlined />,
   editor: <EditOutlined />,
   cloud: <CloudOutlined />,
+  about: <InfoCircleOutlined />,
 };
 
-const NAV_KEYS = ['general', 'appearance', 'editor', 'cloud'];
+const NAV_KEYS = ['general', 'appearance', 'editor', 'cloud', 'about'];
+
+const REPO_URL = 'https://github.com/hhyufan/mde-tauri';
 
 /**
  * 设置弹窗。
@@ -58,6 +66,7 @@ function SettingsModal({ open: openProp, onClose }) {
   const { t, i18n } = useTranslation();
   const [activeNav, setActiveNav] = useState('general');
   const [cloudBusy, setCloudBusy] = useState(false);
+  const [appVersion, setAppVersion] = useState('');
   const config = useConfigStore();
   const { theme, setTheme } = useThemeStore();
   const { isLoggedIn, user, logout } = useAuthStore();
@@ -66,6 +75,32 @@ function SettingsModal({ open: openProp, onClose }) {
   // 手机竖屏下把设置面板当作全屏抽屉处理，给内部双栏布局留出纵向堆叠空间；
   // 横屏移动端横向空间更充足，因此仍保留左右并排布局。
   const fullScreen = isMobileLayout && isPortrait;
+
+  // 从 Tauri 运行时读取应用版本号，避免在前端硬编码版本字符串。
+  useEffect(() => {
+    let alive = true;
+    getVersion()
+      .then((v) => {
+        if (alive) setAppVersion(v);
+      })
+      .catch(() => {});
+    return () => {
+      alive = false;
+    };
+  }, []);
+
+  /**
+   * 在系统默认浏览器中打开项目仓库地址。
+   *
+   * @returns {Promise<void>} 打开失败时通过通知提示用户。
+   */
+  async function handleOpenRepo() {
+    try {
+      await openExternal(REPO_URL);
+    } catch (err) {
+      notify('error', t('notification.error'), err?.message || String(err));
+    }
+  }
 
   /**
    * 写入设置项，并在语言切换时同步更新国际化实例。
@@ -530,6 +565,50 @@ function SettingsModal({ open: openProp, onClose }) {
                     </Button>
                   </Space>
                 </SettingRow>
+              </div>
+            )}
+
+            {activeNav === 'about' && (
+              <div className="settings-section">
+                <div className="settings-about__hero">
+                  <div className="settings-about__logo">
+                    <EditOutlined />
+                  </div>
+                  <div className="settings-about__name">{t('app.name')}</div>
+                  {appVersion && (
+                    <div className="settings-about__version">v{appVersion}</div>
+                  )}
+                  <div className="settings-about__tagline">{t('settings.about.tagline')}</div>
+                </div>
+
+                <SettingGroup label={t('settings.group.about')} />
+                <SettingRow
+                  label={t('settings.about.version')}
+                  desc={t('settings.about.versionDesc')}
+                >
+                  <span className="setting-row__value">
+                    {appVersion ? `v${appVersion}` : '—'}
+                  </span>
+                </SettingRow>
+                <SettingRow
+                  label={t('settings.about.author')}
+                  desc={t('settings.about.authorDesc')}
+                >
+                  <span className="setting-row__value">hhyufan</span>
+                </SettingRow>
+                <SettingRow
+                  label={t('settings.about.repository')}
+                  desc={t('settings.about.repositoryDesc')}
+                >
+                  <Button icon={<GithubOutlined />} onClick={handleOpenRepo}>
+                    {t('settings.about.openRepo')}
+                  </Button>
+                </SettingRow>
+
+                <div className="settings-about__star">
+                  <StarFilled className="settings-about__star-icon" />
+                  <span>{t('settings.about.starHint')}</span>
+                </div>
               </div>
             )}
           </div>

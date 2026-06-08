@@ -196,6 +196,18 @@
   "settings.cloud.exportSuccess": "Settings exported successfully.",
   "settings.cloud.importSuccess": "Settings imported successfully.",
 
+  "settings.nav.about": "About",
+  "settings.group.about": "Information",
+  "settings.about.tagline": "A cross-platform Markdown editor built with Tauri & React.",
+  "settings.about.version": "Version",
+  "settings.about.versionDesc": "Current application version.",
+  "settings.about.author": "Author",
+  "settings.about.authorDesc": "Created and maintained by hhyufan.",
+  "settings.about.repository": "Repository",
+  "settings.about.repositoryDesc": "View the source code on GitHub.",
+  "settings.about.openRepo": "GitHub",
+  "settings.about.starHint": "If you enjoy using MDE, please consider giving it a Star on GitHub — your support keeps the project going!",
+
   "stats.title": "Statistics",
   "stats.openFiles": "Open files",
   "stats.recentFiles": "Recent files",

@@ -1034,6 +1034,20 @@ async fn show_main_window(app: AppHandle) -> Result<(), String> {
     }
 }
 
+/// 在系统默认浏览器中打开外部链接。
+///
+/// 仅允许 http(s) 与 mailto 协议，避免被用于触发本地命令或打开任意文件。
+#[tauri::command]
+async fn open_external(url: String) -> Result<(), String> {
+    let allowed = url.starts_with("http://")
+        || url.starts_with("https://")
+        || url.starts_with("mailto:");
+    if !allowed {
+        return Err("Only http(s) and mailto URLs are allowed".to_string());
+    }
+    open::that(url).map_err(|e| format!("Failed to open URL: {}", e))
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 /// 桌面端 `main()` 与移动端入口共用的 Tauri 启动逻辑。
 ///
@@ -1079,6 +1093,7 @@ pub fn run() {
             show_main_window,
             get_app_documents_dir,
             get_cli_args,
+            open_external,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

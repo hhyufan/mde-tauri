@@ -196,6 +196,18 @@
   "settings.cloud.exportSuccess": "设置已导出。",
   "settings.cloud.importSuccess": "设置已导入。",
 
+  "settings.nav.about": "关于",
+  "settings.group.about": "信息",
+  "settings.about.tagline": "一款基于 Tauri 与 React 构建的跨平台 Markdown 编辑器。",
+  "settings.about.version": "版本",
+  "settings.about.versionDesc": "当前应用版本号。",
+  "settings.about.author": "作者",
+  "settings.about.authorDesc": "由 hhyufan 创建并维护。",
+  "settings.about.repository": "仓库地址",
+  "settings.about.repositoryDesc": "在 GitHub 上查看源代码。",
+  "settings.about.openRepo": "GitHub",
+  "settings.about.starHint": "如果你喜欢 MDE，欢迎在 GitHub 上点一个 Star —— 你的支持是项目持续更新的动力！",
+
   "stats.title": "统计",
   "stats.openFiles": "打开文件",
   "stats.recentFiles": "最近文件",
