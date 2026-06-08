@@ -1,31 +1,58 @@
+/**
+ * ?????????
+ *
+ * ??????????????????????????????????
+ * ??????????????????????????
+ */
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { getCurrentUserScopeId, isOwnedByUser } from './userScope';
 
 export const SYNC_PROTOCOL_VERSION = 2;
 
+/**
+ * 同步状态 store。
+ *
+ * 保存文档镜像、待推送队列、冲突列表、增量同步 cursor 与最近一次错误。
+ * 所有实体都按用户作用域分桶，确保多账号切换时状态互不串联。
+ */
+/**
+ * ???????????????
+ */
 function scopedDocKey(fileId) {
   return `${getCurrentUserScopeId()}::${fileId}`;
 }
 
+/**
+ * ???????????????????
+ */
 function listOwnedDocs(docs) {
   return Object.values(docs || {}).filter((doc) =>
     isOwnedByUser(doc?.ownerUserId, getCurrentUserScopeId())
   );
 }
 
+/**
+ * ??????????????????
+ */
 function listOwnedQueue(queue) {
   return (queue || []).filter((item) =>
     isOwnedByUser(item?.ownerUserId, getCurrentUserScopeId())
   );
 }
 
+/**
+ * ?????????????????
+ */
 function listOwnedConflicts(conflicts) {
   return (conflicts || []).filter((item) =>
     isOwnedByUser(item?.ownerUserId, getCurrentUserScopeId())
   );
 }
 
+/**
+ * ????????????????
+ */
 function newMutationId() {
   if (typeof crypto !== 'undefined' && crypto.randomUUID) {
     return crypto.randomUUID();
@@ -33,6 +60,9 @@ function newMutationId() {
   return `mutation_${Date.now()}_${Math.random().toString(36).slice(2)}`;
 }
 
+/**
+ * ????????????????????
+ */
 function nextRetryAt(retryCount) {
   const delayMs = Math.min(60_000, 2000 * (2 ** Math.max(0, retryCount - 1)));
   return Date.now() + delayMs;
@@ -51,6 +81,7 @@ const useSyncStore = create(
       cursors: {},
       lastSyncError: null,
 
+      /** ?????????????????? */
       markLocalResetDone: () =>
         set((state) => ({
           localResetDone: true,
@@ -61,6 +92,7 @@ const useSyncStore = create(
         })),
       isLocalResetDone: () => !!get().localResetDoneScopes?.[getCurrentUserScopeId()],
 
+      /** ?????????????????????? */
       clearAllSyncState: () =>
         set({
           protocolVersion: SYNC_PROTOCOL_VERSION,
@@ -91,6 +123,7 @@ const useSyncStore = create(
           };
         }),
 
+      /** ?????????????? */
       setCursor: (cursor) =>
         set((state) => ({
           cursor: cursor || '',
@@ -105,6 +138,7 @@ const useSyncStore = create(
       },
       setLastSyncError: (error) => set({ lastSyncError: error || null }),
 
+      /** ???? `fileId` ?????????? */
       getDoc: (fileId) => get().docs[scopedDocKey(fileId)] || null,
 
       findDocByPath: (localPath) => {
@@ -114,6 +148,7 @@ const useSyncStore = create(
 
       listDocs: () => listOwnedDocs(get().docs),
 
+      /** ??????????????????????? */
       upsertDoc: (fileId, patch) => {
         if (!fileId) return;
         const key = scopedDocKey(fileId);
@@ -146,6 +181,7 @@ const useSyncStore = create(
         });
       },
 
+      /** ????????????????????? */
       bindLocalPath: (fileId, localPath, patch = {}) => {
         if (!fileId || !localPath) return;
         const key = scopedDocKey(fileId);
@@ -204,6 +240,22 @@ const useSyncStore = create(
             item.fileId === fileId && ['pending', 'processing'].includes(item.status),
         ),
 
+      // 返回该文件仍在队列中、尚未推送成功的 upsert 原始内容。自动保存会在推送
+      // 成功后立刻清掉标签的 modified 标记，所以冲突判断不能只看 modified，需要
+      // 以队列里待推送的内容作为本地权威内容来比对远端，避免静默覆盖本地改动。
+      getPendingUpsertContent: (fileId) => {
+        const pending = listOwnedQueue(get().queue).find(
+          (item) =>
+            item.fileId === fileId
+            && item.type === 'upsert'
+            && ['pending', 'processing'].includes(item.status),
+        );
+        return typeof pending?.payload?.rawContent === 'string'
+          ? pending.payload.rawContent
+          : undefined;
+      },
+
+      /** ???????????????????? */
       enqueueMutation: ({ fileId, type, payload, baseRev = 0, mutationId, dedupeKey }) => {
         if (!fileId || !type) return null;
         const id = mutationId || newMutationId();
@@ -211,6 +263,8 @@ const useSyncStore = create(
           const ownerUserId = getCurrentUserScopeId();
           let nextQueue = [...state.queue];
 
+          // 删除优先级最高，直接清空该文件的其他待处理项；其余操作按
+          // dedupeKey 去重，只保留最新一份快照型 mutation。
           if (type === 'delete') {
             nextQueue = nextQueue.filter(
               (item) => !(isOwnedByUser(item?.ownerUserId, ownerUserId) && item.fileId === fileId)
@@ -289,6 +343,7 @@ const useSyncStore = create(
             return {
               ...item,
               status: 'pending',
+              // 指数退避把瞬时离线/服务端抖动摊平，避免失败后立即洪泛重试。
               retryCount,
               nextRetryAt: nextRetryAt(retryCount),
               lastError: lastError || null,
@@ -296,6 +351,7 @@ const useSyncStore = create(
           }),
         })),
 
+      /** ??????????????? */
       dropMutationsForFile: (fileId) =>
         set((state) => ({
           queue: state.queue.filter((item) => !(
@@ -316,7 +372,9 @@ const useSyncStore = create(
         });
       },
 
+      /** ???????????? */
       listConflicts: () => listOwnedConflicts(get().conflicts),
+      /** ???????????????? */
       listQueue: () => listOwnedQueue(get().queue),
 
       resolveConflict: (fileId) =>

@@ -29,6 +29,11 @@ const ICONS = {
   ),
 };
 
+/**
+ * 单条顶部通知。
+ *
+ * 负责展示图标、标题、附加消息与自动消失进度条。
+ */
 function NotificationItem({ notification }) {
   const dismiss = useNotificationStore((s) => s.dismiss);
   const progressRef = useRef(null);
@@ -60,6 +65,11 @@ function NotificationItem({ notification }) {
   );
 }
 
+/**
+ * 顶部通知容器。
+ *
+ * 统一渲染全局通知队列，保持通知样式与出场位置一致。
+ */
 function NotificationContainer() {
   const notifications = useNotificationStore((s) => s.notifications);
 

@@ -1,3 +1,10 @@
+/**
+ * Milkdown Markdown 编辑器模块。
+ *
+ * 该模块集中封装所见即所得编辑、只读预览增强、数学公式渲染、Mermaid 预览、
+ * 代码块语言与预览面板、任务列表交互、图片资源补全，以及编辑器与外部缓冲区/
+ * 自动保存链路之间的同步桥接逻辑，对上层暴露单一的 React 组件入口。
+ */
 import {
   Component,
   forwardRef,
@@ -95,16 +102,22 @@ import 'prismjs/components/prism-dart';
 import '@milkdown/kit/prose/view/style/prosemirror.css';
 import '@milkdown/kit/prose/tables/style/tables.css';
 import 'katex/dist/katex.min.css';
+import { useFileManager } from '@hooks/useFileManager';
 import useEditorStore from '@store/useEditorStore';
 import useConfigStore from '@store/useConfigStore';
 import useToastStore from '@store/useToastStore';
 import { useEditorBufferContent } from '@hooks/useEditorBufferContent';
 import { setBuffer } from '@utils/editorBuffer';
-import { hydrateMarkdownImages } from '@utils/markdownAssets';
+import { hydrateMarkdownImages, parseMarkdownLineHint, resolveMarkdownLinkPath } from '@utils/markdownAssets';
 import i18n from '@/i18n';
 import MermaidRenderer from './MermaidRenderer';
 import './markdown-preview.scss';
 
+/**
+ * 代码语言到展示名称的映射表。
+ *
+ * 用于统一代码块头部标签、语言选择器与预览模式中的语言文案展示。
+ */
 const LANG_DISPLAY = {
   html: 'HTML', xml: 'XML', sql: 'SQL', css: 'CSS', cpp: 'C++',
   js: 'JavaScript', javascript: 'JavaScript', ts: 'TypeScript', typescript: 'TypeScript',
@@ -318,6 +331,13 @@ const mathSourceBlockSchema = $nodeSchema(mathSourceBlockType, () => ({
   },
 }));
 
+/**
+ * 为原子渲染节点生成对应的“源码态”节点 schema。
+ *
+ * @param {string} name ProseMirror 节点名称。
+ * @param {{inline: boolean}} options 节点布局选项。
+ * @returns {any} Milkdown 节点 schema 定义。
+ */
 function rawSourceNodeSchema(name, { inline }) {
   return $nodeSchema(name, () => ({
     group: inline ? 'inline' : 'block',
@@ -355,10 +375,28 @@ function rawSourceNodeSchema(name, { inline }) {
 const imageSourceInlineSchema = rawSourceNodeSchema(imageSourceInlineType, { inline: true });
 const tableSourceBlockSchema = rawSourceNodeSchema(tableSourceBlockType, { inline: false });
 
+/**
+ * 允许用户在已渲染态与源码态之间切换的 ProseMirror 插件。
+ *
+ * 对数学公式、图片和表格这类原子节点，Backspace/Delete 不直接删除整块，
+ * 而是先回退到可编辑的 Markdown 源码表示，降低误删成本。
+ */
+/**
+ * 转义 Markdown 图片标题中的双引号。
+ *
+ * @param {string} title 原始标题文本。
+ * @returns {string} 可安全写回 Markdown 的标题文本。
+ */
 function escapeImageTitle(title) {
   return String(title || '').replace(/"/g, '\\"');
 }
 
+/**
+ * 将图片节点序列化为 Markdown 源码片段。
+ *
+ * @param {any} node 图片节点。
+ * @returns {string} 对应的 Markdown 图片语法。
+ */
 function imageToSource(node) {
   const alt = node.attrs.alt || '';
   const src = node.attrs.src || '';
@@ -366,6 +404,12 @@ function imageToSource(node) {
   return `![${alt}](${src}${title})`;
 }
 
+/**
+ * 解析 Markdown 图片源码，提取图片属性。
+ *
+ * @param {string} source Markdown 图片源码。
+ * @returns {{alt: string, src: string, title: string} | null} 解析结果。
+ */
 function parseImageSource(source) {
   const match = /^!\[([\s\S]*?)]\((\S*?)(?:\s+"([\s\S]*?)")?\)$/.exec(source);
   if (!match) return null;
@@ -376,10 +420,22 @@ function parseImageSource(source) {
   };
 }
 
+/**
+ * 提取表格单元格的纯文本内容，并转义竖线字符。
+ *
+ * @param {any} cell 表格单元格节点。
+ * @returns {string} 可写回 Markdown 表格的单元格文本。
+ */
 function tableCellText(cell) {
   return (cell.textContent || '').replace(/\|/g, '\\|').trim();
 }
 
+/**
+ * 将表格节点序列化为 Markdown 表格源码。
+ *
+ * @param {any} node 表格节点。
+ * @returns {string} Markdown 表格文本。
+ */
 function tableToSource(node) {
   const rows = [];
   node.forEach((row) => {
@@ -399,6 +455,12 @@ function tableToSource(node) {
     .join('\n');
 }
 
+/**
+ * 按 Markdown 表格规则拆分一行单元格文本。
+ *
+ * @param {string} line 单行表格源码。
+ * @returns {string[]} 拆分后的单元格数组。
+ */
 function splitTableRow(line) {
   const trimmed = line.trim().replace(/^\|/, '').replace(/\|$/, '');
   const cells = [];
@@ -425,10 +487,24 @@ function splitTableRow(line) {
   return cells;
 }
 
+/**
+ * 判断一行文本是否为 Markdown 表格分隔线。
+ *
+ * @param {string} line 单行表格源码。
+ * @returns {boolean} 是分隔线时返回 `true`。
+ */
 function isTableSeparator(line) {
   return splitTableRow(line).every((cell) => /^:?-{3,}:?$/.test(cell.trim()));
 }
 
+/**
+ * 将 Markdown 表格源码解析回 ProseMirror 表格节点。
+ *
+ * @param {string} source 表格源码。
+ * @param {any} schema 当前编辑器 schema。
+ * @param {object} schemaTypes 表格相关节点类型集合。
+ * @returns {any | null} 构造出的表格节点；解析失败时返回 `null`。
+ */
 function parseTableSource(source, schema, schemaTypes) {
   const lines = source.split(/\r?\n/).filter((line) => line.trim());
   if (lines.length < 2 || !isTableSeparator(lines[1])) return null;
@@ -444,6 +520,11 @@ function parseTableSource(source, schema, schemaTypes) {
   return schemaTypes.table.create(null, [headerRow, ...bodyRows]);
 }
 
+/**
+ * 行内数学公式输入规则。
+ *
+ * 将 `$...$` 输入即时折叠为受控数学原子节点。
+ */
 const mathInlineInputRule = $inputRule(
   (ctx) => new InputRule(/(?:\$)([^$]+)(?:\$)$/, (state, match, start, end) => {
     const value = match[1] || '';
@@ -452,6 +533,11 @@ const mathInlineInputRule = $inputRule(
   })
 );
 
+/**
+ * 块级数学公式输入规则。
+ *
+ * 当用户输入 `$$` 起始标记时，将当前块切换为数学块节点。
+ */
 const mathBlockInputRule = $inputRule(
   (ctx) => new InputRule(/^\$\$\s$/, (state, _match, start, end) => {
     const resolved = state.doc.resolve(start);
@@ -463,6 +549,12 @@ const mathBlockInputRule = $inputRule(
   })
 );
 
+/**
+ * 数学公式、图片和表格的“渲染态/源码态”切换插件。
+ *
+ * 负责在删除键命中原子渲染节点时回退到可编辑源码表示，并在源码恢复成合法
+ * 语法后自动重新折叠为渲染节点。
+ */
 const mathValueEditPlugin = $prose((ctx) => {
   const inlineType = mathInlineSchema.type(ctx);
   const blockType = mathBlockSchema.type(ctx);
@@ -626,6 +718,11 @@ const mathValueEditPlugin = $prose((ctx) => {
   });
 });
 
+/**
+ * 任务列表复选框交互插件。
+ *
+ * 让只命中复选框热区的点击直接切换任务完成状态，而不是触发普通文本选区。
+ */
 const taskListCheckboxPlugin = $prose((ctx) => {
   const listItemType = listItemSchema.type(ctx);
 
@@ -709,6 +806,14 @@ const mathPlugins = [
   mathInlineInputRule,
 ].flat();
 
+/**
+ * 为 CodeMirror 流式语法高亮构建语言描述对象。
+ *
+ * @param {string} name 语言展示名。
+ * @param {string[]} alias 语言别名集合。
+ * @param {any} parser 对应的流式解析器。
+ * @returns {LanguageDescription} 语言描述对象。
+ */
 function languageDescription(name, alias, parser) {
   return LanguageDescription.of({
     name,
@@ -746,34 +851,57 @@ const copyIconSvg = `
   <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
 </svg>`;
 
-// Same eye icon used in the Footer view-mode toggle: switch from code to preview.
+// 与底部状态栏视图切换复用同一套预览图标，用于从源码态切到预览态。
 const previewIconSvg = `
 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="13" height="13" aria-hidden="true">
   <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
   <circle cx="12" cy="12" r="3"/>
 </svg>`;
 
-// Same chevrons icon used in the Footer view-mode toggle: switch back to code.
+// 与底部状态栏视图切换复用同一套代码图标，用于从预览态切回源码态。
 const editIconSvg = `
 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="13" height="13" aria-hidden="true">
   <polyline points="16 18 22 12 16 6"/>
   <polyline points="8 6 2 12 8 18"/>
 </svg>`;
 
+/**
+ * 将 Mermaid 输出包装为不可编辑的预览容器。
+ *
+ * @param {string} svg Mermaid 渲染得到的 SVG 文本。
+ * @returns {string} 可直接注入预览区域的 HTML 字符串。
+ */
 function wrapMermaidPreview(svg) {
   return `<div class="md-preview__milkdown-mermaid-inline" contenteditable="false">${svg}</div>`;
 }
 
+/**
+ * 将代码块语言标识转换为界面展示名称。
+ *
+ * @param {string} raw 原始语言标识。
+ * @returns {string} 供界面显示的语言名称。
+ */
 function getLangDisplay(raw) {
   const key = (raw || '').toLowerCase();
   return LANG_DISPLAY[key] || (key.charAt(0).toUpperCase() + key.slice(1));
 }
 
-// Milkdown's contract: return `null` synchronously when this language has
-// no preview (so the toggle button never appears for plain code), `undefined`
-// to signal an async preview that will be delivered via `applyPreview` later,
-// or a string / element to render immediately. Returning a Promise here
-// would be stored verbatim as the preview content and break the panel.
+// Milkdown 代码块预览协议要求这里同步返回：
+// - `null`：当前语言没有预览能力，界面上也不显示切换按钮；
+// - `undefined`：稍后通过 `applyPreview` 异步补入预览；
+// - 字符串或元素：立即可渲染的预览内容。
+// 若直接返回 Promise，Milkdown 会把它当成预览内容本身，导致预览面板异常。
+/**
+ * 为支持的代码块语言生成预览内容。
+ *
+ * Milkdown 预览协议要求同步返回值仅使用 `null`、`undefined` 或立即可渲染
+ * 的内容；异步结果需通过 `applyPreview` 回填。
+ *
+ * @param {string} language 代码块语言。
+ * @param {string} content 代码块正文。
+ * @param {(preview: string | Element) => void} applyPreview 异步回填预览内容的回调。
+ * @returns {string | Element | null | undefined} 立即可用的预览结果或占位信号。
+ */
 function renderCodeBlockPreview(language, content, applyPreview) {
   if ((language || '').toLowerCase() !== 'mermaid') return null;
 
@@ -798,16 +926,138 @@ function renderCodeBlockPreview(language, content, applyPreview) {
   return undefined;
 }
 
+/**
+ * 阻断只读预览区域里不该落入 ProseMirror 原生选区的交互。
+ *
+ * 这类节点往往是第三方渲染结果或不可编辑的原子块，若放任编辑器接管，
+ * 很容易生成无效 selection，导致点击、双击或触摸选区异常。
+ */
+/**
+ * 判断事件目标是否落在代码块工具栏等交互控件上。
+ *
+ * @param {EventTarget | null} target 事件目标。
+ * @returns {boolean} 命中编辑器工具栏控件时返回 `true`。
+ */
 function isInteractiveToolbarTarget(target) {
   return target instanceof Element
     && !!target.closest('.tools, .language-button, .preview-toggle-button, .language-picker, .lang-tag');
 }
 
+/**
+ * 将用户输入的语言名称或别名归一化为已知语言名。
+ *
+ * @param {string} raw 用户输入的语言文本。
+ * @returns {string} 匹配到的标准语言名；未命中时返回空字符串。
+ */
+function findKnownCodeLanguageName(raw) {
+  const value = String(raw || '').trim().toLowerCase();
+  if (!value) return '';
+  const match = codeLanguages.find((language) => (
+    language.name.toLowerCase() === value
+    || language.alias.some((alias) => alias.toLowerCase() === value)
+  ));
+  return match?.name || '';
+}
+
+/**
+ * 从代码块相关 DOM 节点反查其对应的 ProseMirror 代码块节点。
+ *
+ * @param {any} view 当前 ProseMirror 视图。
+ * @param {Element | null} dom 触发事件的 DOM 节点。
+ * @returns {{pos: number, node: any, rawPos: number, depth: number} | null} 解析结果。
+ */
+function resolveCodeBlockNodeFromDom(view, dom) {
+  if (!(dom instanceof Element)) return null;
+
+  const rawPos = view.posAtDOM(dom, 0);
+  const maxPos = view.state.doc.content.size;
+  const safePos = Math.max(0, Math.min(rawPos, maxPos));
+  const $pos = view.state.doc.resolve(safePos);
+
+  for (let depth = $pos.depth; depth > 0; depth -= 1) {
+    const node = $pos.node(depth);
+    if (node?.type?.name !== 'code_block') continue;
+    return {
+      pos: $pos.before(depth),
+      node,
+      rawPos,
+      depth,
+    };
+  }
+
+  return null;
+}
+
+/**
+ * 将任意事件目标提升为可用的 DOM 元素节点。
+ *
+ * @param {EventTarget | null} target 原始事件目标。
+ * @returns {Element | null} 对应元素节点。
+ */
+function getEventTargetElement(target) {
+  if (target instanceof Element) return target;
+  if (target instanceof Node) return target.parentElement;
+  return null;
+}
+
+/**
+ * 在语言选择器输入框按下回车时提交代码块语言修改。
+ *
+ * @param {any} view 当前 ProseMirror 视图。
+ * @param {KeyboardEvent} event 键盘事件。
+ * @returns {boolean} 事件被消费时返回 `true`。
+ */
+function commitTypedCodeBlockLanguage(view, event) {
+  if (event.key !== 'Enter') return false;
+
+  const target = event.target;
+  if (!(target instanceof HTMLInputElement) || !target.classList.contains('search-input')) return false;
+
+  const picker = target.closest('.language-picker');
+  const codeBlock = target.closest('.milkdown-code-block');
+  if (!picker || !codeBlock) return false;
+
+  const typedValue = target.value.trim();
+  const firstListedLanguage = picker.querySelector('.language-list-item[data-language]')?.dataset.language || '';
+  const nextLanguage = findKnownCodeLanguageName(typedValue) || typedValue || firstListedLanguage;
+  if (!nextLanguage) return false;
+
+  try {
+    const resolved = resolveCodeBlockNodeFromDom(view, codeBlock);
+    const pos = resolved?.pos ?? -1;
+    const node = resolved?.node ?? null;
+    if (!node || !Object.prototype.hasOwnProperty.call(node.attrs || {}, 'language')) return false;
+
+    view.dispatch(view.state.tr.setNodeAttribute(pos, 'language', nextLanguage).scrollIntoView());
+    codeBlock.querySelector('.language-button')?.click();
+    view.focus();
+  } catch {
+    return false;
+  }
+
+  event.preventDefault();
+  event.stopPropagation();
+  event.stopImmediatePropagation?.();
+  return true;
+}
+
+/**
+ * 判断事件目标是否位于脚注定义区域。
+ *
+ * @param {EventTarget | null} target 事件目标。
+ * @returns {boolean} 命中脚注定义区域时返回 `true`。
+ */
 function isFootnoteBackrefTarget(target) {
   if (!(target instanceof Element)) return false;
   return !!target.closest('dl[data-type="footnote_definition"]');
 }
 
+/**
+ * 判断事件目标是否位于不可编辑的预览节点中。
+ *
+ * @param {EventTarget | null} target 事件目标。
+ * @returns {boolean} 命中不可编辑预览区域时返回 `true`。
+ */
 function isNonEditablePreviewTarget(target) {
   return target instanceof Element
     && !isInteractiveToolbarTarget(target)
@@ -827,6 +1077,12 @@ function isNonEditablePreviewTarget(target) {
     );
 }
 
+/**
+ * 创建只读预览区域的事件隔离处理器。
+ *
+ * @param {() => any} getEditor 用于延迟获取 Milkdown 实例的函数。
+ * @returns {(event: Event) => void} 预览区域事件处理器。
+ */
 function createNonEditablePreviewSelectionHandler(getEditor) {
   return function stopNonEditablePreviewSelection(event) {
     if (!isNonEditablePreviewTarget(event.target)) return;
@@ -868,14 +1124,15 @@ function createNonEditablePreviewSelectionHandler(getEditor) {
       if (!target) return;
 
       try {
-        const pos = view.posAtDOM(target, 0);
-        const node = view.state.doc.nodeAt(pos);
+        const resolved = resolveCodeBlockNodeFromDom(view, target);
+        const pos = resolved?.pos ?? -1;
+        const node = resolved?.node ?? null;
         if (!node?.isAtom && !node?.isBlock) return;
         view.dispatch(view.state.tr.setSelection(NodeSelection.create(view.state.doc, pos)).scrollIntoView());
         view.focus();
       } catch {
-        // Some third-party preview DOM cannot be mapped cleanly; event isolation
-        // still prevents ProseMirror/CodeMirror from creating an invalid selection.
+        // 少数第三方预览 DOM 无法稳定映射回 ProseMirror 节点；即便如此，
+        // 事件隔离仍能阻止 ProseMirror/CodeMirror 产生无效选区。
       }
     });
 
@@ -886,6 +1143,12 @@ function createNonEditablePreviewSelectionHandler(getEditor) {
   };
 }
 
+/**
+ * 对内嵌 HTML 预览内容做最小化安全清洗。
+ *
+ * @param {string} value 原始 HTML 字符串。
+ * @returns {string} 去除危险标签和内联脚本后的 HTML。
+ */
 function sanitizeMilkdownHtml(value) {
   const template = document.createElement('template');
   template.innerHTML = value;
@@ -902,6 +1165,12 @@ function sanitizeMilkdownHtml(value) {
   return template.innerHTML;
 }
 
+/**
+ * 将 HTML 占位节点渲染为只读 HTML 预览。
+ *
+ * @param {Element} root 编辑器根节点。
+ * @returns {void}
+ */
 function renderMilkdownHtml(root) {
   root.querySelectorAll('span[data-type="html"]').forEach((node) => {
     const value = node.dataset.value || node.textContent || '';
@@ -913,6 +1182,12 @@ function renderMilkdownHtml(root) {
   });
 }
 
+/**
+ * 将数学节点渲染为 KaTeX 结果。
+ *
+ * @param {Element} root 编辑器根节点。
+ * @returns {void}
+ */
 function renderMilkdownMath(root) {
   root.querySelectorAll(`span[data-type="${mathInlineType}"], div[data-type="${mathBlockType}"]`).forEach((node) => {
     const value = node.dataset.value || node.textContent || '';
@@ -931,6 +1206,15 @@ function renderMilkdownMath(root) {
   });
 }
 
+/**
+ * 在只读模式下增强代码块显示效果。
+ *
+ * 负责补充 Prism 高亮、Mermaid 渲染、语言标签与复制交互。
+ *
+ * @param {Element | null} container 代码块所在容器。
+ * @param {{readOnly: boolean, mermaidRoots: Map<Element, any>}} options 增强配置。
+ * @returns {void}
+ */
 function enhanceCodeBlocks(container, { readOnly, mermaidRoots }) {
   if (!container || !readOnly) return;
   const toast = useToastStore.getState().toast;
@@ -973,7 +1257,7 @@ function enhanceCodeBlocks(container, { readOnly, mermaidRoots }) {
       try {
         Prism.highlightElement(code);
       } catch (_) {
-        // A malformed or unsupported language should not break the editor.
+        // 语言声明格式异常或暂不支持时，不应影响整个编辑器继续工作。
       }
     }
 
@@ -1000,6 +1284,13 @@ function enhanceCodeBlocks(container, { readOnly, mermaidRoots }) {
   });
 }
 
+/**
+ * 根据大纲项信息在 ProseMirror 文档中定位对应节点。
+ *
+ * @param {any} doc 当前 ProseMirror 文档。
+ * @param {{line?: number, text?: string, type?: string}} outlineItem 大纲项信息。
+ * @returns {any | null} 命中的节点与位置信息；未命中时返回 `null`。
+ */
 function findNodeByOutlineItem(doc, { line, text, type }) {
   const cleanText = String(text || '').trim();
   const candidates = findChildren(doc, (node) => {
@@ -1017,6 +1308,13 @@ function findNodeByOutlineItem(doc, { line, text, type }) {
   return candidates.find(({ node }) => node.textContent.trim().startsWith(cleanText)) || null;
 }
 
+/**
+ * 根据大纲项信息在只读 DOM 预览中定位对应元素。
+ *
+ * @param {Element | null} container 预览容器。
+ * @param {{text?: string, type?: string}} outlineItem 大纲项信息。
+ * @returns {Element | null} 命中的 DOM 元素。
+ */
 function findDomByOutlineItem(container, { text, type }) {
   if (!(container instanceof Element)) return null;
   const cleanText = String(text || '').trim();
@@ -1031,6 +1329,12 @@ function findDomByOutlineItem(container, { text, type }) {
   return null;
 }
 
+/**
+ * 核心 Milkdown 实例。
+ *
+ * 负责挂载编辑器、向外暴露工具栏操作能力，并把编辑中的 Markdown
+ * 通过 `editorBuffer`、脏状态与自动保存节流器同步给应用其余部分。
+ */
 function MilkdownInner({
   activeTabId,
   className,
@@ -1050,6 +1354,7 @@ function MilkdownInner({
   const mermaidRootsRef = useRef(new Map());
   const imageCleanupsRef = useRef([]);
   const [renderTick, setRenderTick] = useState(0);
+  const { openFileFromPath } = useFileManager();
   const markTabDirty = useEditorStore((s) => s.markTabDirty);
   const setCharacterCount = useEditorStore((s) => s.setCharacterCount);
   const documentPath = useMemo(() => {
@@ -1059,6 +1364,12 @@ function MilkdownInner({
   currentTabIdRef.current = activeTabId;
   onAutoSaveRef.current = onAutoSave;
 
+  /**
+   * 将编辑器内部变更批量转发到应用层副作用。
+   *
+   * 这里把内容缓冲、脏标记、字数统计与自动保存拆成不同节流窗口，
+   * 避免每次按键都立刻触发整条 React/Zustand 链路。
+   */
   const scheduleEditorSideEffects = useCallback((markdown) => {
     const tabId = currentTabIdRef.current;
     if (!tabId || readOnly) return;
@@ -1220,6 +1531,11 @@ function MilkdownInner({
     },
   }), [content]);
 
+  /**
+   * 根据当前主题切换 Prism 高亮样式表。
+   *
+   * @returns {void}
+   */
   const loadPrismTheme = useCallback(() => {
     const existing = document.getElementById('prism-theme');
     if (existing) existing.remove();
@@ -1294,6 +1610,45 @@ function MilkdownInner({
   }, [readOnly, renderTick]);
 
   useEffect(() => {
+    const wrapper = wrapperRef.current;
+    if (!wrapper) return undefined;
+
+    const handleLinkClick = (event) => {
+      const anchor = getEventTargetElement(event.target)?.closest('a[href]');
+      const href = anchor?.getAttribute('href') || '';
+      if (!anchor || !href || href.startsWith('#')) return;
+
+      const target = resolveMarkdownLinkPath(href, documentPath);
+      if (!target.internal || !target.path) return;
+
+      event.preventDefault();
+      event.stopPropagation();
+      event.nativeEvent?.stopImmediatePropagation?.();
+      event.stopImmediatePropagation?.();
+      const fileName = target.path.split(/[\\/]/).pop() || target.path;
+      const lineHint = parseMarkdownLineHint(target.hash)
+        || parseMarkdownLineHint([
+          anchor.textContent || '',
+          anchor.getAttribute('aria-label') || '',
+          anchor.querySelector('img')?.getAttribute('alt') || '',
+          anchor.querySelector('img')?.getAttribute('title') || '',
+        ].filter(Boolean).join(' '));
+
+      void openFileFromPath(target.path, fileName).then(() => {
+        if (!lineHint?.line) return;
+        window.setTimeout(() => {
+          window.dispatchEvent(new CustomEvent('editor:jump-to-line', {
+            detail: { line: lineHint.line },
+          }));
+        }, 150);
+      });
+    };
+
+    wrapper.addEventListener('click', handleLinkClick, true);
+    return () => wrapper.removeEventListener('click', handleLinkClick, true);
+  }, [documentPath, openFileFromPath]);
+
+  useEffect(() => {
     const handler = (e) => {
       const wrapper = wrapperRef.current;
       const detail = e.detail ?? {};
@@ -1343,6 +1698,49 @@ function MilkdownInner({
     };
   }, [readOnly]);
 
+  useEffect(() => {
+    if (readOnly) return undefined;
+    const wrapper = wrapperRef.current;
+    if (!wrapper) return undefined;
+
+    const keydownHandler = (event) => {
+      editorRef.current?.action((ctx) => {
+        const view = ctx.get(editorViewCtx);
+        commitTypedCodeBlockLanguage(view, event);
+      });
+    };
+
+    wrapper.addEventListener('keydown', keydownHandler, true);
+    return () => wrapper.removeEventListener('keydown', keydownHandler, true);
+  }, [readOnly]);
+
+  useEffect(() => {
+    if (readOnly) return undefined;
+    const wrapper = wrapperRef.current;
+    if (!wrapper) return undefined;
+
+    const blockNoResultInteraction = (event) => {
+      const target = getEventTargetElement(event.target);
+      const noResult = target?.closest('.language-list-item.no-result');
+      if (!noResult) return;
+
+      event.preventDefault();
+      event.stopPropagation();
+      event.stopImmediatePropagation?.();
+    };
+
+    const events = ['pointerdown', 'mousedown', 'mouseup', 'click', 'dblclick', 'touchstart'];
+    events.forEach((eventName) => {
+      wrapper.addEventListener(eventName, blockNoResultInteraction, true);
+    });
+
+    return () => {
+      events.forEach((eventName) => {
+        wrapper.removeEventListener(eventName, blockNoResultInteraction, true);
+      });
+    };
+  }, [readOnly]);
+
   useEffect(() => () => {
     [dirtyTimerRef, charTimerRef, saveTimerRef].forEach((timerRef) => {
       if (timerRef.current) clearTimeout(timerRef.current);
@@ -1370,19 +1768,41 @@ function MilkdownInner({
 const ForwardedMilkdownInner = forwardRef(MilkdownInner);
 
 class MilkdownErrorBoundary extends Component {
+  /**
+   * 初始化错误边界状态。
+   *
+   * @param {object} props React 组件属性。
+   */
   constructor(props) {
     super(props);
     this.state = { error: null };
   }
 
+  /**
+   * 在渲染阶段错误发生后，将异常同步到边界状态。
+   *
+   * @param {Error} error 捕获到的异常。
+   * @returns {{error: Error}} 供 React 合并的状态对象。
+   */
   static getDerivedStateFromError(error) {
     return { error };
   }
 
+  /**
+   * 记录 Milkdown 初始化或渲染期间抛出的错误。
+   *
+   * @param {Error} error 捕获到的异常。
+   * @returns {void}
+   */
   componentDidCatch(error) {
     console.error('Milkdown failed to mount:', error);
   }
 
+  /**
+   * 渲染错误回退界面或正常子树。
+   *
+   * @returns {import('react').ReactNode} 当前错误边界的渲染结果。
+   */
   render() {
     if (this.state.error) {
       return (
@@ -1397,20 +1817,31 @@ class MilkdownErrorBoundary extends Component {
   }
 }
 
+/**
+ * 对外暴露的 Milkdown Markdown 组件。
+ *
+ * 根据当前标签、是否只读以及预览缩放同步配置，选择合适的内容源和字号，
+ * 并用 ErrorBoundary 包住第三方编辑器初始化过程。
+ */
 const MilkdownMarkdownEditor = forwardRef(function MilkdownMarkdownEditor({
   className,
   onAutoSave,
   readOnly = false,
 }, ref) {
   const activeTabId = useEditorStore((s) => s.activeTabId);
-  const fontSize = useConfigStore((s) => s.fontSize);
-  const lineHeight = useConfigStore((s) => s.lineHeight);
+  const editorFontSize = useConfigStore((s) => s.fontSize);
+  const editorLineHeight = useConfigStore((s) => s.lineHeight);
+  const previewFontSize = useConfigStore((s) => s.previewFontSize);
+  const previewLineHeight = useConfigStore((s) => s.previewLineHeight);
+  const previewZoomSync = useConfigStore((s) => s.previewZoomSync);
   const fallback = useMemo(() => {
     const tab = useEditorStore.getState().tabs.find((t) => t.id === activeTabId);
     return tab?.content || '';
   }, [activeTabId]);
   const bufferedContent = useEditorBufferContent(activeTabId, fallback, readOnly ? 240 : 10_000_000);
   const content = bufferedContent;
+  const fontSize = previewZoomSync ? editorFontSize : (previewFontSize || editorFontSize);
+  const lineHeight = previewZoomSync ? editorLineHeight : (previewLineHeight || editorLineHeight);
 
   return (
     <MilkdownErrorBoundary className={className}>

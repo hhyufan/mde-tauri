@@ -1,14 +1,22 @@
-// ESM-native reimplementation of monaco-editor-nls-adapter/proxy.
+/**
+ * Monaco NLS ???????
+ *
+ * ?? ESM ???? `monaco-editor-nls-adapter/proxy` ???????? Vite ? Monaco ???????????
+ */
+// 基于 ESM 重新实现的 `monaco-editor-nls-adapter/proxy`。
 //
-// The original package exports with CommonJS `module.exports = { ... }`. When Vite
-// pre-bundles it, esbuild emits `export default require_proxy()` — i.e. only a
-// default export. Monaco's transformed files, however, use
-// `import * as nls from 'monaco-editor-nls-adapter/proxy'` and then call
-// `nls.localize(path, key, defaultMessage)`. With only a default export,
-// `nls.localize` is undefined and every call throws / silently falls through.
+// 原包使用 CommonJS `module.exports = { ... }` 导出。Vite 预构建后，
+// esbuild 会把它整理成 `export default require_proxy()`，也就是只留下
+// 默认导出。
 //
-// This file is a pure-ESM drop-in with proper named exports, aliased in via
-// `vite.config.js` so monaco sees real functions at `nls.localize`, `nls.localize2`, etc.
+// 但 Monaco 转译后的代码采用的是
+// `import * as nls from 'monaco-editor-nls-adapter/proxy'`，
+// 随后直接调用 `nls.localize(path, key, defaultMessage)`。
+// 如果模块只有默认导出，那么 `nls.localize` 就会是 `undefined`，
+// 所有本地化调用要么直接抛错，要么悄悄退回默认行为。
+//
+// 这个文件提供了一个纯 ESM 的等价替身，并通过 `vite.config.js` 做 alias，
+// 让 Monaco 访问到真实的命名导出，如 `nls.localize`、`nls.localize2` 等。
 
 const globalObj =
   typeof globalThis !== 'undefined'
@@ -21,7 +29,13 @@ const globalObj =
 globalObj.__MONACO_NLS_ADAPTER_STATE__ =
   globalObj.__MONACO_NLS_ADAPTER_STATE__ || { data: null, name: '' };
 
+/**
+ * ???? Monaco NLS ?????
+ */
 const getState = () => globalObj.__MONACO_NLS_ADAPTER_STATE__;
+/**
+ * ??????????????????????
+ */
 const getDebugState = () => {
   globalObj.__MONACO_NLS_DEBUG__ = globalObj.__MONACO_NLS_DEBUG__ || {
     loggedFindWidget: false,
@@ -32,6 +46,9 @@ const getDebugState = () => {
 
 const FORMAT_REGEX = /\{(\d+)\}/g;
 
+/**
+ * ? Monaco ???????????????????
+ */
 function _format(message, args) {
   if (!args || args.length === 0) return message;
   return String(message).replace(FORMAT_REGEX, (match, index) => {
@@ -40,6 +57,9 @@ function _format(message, args) {
   });
 }
 
+/**
+ * ??????????????????????????
+ */
 export function localize(path, data, defaultMessage, ...args) {
   const key = data && typeof data === 'object' ? data.key : data;
   const state = getState();
@@ -75,55 +95,85 @@ export function localize(path, data, defaultMessage, ...args) {
   return args.length > 0 ? _format(final, args) : final;
 }
 
+/**
+ * ???? Monaco `localize2` ?????????
+ */
 export function localize2(path, data, defaultMessage, ...args) {
   const v = localize(path, data, defaultMessage, ...args);
   return { value: v, original: v };
 }
 
+/**
+ * ???????????????????
+ */
 export function setLocaleData(data, locale = 'custom') {
   const s = getState();
   s.data = data;
   s.name = locale;
 
   if (import.meta.env?.DEV) {
-    // One-shot boot log so we can verify locale is loaded before Monaco renders.
-    // Silently no-ops in production builds.
+    // 仅在开发环境打印一次启动日志，用于确认 Monaco 渲染前语言已正确装载。
+    // 生产构建中这里不会产生实际影响。
     // eslint-disable-next-line no-console
     console.log('[mde/nls] setLocaleData →', locale, data ? '(loaded)' : '(cleared)');
   }
 }
 
+/**
+ * ??????????????
+ */
 export function getLocaleData() {
   return getState().data;
 }
 
+/**
+ * ???????????
+ */
 export function getLocaleName() {
   return getState().name;
 }
 
+/**
+ * ?????????????????????
+ */
 export function getConfiguredDefaultLocale() {
   return undefined;
 }
 
-// Monaco also imports these from `vs/nls.js` in worker bootstrap code.
-// We don't use VS Code's indexed message arrays, so messages stay undefined
-// and the runtime falls back to default English strings where applicable.
+// Monaco 的 worker 启动代码也会从 `vs/nls.js` 读取这些导出。
+// 这里没有采用 VS Code 的“按索引存储消息数组”方案，因此消息保持 undefined，
+// 运行时会在适用处自然回退到默认英文文案。
+/**
+ * ??? Monaco worker ????????
+ */
 export function getNLSLanguage() {
   return getState().name || undefined;
 }
 
+/**
+ * ??? worker ??????????????????????
+ */
 export function getNLSMessages() {
   return undefined;
 }
 
+/**
+ * ?? Monaco ??????????
+ */
 export function loadMessageBundle() {
   return localize;
 }
 
+/**
+ * ???????????????
+ */
 export function config() {
   return loadMessageBundle;
 }
 
+/**
+ * ??????????????????
+ */
 export function create(key) {
   return {
     localize: (idx, def, ...args) => localize(key, idx, def, ...args),

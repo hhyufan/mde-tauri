@@ -1,11 +1,13 @@
-// Global antd v5 visual overrides so antd components blend into the existing
-// BEM-based design system without altering visual appearance.
+/**
+ * @file antd-overrides.scss
+ * @description 统一定义 Ant Design v5 组件在应用中的视觉覆盖，使其继承当前主题变量、
+ * BEM 结构约束与移动端弹层适配，同时尽量保持既有界面观感不变。
+ */
 
-// ── Layout pass-through ─────────────────────────────────────────────────────
-// <App> from antd wraps children in a .ant-app div. Its default styles don't
-// set a height, which breaks the #root -> .ant-app -> .app height chain and
-// causes the main layout to either collapse or leave black space below.
-// Keep it transparent and full-size so the existing layout works unchanged.
+// ── 布局透传 ────────────────────────────────────────────────────────────────
+// antd 的 <App> 会用 .ant-app 包裹子节点。其默认样式没有设置高度，
+// 会破坏 #root -> .ant-app -> .app 的高度链，导致主布局塌陷
+// 或在底部留下黑边。这里保持其透明且撑满尺寸，以维持现有布局不变。
 .ant-app {
   width: 100%;
   height: 100%;
@@ -13,7 +15,7 @@
   background: transparent;
 }
 
-// ── Button ──────────────────────────────────────────────────────────────────
+// ── 按钮 ────────────────────────────────────────────────────────────────────
 .ant-btn {
   box-shadow: none !important;
   border-radius: var(--radius-sm);
@@ -61,7 +63,7 @@
   }
 }
 
-// ── Input / Select / InputNumber ────────────────────────────────────────────
+// ── 输入框 / 选择器 / 数字输入框 ───────────────────────────────────────────
 .ant-input,
 .ant-input-affix-wrapper,
 .ant-input-number,
@@ -120,7 +122,7 @@
   }
 }
 
-// ── Switch ──────────────────────────────────────────────────────────────────
+// ── 开关 ────────────────────────────────────────────────────────────────────
 .ant-switch {
   background: var(--text-dim);
 
@@ -129,7 +131,7 @@
   }
 }
 
-// ── Modal ───────────────────────────────────────────────────────────────────
+// ── 弹窗 ────────────────────────────────────────────────────────────────────
 .ant-modal-root {
   .ant-modal-mask {
     background: rgba(0, 0, 0, 0.35);
@@ -175,9 +177,9 @@
   }
 }
 
-// Let custom BEM overlays keep their own look when hosted inside antd Modal
-// (LoginModal, SettingsModal, etc. wrap their content in the original BEM
-// roots and do not need antd's default padding / header).
+// 让自定义 BEM 弹层在放入 antd Modal 时保持原有外观
+// （如 LoginModal、SettingsModal 等，它们的内容本就包在原始 BEM 根节点中，
+// 不需要 antd 默认的内边距和头部样式）。
 .mde-naked-modal {
   .ant-modal-content {
     background: transparent;
@@ -189,7 +191,7 @@
   }
 }
 
-// Per-modal padding/spacing helpers
+// 针对不同弹窗的内边距与间距辅助样式
 .mde-login-modal-root .ant-modal-content {
   padding: 28px 32px 24px;
 }
@@ -217,9 +219,8 @@
   overflow: hidden;
 }
 
-// Full-screen search overlay for mobile portrait. Fills the screen, respects
-// safe-area insets, and reserves space for the IME so the result list stays
-// scrollable while the keyboard is open.
+// 竖屏移动端的全屏搜索层。铺满屏幕、兼容安全区，
+// 并为输入法键盘预留空间，确保键盘弹出时结果列表仍可滚动。
 .mde-search-modal-root--fullscreen {
   .ant-modal {
     margin: 0;
@@ -252,8 +253,8 @@
   .ant-modal-body {
     padding: 0;
   }
-  // Neutralise the legacy .settings-modal fixed width/height so the inner
-  // layout fills the antd Modal dialog exactly.
+  // 取消旧版 .settings-modal 的固定宽高限制，
+  // 让内部布局能够完整填满 antd Modal 对话框。
   .settings-modal {
     width: 100%;
     max-width: none;
@@ -263,8 +264,8 @@
     border-radius: 0;
     box-shadow: none;
   }
-  // antd Menu used as the settings nav — flatten it visually so items match
-  // the existing .settings-modal__nav-item look.
+  // 设置导航使用了 antd Menu，这里将其视觉扁平化，
+  // 让条目样式与现有 .settings-modal__nav-item 保持一致。
   .settings-modal__nav.ant-menu {
     padding: 8px;
     border-inline-end: 1px solid var(--border) !important;
@@ -298,9 +299,8 @@
   }
 }
 
-// Full-screen portrait mode for the settings dialog on phones. The Modal
-// fills the screen, respects safe-area insets, and the section nav flips
-// from a left sidebar to a horizontally scrollable tab row.
+// 手机竖屏下的设置对话框全屏模式。Modal 会铺满屏幕并兼容安全区，
+// 同时将左侧栏式的分区导航切换为可横向滚动的标签行。
 .mde-settings-modal-root--fullscreen {
   .ant-modal {
     margin: 0;
@@ -323,7 +323,7 @@
     display: flex;
     flex-direction: column;
   }
-  // Push the antd close button inside the safe-area on notched devices.
+  // 在有刘海/挖孔的设备上，将 antd 关闭按钮推入安全区内。
   .ant-modal-close {
     top: calc(env(safe-area-inset-top) + 8px);
     inset-inline-end: 8px;
@@ -365,8 +365,8 @@
         font-weight: 500;
       }
     }
-    // Hide antd's horizontal-mode "overflow" submenu trigger — we already
-    // scroll horizontally ourselves.
+    // 隐藏 antd 横向模式下的“更多”溢出子菜单触发器，
+    // 因为这里已经自行实现了横向滚动。
     .ant-menu-overflow-item-rest {
       display: none !important;
     }
@@ -378,8 +378,8 @@
   overflow: hidden;
 }
 
-// Sidebar version Tag — small grey pill that predated antd Tag. Override
-// antd Tag defaults so font-size / color match the existing SCSS.
+// 侧边栏版本 Tag：这是早于 antd Tag 就存在的小号灰色胶囊标签。
+// 这里覆盖 antd Tag 默认值，让字号和颜色与现有 SCSS 保持一致。
 .ant-tag.sidebar__version {
   margin-inline-end: 0;
   font-family: var(--font-editor);
@@ -392,9 +392,9 @@
   border-radius: 4px;
 }
 
-// When antd Button is used as a small icon slot inside our legacy BEM chrome
-// (sidebar footer buttons, stb toolbar buttons), force square sizing and
-// neutralise antd's default min-width/padding.
+// 当 antd Button 被用作旧版 BEM 外壳中的小图标按钮时
+// （如侧边栏底部按钮、stb 工具栏按钮），强制其为正方形尺寸，
+// 并清除 antd 默认的最小宽度和内边距。
 .ant-btn.sidebar__footer-btn {
   width: 26px;
   height: 26px;
@@ -414,7 +414,7 @@
   }
 }
 
-// ── Dropdown / Menu ─────────────────────────────────────────────────────────
+// ── 下拉菜单 / 菜单 ────────────────────────────────────────────────────────
 .ant-dropdown {
   .ant-dropdown-menu {
     background: var(--surface);
@@ -452,7 +452,7 @@
   }
 }
 
-// ── Tooltip ─────────────────────────────────────────────────────────────────
+// ── 提示框 ─────────────────────────────────────────────────────────────────
 .ant-tooltip .ant-tooltip-inner {
   font-size: 11px;
   padding: 4px 8px;
@@ -487,7 +487,7 @@ html[data-theme='dark'] {
   }
 }
 
-// ── Tabs ────────────────────────────────────────────────────────────────────
+// ── 标签页 ─────────────────────────────────────────────────────────────────
 .ant-tabs {
   color: var(--text);
   font-family: var(--font-app);
@@ -514,7 +514,7 @@ html[data-theme='dark'] {
   }
 }
 
-// ── Tree ────────────────────────────────────────────────────────────────────
+// ── 树组件 ─────────────────────────────────────────────────────────────────
 .ant-tree {
   background: transparent;
   color: var(--text);
@@ -539,7 +539,7 @@ html[data-theme='dark'] {
   }
 }
 
-// ── Form ────────────────────────────────────────────────────────────────────
+// ── 表单 ────────────────────────────────────────────────────────────────────
 .ant-form-item {
   margin-bottom: 14px;
 
@@ -550,14 +550,14 @@ html[data-theme='dark'] {
   }
 }
 
-// Keep antd's ad-hoc message/notification popups (used inside custom
-// components as small helpers) on the same font family as the app.
+// 保持 antd 临时消息/通知弹层（在自定义组件中用作轻量提示）
+// 与应用主体使用同一套字体族。
 .ant-notification,
 .ant-message {
   font-family: var(--font-app);
 }
 
-// ── Empty / Spin / Alert tone alignment ─────────────────────────────────────
+// ── Empty / Spin / Alert 风格对齐 ─────────────────────────────────────────
 .ant-empty-description {
   color: var(--text-sec);
 }
@@ -570,14 +570,14 @@ html[data-theme='dark'] {
   border-radius: var(--radius-sm);
 }
 
-// ── Avatar ──────────────────────────────────────────────────────────────────
+// ── 头像 ────────────────────────────────────────────────────────────────────
 .ant-avatar {
   background: var(--accent);
   color: #fff;
   font-weight: 600;
 }
 
-// ── Segmented ───────────────────────────────────────────────────────────────
+// ── 分段选择器 ─────────────────────────────────────────────────────────────
 .ant-segmented {
   background: var(--hover);
   padding: 3px;
@@ -591,7 +591,7 @@ html[data-theme='dark'] {
   }
 }
 
-// ── Card ────────────────────────────────────────────────────────────────────
+// ── 卡片 ────────────────────────────────────────────────────────────────────
 .ant-card {
   background: var(--surface);
   border-color: var(--border-light);
@@ -599,7 +599,7 @@ html[data-theme='dark'] {
   color: var(--text);
 }
 
-// ── Table (used inside StatsPanel) ──────────────────────────────────────────
+// ── 表格（用于 StatsPanel 内部） ───────────────────────────────────────────
 .ant-table-wrapper .ant-table {
   background: transparent;
   color: var(--text);

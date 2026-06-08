@@ -1,3 +1,8 @@
+/**
+ * @file App.scss
+ * @description 定义应用根容器、主内容区、拖拽覆盖层与移动端安全区相关的整体布局样式。
+ */
+
 .app {
   display: flex;
   width: 100%;
@@ -93,19 +98,19 @@
 
 @media (max-width: 768px) {
   .app {
-    // 100dvh tracks the dynamic viewport (excludes browser chrome and
-    // soft-keyboard space on Android Chrome / WebView). Combined with the
-    // --mde-kb-inset fallback below, this keeps the layout reachable even
-    // on browsers that don't update dvh while the IME is shown.
+    // 100dvh 会跟踪动态视口高度（不包含浏览器顶部/底部界面以及
+    // Android Chrome / WebView 中软键盘占用的空间）。配合下面的
+    // --mde-kb-inset 回退值，即使在 IME 显示时不更新 dvh 的浏览器里，
+    // 也能保持布局可达。
     height: 100dvh;
     overflow: hidden;
   }
 
   .app__main {
     width: 100%;
-    // Reserve room for the system gesture/nav bar; the keyboard inset is
-    // applied lower in the layout (footer / floating UI) so the editor
-    // itself doesn't get squeezed when the IME opens.
+    // 预留系统手势区/导航栏空间；键盘插入高度会在更下层的布局
+    // （footer / 浮动 UI）中处理，这样 IME 打开时编辑器本体
+    // 不会被额外挤压。
     padding-bottom: env(safe-area-inset-bottom);
   }
 
@@ -124,9 +129,8 @@
   }
 }
 
-// When the on-screen keyboard is open, take the system nav-bar / safe-area
-// inset out of the bottom padding (the IME already pushes its own chrome up,
-// so we shouldn't double-count it).
+// 当屏幕键盘打开时，从底部内边距中移除系统导航栏 / 安全区插入值
+// （IME 已经会把自己的界面顶上来，因此这里不应重复计算）。
 html.mde--kb-open .app__main {
   padding-bottom: 0;
 }

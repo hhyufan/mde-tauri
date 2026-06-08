@@ -1,3 +1,4 @@
+/** 同步模块 DTO 聚合导出。 */
 export {
   BindPathDto,
   DeleteFileDto,

@@ -1,3 +1,9 @@
+/**
+ * 顶部标签栏模块。
+ *
+ * 组织编辑器多标签切换、标签重命名、书签管理，以及 Markdown 相关工具按钮，
+ * 为主编辑区提供高频文件操作入口。
+ */
 import { useRef, useCallback, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Tooltip } from 'antd';
@@ -15,6 +21,14 @@ import { cn } from '@utils/classNames';
 import FileTypeIcon from '@components/ui/FileTypeIcon';
 import './tabbar.scss';
 
+/**
+ * 顶部标签栏。
+ *
+ * 承载文件标签切换、重命名、关闭、新建、书签、工具栏开关与 Markdown
+ * 分栏视图切换等高频编辑器操作。
+ *
+ * @returns {JSX.Element} 标签栏界面。
+ */
 function TabBar() {
   const { t } = useTranslation();
   const tabs = useEditorStore((s) => s.tabRenderList);
@@ -52,6 +66,12 @@ function TabBar() {
     [activeTab],
   );
 
+  /**
+   * 根据当前字体设置估算标签重命名输入框所需宽度。
+   *
+   * @param {string} text 待测量的文本内容。
+   * @returns {number} 文本渲染宽度。
+   */
   const getTextWidth = useCallback((text) => {
     const canvas = document.createElement('canvas');
     const ctx = canvas.getContext('2d');
@@ -59,6 +79,12 @@ function TabBar() {
     return ctx.measureText(text).width;
   }, []);
 
+  /**
+   * 进入标签重命名模式，并在下一帧自动聚焦输入框。
+   *
+   * @param {object} tab 待重命名的标签对象。
+   * @param {MouseEvent} e 双击事件对象。
+   */
   const startRename = useCallback((tab, e) => {
     e.stopPropagation();
     setRenamingTabId(tab.id);
@@ -69,18 +95,24 @@ function TabBar() {
     });
   }, []);
 
+  /**
+   * 提交标签重命名；对已落盘文件会同步更新磁盘路径与同步映射。
+   *
+   * @param {object} tab 当前重命名的标签对象。
+   * @returns {Promise<void>} 重命名流程结束后刷新相关状态。
+   */
   const commitRename = useCallback(async (tab) => {
     const trimmed = renameValue.trim();
     setRenamingTabId(null);
     if (!trimmed || trimmed === tab.name) return;
 
     if (!tab.path) {
-      // untitled tab — 只改显示名，保存时再由系统对话框决定真正路径
+      // 未落盘标签仅修改显示名，真正保存路径交由后续系统对话框决定。
       renameTab(tab.id, trimmed);
       return;
     }
 
-    // 真实文件 — 磁盘重命名 + 更新 store
+    // 已落盘文件需要同时完成磁盘重命名、编辑器状态与同步映射更新。
     const sep = tab.path.includes('\\') ? '\\' : '/';
     const dir = tab.path.substring(0, tab.path.lastIndexOf(sep) + 1);
     const newPath = dir + trimmed;
@@ -99,6 +131,9 @@ function TabBar() {
     }
   }, [renameValue, renameTab, updateTabPath, notify, t, currentDir, loadDirectory]);
 
+  /**
+   * 退出标签重命名模式并丢弃当前输入。
+   */
   const cancelRename = useCallback(() => {
     setRenamingTabId(null);
   }, []);
@@ -109,14 +144,25 @@ function TabBar() {
   );
   const isBookmarked = activeTab?.path && bookmarkedPaths.includes(activeTab.path);
 
+  /**
+   * 向左平滑滚动标签列表，便于访问被遮挡的标签。
+   */
   const scrollLeft = useCallback(() => {
     scrollRef.current?.scrollBy({ left: -120, behavior: 'smooth' });
   }, []);
 
+  /**
+   * 向右平滑滚动标签列表，便于访问被遮挡的标签。
+   */
   const scrollRight = useCallback(() => {
     scrollRef.current?.scrollBy({ left: 120, behavior: 'smooth' });
   }, []);
 
+  /**
+   * 切换当前活动文件的书签状态，并同步 recent 视图与云端映射。
+   *
+   * @returns {Promise<void>} 书签相关副作用处理完成。
+   */
   const handleBookmark = useCallback(async () => {
     if (!activeTab?.path) return;
     toggleBookmark(activeTab.path);
@@ -129,9 +175,9 @@ function TabBar() {
         lineEnding: syncTab.lineEnding,
         source: 'bookmark-add',
       });
-      // Ensure the file is in the recent list so it appears in the sidebar
+      // 顺手补入最近文件列表，保证侧边栏 recent 视图能立刻看见。
       addRecentFile({ path: syncTab.path, name: syncTab.name, ext: syncTab.ext });
-      // Open sidebar and navigate to Recent tab to show the bookmarked file
+      // 自动切到侧边栏 recent 视图，直观反馈当前书签已加入列表。
       if (!sidebarVisible) toggleSidebar();
       setSidebarView('recent');
     } else {
@@ -240,7 +286,7 @@ function TabBar() {
             </svg>
           </button>
         </Tooltip>
-        {/* Toolbar toggle — only for markdown files */}
+        {/* Markdown 文件专属工具栏开关。 */}
         {isMarkdown && (
           <Tooltip title={t('tabbar.toggleToolbar')} placement="bottom" mouseEnterDelay={0.3}>
             <button
@@ -256,7 +302,7 @@ function TabBar() {
             </button>
           </Tooltip>
         )}
-        {/* Bookmark */}
+        {/* 当前文件书签开关。 */}
         <Tooltip title={t('tabbar.bookmark')} placement="bottom" mouseEnterDelay={0.3}>
           <button
             className={cn('tabbar__action-btn', isBookmarked && 'tabbar__action-btn--active')}
@@ -269,7 +315,7 @@ function TabBar() {
             </svg>
           </button>
         </Tooltip>
-        {/* Split view — only for markdown files */}
+        {/* Markdown 文件专属分栏视图开关。 */}
         {isMarkdown && (
           <Tooltip title={t('tabbar.splitView')} placement="bottom" mouseEnterDelay={0.3}>
             <button

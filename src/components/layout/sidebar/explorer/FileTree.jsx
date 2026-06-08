@@ -1,3 +1,9 @@
+/**
+ * @file 资源管理器文件树模块。
+ *
+ * 该文件负责展示当前目录的文件树、面包屑导航与行内新建文件流程，并承接
+ * Explorer 视图中的目录切换、删除与快速打开等交互。
+ */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Tooltip } from 'antd';
@@ -12,6 +18,13 @@ import FileTypeIcon from '@components/ui/FileTypeIcon';
 import { isSafUri, safDisplayName } from '@utils/tauriApi';
 import './file-tree.scss';
 
+/**
+ * 根据面包屑索引重建可跳转的目录路径。
+ *
+ * @param {string} currentDir 当前目录绝对路径。
+ * @param {number} index 目标面包屑片段索引。
+ * @returns {string} 对应片段代表的目录路径。
+ */
 function buildBreadcrumbPath(currentDir, index) {
   if (!currentDir) return '';
   const normalized = currentDir.replace(/[\\/]+$/, '');
@@ -26,6 +39,12 @@ function buildBreadcrumbPath(currentDir, index) {
   return `/${parts.slice(0, index + 1).join('/')}`;
 }
 
+/**
+ * 计算当前目录的父级目录路径。
+ *
+ * @param {string} currentDir 当前目录绝对路径。
+ * @returns {string} 父级目录路径；若已到根目录则返回空字符串。
+ */
 function getParentDir(currentDir) {
   if (!currentDir) return '';
   const normalized = currentDir.replace(/[\\/]+$/, '');
@@ -41,6 +60,12 @@ function getParentDir(currentDir) {
   return next || '/';
 }
 
+/**
+ * 资源管理器文件树。
+ *
+ * 负责目录导航、面包屑滚动、文件排序、新建文件入口，以及目录项点击与删除等
+ * 资源管理器层交互。
+ */
 function FileTree() {
   const { t } = useTranslation();
   const files = useFileStore((s) => s.files);
@@ -66,7 +91,12 @@ function FileTree() {
   const bcScrollRef = useRef(null);
   const bcThumbRef = useRef(null);
 
-  // ── Breadcrumb scroll helpers ─────────────────────────────────────────────
+  // 面包屑横向滚动与自定义滚动条联动。
+  /**
+   * 按当前滚动范围更新面包屑滚动条滑块的尺寸与位置。
+   *
+   * @returns {void}
+   */
   const updateBcScrollbar = useCallback(() => {
     const el = bcScrollRef.current;
     const thumb = bcThumbRef.current;
@@ -87,10 +117,8 @@ function FileTree() {
     const el = bcScrollRef.current;
     if (!el) return;
     el.addEventListener('scroll', updateBcScrollbar, { passive: true });
-    // React's synthetic onWheel is always registered as passive, so
-    // preventDefault() triggers a warning. Attach a native non-passive
-    // wheel listener here so vertical wheel scrolls the breadcrumb
-    // horizontally without propagating to the page.
+    // React 合成事件里的 `onWheel` 默认是被动监听，调用 `preventDefault()`
+    // 会报警告；这里改挂原生非被动监听，把纵向滚轮转成面包屑横向滚动。
     const onWheel = (e) => {
       if (Math.abs(e.deltaX) > Math.abs(e.deltaY)) return;
       e.preventDefault();
@@ -108,7 +136,7 @@ function FileTree() {
     };
   }, [updateBcScrollbar, currentDir]);
 
-  // Scroll to end when path changes so the leaf folder is visible
+  // 路径变化后自动滚到尾部，优先露出当前所在的最深层目录。
   useEffect(() => {
     const el = bcScrollRef.current;
     if (!el) return;
@@ -118,11 +146,16 @@ function FileTree() {
     });
   }, [currentDir, updateBcScrollbar]);
 
-  // ── Navigation ───────────────────────────────────────────────────────────
+  // 目录历史导航状态与能力判断。
   const currentDirIsSaf = isSafUri(currentDir);
   const canGoBack = historyIndex > 0;
   const canGoForward = historyIndex < dirHistory.length - 1;
 
+  /**
+   * 在目录历史中后退一级，并仅刷新目标目录的文件列表。
+   *
+   * @returns {Promise<void>}
+   */
   const handleGoBack = useCallback(async () => {
     if (!canGoBack) return;
     const targetDir = dirHistory[historyIndex - 1];
@@ -130,6 +163,11 @@ function FileTree() {
     await loadFilesOnly(targetDir);
   }, [canGoBack, dirHistory, historyIndex, loadFilesOnly]);
 
+  /**
+   * 在目录历史中前进一步，并仅刷新目标目录的文件列表。
+   *
+   * @returns {Promise<void>}
+   */
   const handleGoForward = useCallback(async () => {
     if (!canGoForward) return;
     const targetDir = dirHistory[historyIndex + 1];
@@ -137,6 +175,11 @@ function FileTree() {
     await loadFilesOnly(targetDir);
   }, [canGoForward, dirHistory, historyIndex, loadFilesOnly]);
 
+  /**
+   * 打开当前目录的父级目录。
+   *
+   * @returns {void}
+   */
   const handleGoUp = useCallback(() => {
     if (!currentDir) return;
     if (currentDirIsSaf) return;
@@ -144,22 +187,42 @@ function FileTree() {
     if (parentDir) loadDirectory(parentDir);
   }, [currentDir, currentDirIsSaf, loadDirectory]);
 
+  /**
+   * 关闭当前已打开的目录，并清空资源管理器状态。
+   *
+   * @returns {void}
+   */
   const handleCloseFolder = useCallback(() => {
     useFileStore.getState().clearDirectory();
   }, []);
 
-  // ── File creation ─────────────────────────────────────────────────────────
+  // 行内新建文件流程。
+  /**
+   * 启动行内新建文件流程并展示输入框。
+   *
+   * @returns {void}
+   */
   const startCreatingFile = useCallback(() => {
     if (!currentDir) return;
     setCreatingFileName('');
     setIsCreatingFile(true);
   }, [currentDir]);
 
+  /**
+   * 取消行内新建文件流程并恢复初始状态。
+   *
+   * @returns {void}
+   */
   const cancelCreatingFile = useCallback(() => {
     setCreatingFileName('');
     setIsCreatingFile(false);
   }, []);
 
+  /**
+   * 提交当前输入的文件名，并在创建成功后关闭输入态。
+   *
+   * @returns {Promise<void>}
+   */
   const commitCreatingFile = useCallback(async () => {
     if (!creatingFileName.trim()) {
       cancelCreatingFile();
@@ -183,13 +246,13 @@ function FileTree() {
     return () => window.removeEventListener('explorer:newFileRequest', handler);
   }, [startCreatingFile]);
 
-  // Cancel creation & collapse breadcrumb when directory changes
+  // 切换目录时重置新建文件状态，并恢复面包屑折叠态。
   useEffect(() => {
     cancelCreatingFile();
     setBreadcrumbExpanded(false);
   }, [currentDir]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // ── Sorting ───────────────────────────────────────────────────────────────
+  // 文件与目录排序规则：目录优先，其次按用户选择字段排序。
   const sortedFiles = useMemo(() => {
     const direction = sortOrder === 'desc' ? -1 : 1;
     return [...files].sort((a, b) => {
@@ -204,13 +267,13 @@ function FileTree() {
     });
   }, [files, sortBy, sortOrder]);
 
-  // ── Breadcrumb ────────────────────────────────────────────────────────────
+  // 面包屑展示数据。
   const breadcrumbParts = currentDir
     ? (currentDirIsSaf ? [safDisplayName(currentDir)] : currentDir.split(/[\\/]/).filter(Boolean))
     : [];
   const shouldCollapse = breadcrumbParts.length > 3 && !breadcrumbExpanded;
 
-  // ── Empty state ───────────────────────────────────────────────────────────
+  // 未打开目录时显示空状态占位。
   if (!currentDir) {
     return (
       <div className="file-tree__empty">
@@ -237,7 +300,7 @@ function FileTree() {
 
   return (
     <div className="file-tree">
-      {/* Navigation bar */}
+      {/* 顶部导航栏：前进后退、刷新、系统资源管理器与关闭目录等入口。 */}
       <div className="file-tree__nav">
         {navBtn(
           t('sidebar.explorer.back'),
@@ -297,7 +360,7 @@ function FileTree() {
         )}
       </div>
 
-      {/* Breadcrumb */}
+      {/* 目录面包屑：支持折叠展示、横向滚动与快速跳转。 */}
       <div className="file-tree__breadcrumb">
         <svg
           className="file-tree__breadcrumb-icon"
@@ -316,7 +379,7 @@ function FileTree() {
             ref={bcScrollRef}
           >
             {shouldCollapse ? (
-              /* Collapsed: first > ... > last */
+              /* 折叠态只保留首层、省略号与当前叶子目录。 */
               <>
                 <span className="file-tree__breadcrumb-item">
                   <span
@@ -352,7 +415,7 @@ function FileTree() {
                 </span>
               </>
             ) : (
-              /* Expanded: all parts, scrollable */
+              /* 展开态显示全部目录段，并允许横向滚动。 */
               breadcrumbParts.map((part, i) => (
                 <span key={i} className="file-tree__breadcrumb-item">
                   {i > 0 && (
@@ -371,7 +434,7 @@ function FileTree() {
             )}
           </div>
 
-          {/* Custom horizontal scrollbar — only useful when expanded */}
+          {/* 自定义横向滚动条，路径较长或展开时更易操作。 */}
           <div className="file-tree__breadcrumb-scrollbar">
             <div
               className="file-tree__breadcrumb-scrollbar-thumb"
@@ -381,7 +444,7 @@ function FileTree() {
           </div>
         </div>
 
-        {/* Collapse button — shown when expanded and path was long */}
+        {/* 长路径展开后提供单独的折叠按钮。 */}
         {breadcrumbParts.length > 3 && breadcrumbExpanded && (
           <Tooltip title={t('sidebar.explorer.collapseBreadcrumb')} placement="bottom" mouseEnterDelay={0.3}>
             <button
@@ -397,7 +460,7 @@ function FileTree() {
         )}
       </div>
 
-      {/* File list */}
+      {/* 文件列表主体。 */}
       <div className="file-tree__list">
         {sortedFiles.map((file) => {
           const ext = file.name.split('.').pop() || '';
@@ -438,7 +501,7 @@ function FileTree() {
           );
         })}
 
-        {/* Inline new-file row — always at the bottom */}
+        {/* 行内新建文件输入行，固定追加在列表底部。 */}
         {isCreatingFile && (
           <div className="file-tree__item file-tree__item--creating">
             <span className="file-tree__item-icon">
@@ -463,6 +526,11 @@ function FileTree() {
     </div>
   );
 
+  /**
+   * 处理文件树项点击：目录进入、文件打开。
+   *
+   * @param {object} file 当前点击的文件树节点。
+   */
   function handleFileClick(file) {
     if (file.is_dir) loadDirectory(file.path);
     else openFileFromPath(file.path, file.name);

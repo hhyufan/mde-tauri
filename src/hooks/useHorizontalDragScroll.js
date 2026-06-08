@@ -1,12 +1,17 @@
+/**
+ * ?????? Hook ???
+ *
+ * ????????????????????????????????????
+ */
 import { useCallback, useRef } from 'react';
 
 /**
- * Returns an onMouseDown handler to put on the custom scrollbar thumb.
- * Dragging the thumb moves the scroll container proportionally.
+ * 返回一个用于自定义横向滚动条滑块的 `onMouseDown` 处理器。
+ * 用户拖动滑块时，会按内容区与可视区的比例同步移动真实滚动位置。
  *
- * @param {React.RefObject} scrollRef   - ref on the scrollable content element
- * @param {Function}        updateScrollbar - callback that repositions the thumb after scrolling
- * @returns {{ onThumbMouseDown }} - spread onto the thumb element
+ * @param {React.RefObject} scrollRef 可滚动内容节点的 ref
+ * @param {Function} updateScrollbar 滚动后用于刷新滑块位置的回调
+ * @returns {{ onThumbMouseDown }} 可直接展开到滑块元素上的事件集合
  */
 export function useHorizontalDragScroll(scrollRef, updateScrollbar) {
   const startX = useRef(0);
@@ -16,7 +21,7 @@ export function useHorizontalDragScroll(scrollRef, updateScrollbar) {
     const el = scrollRef.current;
     if (!el) return;
     const dx = e.clientX - startX.current;
-    // Convert thumb px movement → content px movement
+    // 将滑块移动的像素距离换算成内容区应滚动的像素距离。
     const scrollRatio = el.scrollWidth / el.clientWidth;
     el.scrollLeft = startScrollLeft.current + dx * scrollRatio;
     updateScrollbar?.();

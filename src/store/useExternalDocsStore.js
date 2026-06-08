@@ -1,7 +1,15 @@
+/**
+ * ??????????
+ *
+ * ???????????????????????? `cloud://` ????????????????
+ */
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { getCurrentUserScopeId, isOwnedByUser } from './userScope';
 
+/**
+ * ?????????????????
+ */
 function scopedDocKey(fileId) {
   return `${getCurrentUserScopeId()}::${fileId}`;
 }
@@ -13,30 +21,28 @@ export function getScopedExternalDocsMap(docs, userId) {
 }
 
 /**
- * In-memory cache of cloud documents that have been pulled to this device
- * but never bound to a local file path here (i.e. the server's
- * `devicePaths[myDeviceId]` is missing for this fileId).
+ * 缓存那些已经同步到当前设备、但尚未在本机绑定实际文件路径的云端文档。
+ * 也就是服务端记录里，这个 `fileId` 还没有对应的
+ * `devicePaths[myDeviceId]`。
  *
- * Such "external" documents appear in the sidebar via a virtual path of
- * the form `cloud://<fileId>`. Opening one creates an editor tab whose
- * content comes from this store, and on first save we trigger a `Save As`
- * dialog, save to disk, then push the chosen path back to the server so
- * the document becomes "bound" on this device for all subsequent syncs.
+ * 这类“外部文档”会以 `cloud://<fileId>` 这种虚拟路径出现在侧边栏。
+ * 打开后，编辑器标签页读取的正文内容来自本 store；当用户第一次保存时，
+ * 会触发一次“另存为”，把内容落盘，并将新选择的本地路径回写到服务端。
+ * 这样后续同步时，这份文档就会被视为当前设备已绑定文件。
  *
- * The store is persisted so that an unbound external bookmark survives an
- * app restart — otherwise the user would lose the ability to claim it
- * without running another sync round.
+ * 之所以要持久化这个 store，是为了让尚未绑定的外部书签在应用重启后仍然存在；
+ * 否则用户必须再跑一轮同步，才能重新“认领”这份文档。
  */
 const useExternalDocsStore = create(
   persist(
     (set, get) => ({
-      /** `{ [fileId]: { name, ext, encoding, lineEnding, originalPath, content, checksum } }` */
+      /** 外部文档表：`{ [fileId]: { name, ext, encoding, lineEnding, originalPath, content, checksum } }` */
       docs: {},
 
       /**
-       * Merge `patch` into the entry for `fileId` (creating it if absent).
-       * Used both to seed display metadata from the manifest (`name`,
-       * `ext`) and to fill in the body once a per-file pull succeeds.
+       * 将 `patch` 合并到指定 `fileId` 的条目中；若条目不存在则先创建。
+       * 既用于从清单中写入展示元数据（如 `name`、`ext`），
+       * 也用于在单文件拉取成功后补齐正文与其他同步字段。
        */
       put: (fileId, patch) => {
         if (!fileId) return;
@@ -54,8 +60,10 @@ const useExternalDocsStore = create(
         }));
       },
 
+      /** ???? `fileId` ???????? */
       get: (fileId) => get().docs[scopedDocKey(fileId)] || null,
 
+      /** ?????????????? */
       remove: (fileId) => {
         if (!fileId) return;
         set((state) => {
@@ -65,7 +73,7 @@ const useExternalDocsStore = create(
         });
       },
 
-      /** Replace the current user's full set (used when reconciling against the server). */
+      /** 用服务端最新结果整体替换当前用户的外部文档集合，主要用于同步对账。 */
       replaceAll: (docs) =>
         set((state) => {
           const ownerUserId = getCurrentUserScopeId();
@@ -81,12 +89,14 @@ const useExternalDocsStore = create(
           return { docs: { ...preserved, ...nextDocs } };
         }),
 
+      /** ???????????????? `fileId` ??? */
       ids: () =>
         Object.values(get().docs)
           .filter((doc) => isOwnedByUser(doc?.ownerUserId, getCurrentUserScopeId()))
           .map((doc) => doc.fileId)
           .filter(Boolean),
 
+      /** ??????????????????????? */
       resetCurrentUser: () =>
         set((state) => {
           const ownerUserId = getCurrentUserScopeId();

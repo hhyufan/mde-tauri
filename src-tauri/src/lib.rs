@@ -12,6 +12,8 @@ use std::sync::{Arc, Mutex};
 use std::time::{SystemTime, UNIX_EPOCH};
 use tauri::{async_runtime, AppHandle, Emitter, Manager};
 
+/// 返回给前端的轻量级文件系统条目元数据，
+/// 用于资源管理器界面展示文件和目录。
 #[derive(Serialize, Deserialize, Debug, Clone)]
 struct FileInfo {
     name: String,
@@ -22,6 +24,8 @@ struct FileInfo {
     modified: u64,
 }
 
+/// 文件读写与变更命令共用的标准化返回结构，
+/// 便于 WebView 统一处理成功状态、元数据和可选内容。
 #[derive(Serialize, Deserialize, Debug, Clone)]
 struct FileOperationResult {
     success: bool,
@@ -38,6 +42,8 @@ struct FileOperationResult {
     line_ending: Option<String>,
 }
 
+/// 返回给前端的二进制内容与预览元数据，
+/// 适用于图片等非文本资源。
 #[derive(Serialize, Deserialize, Debug, Clone)]
 struct BinaryFileResult {
     content_base64: String,
@@ -45,6 +51,7 @@ struct BinaryFileResult {
     size: u64,
 }
 
+/// 磁盘上的被监听文件发生变化时，发送给前端的事件载荷。
 #[derive(Serialize, Deserialize, Debug, Clone)]
 struct FileChangeEvent {
     file_path: String,
@@ -52,11 +59,17 @@ struct FileChangeEvent {
     timestamp: u64,
 }
 
+/// 进程内共享的文件监听注册表，
+/// 用于持有 `notify` watcher 句柄并记录每个文件最近一次观察到的修改时间。
 struct FileWatcherState {
     watchers: HashMap<String, Box<dyn Watcher + Send>>,
     watched_files: HashMap<String, u64>,
 }
 
+/// 各个 Tauri 命令之间共享的全局监听状态。
+///
+/// 只要某个文件仍在被监听，对应的 `notify` watcher 句柄就必须持续被持有。
+/// 这里的互斥锁同时也保护用于去重的时间戳，避免同一次保存触发重复的修改事件。
 static FILE_WATCHER_STATE: Lazy<Arc<Mutex<FileWatcherState>>> = Lazy::new(|| {
     Arc::new(Mutex::new(FileWatcherState {
         watchers: HashMap::new(),
@@ -64,6 +77,10 @@ static FILE_WATCHER_STATE: Lazy<Arc<Mutex<FileWatcherState>>> = Lazy::new(|| {
     }))
 });
 
+/// 检测读取文件时应使用的文本编码。
+///
+/// 当前实现只区分是否兼容 UTF-8，其余情况统一回退到 UTF-8，
+/// 以便桥接层稳定地向前端返回解码结果。
 fn detect_file_encoding(bytes: &[u8]) -> &'static Encoding {
     if bytes.starts_with(&[0xEF, 0xBB, 0xBF]) {
         return UTF_8;
@@ -74,6 +91,10 @@ fn detect_file_encoding(bytes: &[u8]) -> &'static Encoding {
     UTF_8
 }
 
+/// 检测解码后文本内容的主要换行风格。
+///
+/// 结果会归一化为 `CRLF`、`CR` 或 `LF`，
+/// 便于前端编辑器在保存时保持用户原有的换行约定。
 fn detect_line_ending(content: &str) -> String {
     let crlf_count = content.matches("\r\n").count();
     let lf_count = content.matches('\n').count() - crlf_count;
@@ -88,6 +109,7 @@ fn detect_line_ending(content: &str) -> String {
     }
 }
 
+/// 读取文本文件，并返回解码后的内容与基础编辑器元数据。
 #[tauri::command]
 async fn read_file_content(path: String) -> Result<FileOperationResult, String> {
     match fs::read(&path) {
@@ -119,6 +141,7 @@ async fn read_file_content(path: String) -> Result<FileOperationResult, String> 
     }
 }
 
+/// 根据路径扩展名推断二进制文件预览所需的 MIME 类型。
 fn guess_mime_from_path(path: &Path) -> &'static str {
     match path
         .extension()
@@ -139,6 +162,7 @@ fn guess_mime_from_path(path: &Path) -> &'static str {
     }
 }
 
+/// 读取二进制文件，并返回供前端预览的 base64 内容。
 #[tauri::command]
 async fn read_binary_file(path: String) -> Result<BinaryFileResult, String> {
     let file_path = Path::new(&path);
@@ -150,6 +174,8 @@ async fn read_binary_file(path: String) -> Result<BinaryFileResult, String> {
     })
 }
 
+/// 将原始文本内容写入目标路径，
+/// 如果父目录不存在则自动创建。
 #[tauri::command]
 async fn write_file_content(path: String, content: String) -> Result<(), String> {
     if let Some(parent) = Path::new(&path).parent() {
@@ -163,6 +189,8 @@ async fn write_file_content(path: String, content: String) -> Result<(), String>
     }
 }
 
+/// 按指定编码保存编辑器内容，
+/// 并返回前端需要的已落盘文件元数据。
 #[tauri::command]
 async fn save_file(
     file_path: String,
@@ -230,11 +258,13 @@ async fn save_file(
     }
 }
 
+/// 返回给定路径当前是否存在于磁盘上。
 #[tauri::command]
 async fn check_file_exists(path: String) -> bool {
     Path::new(&path).exists()
 }
 
+/// 返回单个文件或目录路径对应的文件系统元数据。
 #[tauri::command]
 async fn get_file_info(path: String) -> Result<FileInfo, String> {
     let file_path = Path::new(&path);
@@ -265,6 +295,8 @@ async fn get_file_info(path: String) -> Result<FileInfo, String> {
     }
 }
 
+/// 列出目录的直接子项，
+/// 让前端无需递归读取整个工作区也能构建文件树。
 #[tauri::command]
 async fn get_directory_contents(dir_path: String) -> Result<Vec<FileInfo>, String> {
     let path = Path::new(&dir_path);
@@ -305,6 +337,8 @@ async fn get_directory_contents(dir_path: String) -> Result<Vec<FileInfo>, Strin
     }
 }
 
+/// 在校验前端工作流所需的源路径和目标路径后，
+/// 对文件系统条目执行重命名或移动。
 #[tauri::command]
 async fn rename_file(old_path: String, new_path: String) -> Result<FileOperationResult, String> {
     if old_path.is_empty() || new_path.is_empty() {
@@ -376,6 +410,7 @@ async fn rename_file(old_path: String, new_path: String) -> Result<FileOperation
     }
 }
 
+/// 删除文件或目录，并向桥接层返回标准化的操作结果。
 #[tauri::command]
 async fn delete_file(path: String) -> Result<FileOperationResult, String> {
     let file_path = Path::new(&path);
@@ -419,6 +454,11 @@ async fn delete_file(path: String) -> Result<FileOperationResult, String> {
     }
 }
 
+/// 开始监听某个文件所在的父目录，并在该文件发生修改时
+/// 向前端发出 `file-changed` 事件。
+///
+/// 监听父目录而不是直接监听文件本身，可以兼容那些通过
+/// “先写临时文件、再替换原路径”方式实现保存的编辑器和操作系统。
 #[tauri::command]
 async fn start_file_watching(app_handle: AppHandle, file_path: String) -> Result<bool, String> {
     let path = Path::new(&file_path);
@@ -450,6 +490,8 @@ async fn start_file_watching(app_handle: AppHandle, file_path: String) -> Result
                             .unwrap_or_default()
                             .as_secs();
 
+                        // 对比最近一次观察到的修改时间，避免重复的
+                        // notify 事件继续扩散成多次 UI 更新。
                         let should_emit = {
                             let mut state = FILE_WATCHER_STATE.lock().unwrap();
                             if let Some(last_modified) =
@@ -514,6 +556,7 @@ async fn start_file_watching(app_handle: AppHandle, file_path: String) -> Result
     Ok(true)
 }
 
+/// 停止并移除先前为某个文件创建的 watcher。
 #[tauri::command]
 async fn stop_file_watching(file_path: String) -> Result<bool, String> {
     let mut state = FILE_WATCHER_STATE.lock().unwrap();
@@ -525,6 +568,10 @@ async fn stop_file_watching(file_path: String) -> Result<bool, String> {
     }
 }
 
+/// 通过桌面桥接层支持的平台运行时执行本地脚本文件。
+///
+/// 这里只允许少量白名单脚本扩展名，
+/// 这样桥接层才能分发到明确的解释器（`node` 或 `python`），并把标准输出返回给调用方。
 #[tauri::command]
 async fn execute_file(file_path: String) -> Result<String, String> {
     #[cfg(target_os = "android")]
@@ -556,6 +603,11 @@ async fn execute_file(file_path: String) -> Result<String, String> {
     }
 }
 
+/// 执行内存中的代码片段，并返回 stdout 或 stderr，
+/// 便于前端直接展示运行结果。
+///
+/// 这与 `execute_file` 的行为类似，但会直接执行编辑器传入的源码，
+/// 不会在磁盘上创建临时文件。
 #[tauri::command]
 async fn run_code_snippet(code: String, language: String) -> Result<String, String> {
     #[cfg(target_os = "android")]
@@ -596,6 +648,8 @@ async fn run_code_snippet(code: String, language: String) -> Result<String, Stri
     }
 }
 
+/// 返回给前端的搜索结果项，
+/// 用于表示文件名命中或 Markdown 文件内容命中。
 #[derive(Serialize, Deserialize, Debug, Clone)]
 struct SearchResult {
     name: String,
@@ -607,6 +661,7 @@ struct SearchResult {
     line_number: Option<u32>,
 }
 
+/// 判断路径是否使用了递归搜索索引支持的 Markdown 扩展名之一。
 fn is_markdown_ext(path: &Path) -> bool {
     match path.extension().and_then(|e| e.to_str()) {
         Some(ext) => {
@@ -617,7 +672,8 @@ fn is_markdown_ext(path: &Path) -> bool {
     }
 }
 
-/// Phase-1 helper: recursively collect markdown file paths without reading content.
+/// 内容搜索的第一阶段辅助函数：
+/// 先收集 Markdown 文件路径，不立即读取文件内容。
 fn collect_md_paths(dir: &Path, out: &mut Vec<std::path::PathBuf>) {
     let entries = match fs::read_dir(dir) {
         Ok(e) => e,
@@ -637,7 +693,8 @@ fn collect_md_paths(dir: &Path, out: &mut Vec<std::path::PathBuf>) {
     }
 }
 
-/// Phase-2 helper: search matching lines inside a file's content string.
+/// 内容搜索的第二阶段辅助函数：
+/// 扫描已加载的文件内容，并提取命中行的预览文本。
 fn search_content_lines(
     path: &Path,
     content: &str,
@@ -669,7 +726,8 @@ fn search_content_lines(
     results
 }
 
-/// Filename-only recursive walk (no content reading).
+/// 当前端只请求路径匹配而不读取文件内容时，
+/// 使用的递归文件名遍历逻辑。
 fn walk_names(
     dir: &Path,
     query_lower: &str,
@@ -710,6 +768,8 @@ fn walk_names(
     }
 }
 
+/// 按文件名或文件内容搜索 Markdown 文件，
+/// 并向前端搜索面板返回轻量结果记录。
 #[tauri::command]
 async fn search_files(
     dir_path: String,
@@ -728,10 +788,8 @@ async fn search_files(
     let limit = max_results.unwrap_or(100);
 
     if search_content {
-        // Phase 1: collect markdown paths synchronously (stat calls only, fast).
-        // Run on Tauri's blocking pool so we don't park an async worker thread.
-        // Using `tauri::async_runtime` instead of a separate `tokio` dependency
-        // means no second runtime/thread-pool is spun up at app startup.
+        // 在执行内容扫描前，先在线程池中收集候选 Markdown 路径，
+        // 让异步执行器线程继续留给 UI 相关任务使用。
         let root_clone = root_path.clone();
         let md_paths = async_runtime::spawn_blocking(move || {
             let mut paths = Vec::new();
@@ -741,10 +799,8 @@ async fn search_files(
         .await
         .map_err(|e| e.to_string())?;
 
-        // Phase 2: read every file in parallel on the blocking pool. `std::fs`
-        // inside `spawn_blocking` is just as concurrent as `tokio::fs` (which
-        // ultimately dispatches to the same blocking pool) and avoids pulling
-        // in tokio's `fs` feature.
+        // 在线程池中并行读取和扫描文件，
+        // 避免大工作区搜索在单线程上串行执行。
         let handles: Vec<_> = md_paths
             .into_iter()
             .map(|path| {
@@ -756,7 +812,8 @@ async fn search_files(
             })
             .collect();
 
-        // Phase 3: collect results in discovery order, stop once limit is reached.
+        // 按发现顺序合并各文件的命中结果，
+        // 一旦达到请求的结果上限就停止继续收集。
         let mut results = Vec::new();
         for handle in handles {
             if results.len() >= limit {
@@ -773,7 +830,8 @@ async fn search_files(
         }
         Ok(results)
     } else {
-        // Filename search: no content reads, but still move off async thread.
+        // 仅文件名搜索仍放在线程池执行，
+        // 因为递归遍历目录本身就是同步文件系统操作。
         let q = query_lower.to_string();
         let results = async_runtime::spawn_blocking(move || {
             let mut out = Vec::new();
@@ -786,6 +844,7 @@ async fn search_files(
     }
 }
 
+/// 在宿主平台的文件管理器中显示指定文件或目录。
 #[tauri::command]
 async fn show_in_explorer(path: String) -> Result<String, String> {
     #[cfg(target_os = "android")]
@@ -849,15 +908,15 @@ async fn show_in_explorer(path: String) -> Result<String, String> {
     }
 }
 
-/// Returns the per-app "Documents" folder, creating it if needed.
+/// 返回当前应用专属的 `Documents` 目录，
+/// 如有必要会先创建该目录。
 ///
-/// This is the only directory we can guarantee is writable on Android
-/// without runtime permissions or the Storage Access Framework. On
-/// Android Tauri maps `app_data_dir()` to `Context.getFilesDir()`, i.e.
-/// `/data/data/<package>/files` — always writable by the app, invisible
-/// to other apps, and wiped on uninstall. On desktop platforms it
-/// resolves to the platform-conventional app data directory (e.g.
-/// `%APPDATA%\com.mde.app` on Windows), which keeps behavior consistent.
+/// 在 Android 上，这是唯一一个无需运行时权限或 Storage Access Framework
+/// 就能保证可写的目录。Tauri 在 Android 上会把 `app_data_dir()` 映射到
+/// `Context.getFilesDir()`，也就是 `/data/data/<package>/files`：
+/// 该目录始终对当前应用可写，对其他应用不可见，并会在卸载时被清空。
+/// 在桌面平台上，它会解析到各平台约定的应用数据目录
+/// （例如 Windows 上的 `%APPDATA%\com.mde.app`），从而保持行为一致。
 #[tauri::command]
 async fn get_app_documents_dir(app: AppHandle) -> Result<String, String> {
     let app_data_dir = app
@@ -872,6 +931,7 @@ async fn get_app_documents_dir(app: AppHandle) -> Result<String, String> {
     Ok(docs.to_string_lossy().to_string())
 }
 
+/// 判断路径是否使用了 CLI 交接流程所接受的 Markdown 扩展名之一。
 fn is_markdown_file_path(path: &Path) -> bool {
     matches!(
         path.extension()
@@ -882,6 +942,7 @@ fn is_markdown_file_path(path: &Path) -> bool {
     )
 }
 
+/// 收集传递给应用进程的 Markdown 文件参数。
 #[tauri::command]
 async fn get_cli_args() -> Result<Vec<String>, String> {
     let current_dir = std::env::current_dir().ok();
@@ -909,6 +970,8 @@ async fn get_cli_args() -> Result<Vec<String>, String> {
     Ok(files)
 }
 
+/// 确保在桥接层触发的流程结束后，
+/// 例如通过外部启动器重新打开文件时，主桌面窗口仍然可见。
 #[tauri::command]
 async fn show_main_window(app: AppHandle) -> Result<(), String> {
     #[cfg(not(target_os = "android"))]
@@ -931,6 +994,10 @@ async fn show_main_window(app: AppHandle) -> Result<(), String> {
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
+/// 桌面端 `main()` 与移动端入口共用的 Tauri 启动逻辑。
+///
+/// 这里统一挂载插件并注册所有可由前端 `invoke` 调用的桥接命令，
+/// 让启动配置集中维护在同一个位置。
 pub fn run() {
     #[allow(unused_mut)]
     let mut builder = tauri::Builder::default()
@@ -938,10 +1005,8 @@ pub fn run() {
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_store::Builder::default().build());
 
-    // Opening devtools is the *only* startup work we still want, and only in
-    // debug builds. In release we skip `setup()` entirely — that closure is
-    // on the hot path to first paint, so leaving it empty would still allocate
-    // a Box<dyn FnOnce> and run a no-op on every cold start.
+    // 避免把额外初始化逻辑带入生产启动路径；
+    // 只有调试构建才会自动打开 devtools，便于本地排查桥接行为。
     #[cfg(all(debug_assertions, not(target_os = "android")))]
     {
         builder = builder.setup(|app| {
@@ -953,6 +1018,7 @@ pub fn run() {
     }
 
     builder
+        // 注册通过 `invoke` 暴露给前端的 Rust <-> WebView 桥接接口。
         .invoke_handler(tauri::generate_handler![
             read_file_content,
             read_binary_file,

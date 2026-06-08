@@ -1,28 +1,31 @@
+
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { getCurrentUserScopeId } from './userScope';
 
+/**
+ * 为路径键补上当前用户作用域，避免不同账号的本地映射互相覆盖。
+ */
 function scopePathKey(path) {
   return `${getCurrentUserScopeId()}::path::${path}`;
 }
 
+/**
+ * 为 fileId 键补上当前用户作用域。
+ */
 function scopeFileIdKey(fileId) {
   return `${getCurrentUserScopeId()}::file::${fileId}`;
 }
 
 /**
- * Stable mapping `originalPath -> fileId (UUID)`.
+ * 本地路径与云端 `fileId` 的稳定映射 store。
  *
- * The cloud sync layer addresses every file by `fileId` instead of by path
- * so that the same logical document can be pushed/pulled across devices
- * whose absolute paths differ. The first time a path is seen we mint a new
- * UUID and remember it forever (per device, persisted to local storage).
+ * 云同步层不直接以绝对路径标识文档，而是依赖 `fileId` 维持“同一逻辑文件”
+ * 在多设备上的身份一致性。这里负责在设备本地生成、持久化并维护这份映射。
  *
- * If two devices independently create the same file (same path, no prior
- * sync) they will end up with two different fileIds and therefore two
- * separate cloud documents. That is intentional — the system has no
- * reliable way to merge such files automatically; users can resolve
- * conflicts manually if/when needed.
+ * 如果两台设备在完全没有同步历史的前提下独立创建“看起来相同”的文件，
+ * 它们会得到不同的 `fileId`，从而形成两份独立云文档。这是刻意设计的保守
+ * 策略，避免系统在缺乏可靠依据时误把不同文件自动合并。
  */
 const useFileIdStore = create(
   persist(
@@ -30,7 +33,9 @@ const useFileIdStore = create(
       pathToId: {},
       idToPath: {},
 
-      /** Returns the existing UUID for a path, or mints + persists a new one. */
+      /**
+       * 读取路径已有的 `fileId`，若不存在则创建并持久化一个新值。
+       */
       getOrCreate: (path) => {
         if (!path) return null;
         const { pathToId } = get();
@@ -46,7 +51,9 @@ const useFileIdStore = create(
         return id;
       },
 
-      /** Explicitly bind a path to an existing fileId (used after pull). */
+      /**
+       * 显式把路径绑定到已有 `fileId`，常用于远端拉取后回填本地映射。
+       */
       bind: (path, fileId) => {
         if (!path || !fileId) return;
         set((state) => ({
@@ -56,8 +63,7 @@ const useFileIdStore = create(
       },
 
       /**
-       * Move an existing path binding to a new local path while preserving
-       * the logical document identity (`fileId`).
+       * 在文件移动或重命名后迁移路径绑定，同时保持逻辑文档身份不变。
        */
       movePath: (oldPath, newPath) => {
         if (!oldPath || !newPath || oldPath === newPath) return;
@@ -76,7 +82,9 @@ const useFileIdStore = create(
         });
       },
 
-      /** Lookup helpers. */
+      /**
+       * 常用双向查询辅助方法。
+       */
       idOf: (path) => get().pathToId[scopePathKey(path)] || null,
       pathOf: (fileId) => get().idToPath[scopeFileIdKey(fileId)] || null,
 
@@ -107,6 +115,9 @@ const useFileIdStore = create(
         });
       },
 
+      /**
+       * 清空当前用户作用域下的全部映射，常用于账号切换后的同步重置。
+       */
       resetCurrentUser: () =>
         set((state) => {
           const scopePrefix = `${getCurrentUserScopeId()}::`;

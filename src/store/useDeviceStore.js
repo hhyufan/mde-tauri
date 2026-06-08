@@ -1,17 +1,22 @@
+/**
+ * ?????????
+ *
+ * ??????????????????? ID?????????????????
+ */
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 
 /**
- * Stable per-device identifier.
+ * 当前设备稳定使用的唯一标识。
  *
- * Generated once, on first access, and persisted to localStorage. The cloud
- * sync layer sends this id with every push so the server can record where
- * each individual device keeps its on-disk copy of the document
- * (`SyncDocument.devicePaths[deviceId] = absoluteLocalPath`).
+ * 它会在首次访问时生成一次，并持久化到 localStorage。
+ * 云同步层在每次推送时都会带上这个 id，服务端据此记录
+ * 每台设备把文档落在哪个本地绝对路径上：
+ * `SyncDocument.devicePaths[deviceId] = absoluteLocalPath`。
  *
- * Reinstalling the app / clearing storage produces a *new* device id, which
- * is intentional — the new install has no on-disk files and must rebind via
- * the "external first save" flow.
+ * 如果用户重装应用或清空本地存储，就会生成新的设备 id。
+ * 这是刻意保留的行为，因为新的安装实例并不持有旧的本地文件，
+ * 需要重新通过“外部文档首次保存”的流程完成绑定。
  */
 function newDeviceId() {
   if (typeof crypto !== 'undefined' && crypto.randomUUID) {
@@ -25,7 +30,7 @@ const useDeviceStore = create(
     (set, get) => ({
       deviceId: '',
 
-      /** Returns the current device id, minting + persisting one if missing. */
+      /** 返回当前设备 id；若尚不存在，则即时生成并持久化。 */
       getId: () => {
         const cur = get().deviceId;
         if (cur) return cur;

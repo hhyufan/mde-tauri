@@ -1,3 +1,9 @@
+/**
+ * 编辑器悬浮格式工具栏。
+ *
+ * 本文件实现一个可拖拽、可持久化位置的 Markdown 操作工具栏，负责把用户点击
+ * 的格式化动作转换为统一的插入指令，并在桌面与移动端共享同一套交互入口。
+ */
 import { useState, useCallback, useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Tooltip } from 'antd';
@@ -16,6 +22,17 @@ const HEADING_OPTIONS = [
   { label: 'H6', prefix: '###### ' },
 ];
 
+/**
+ * 工具栏内统一样式的按钮封装。
+ *
+ * @param {{
+ *   title: string,
+ *   className?: string,
+ *   onClick?: (event: import('react').MouseEvent<HTMLButtonElement>) => void,
+ *   children: import('react').ReactNode
+ * }} props 按钮属性
+ * @returns {JSX.Element} 带提示的按钮组件
+ */
 function FtBtn({ title, className, onClick, children }) {
   return (
     <Tooltip title={title} placement="top" mouseEnterDelay={0.3}>
@@ -31,6 +48,11 @@ function FtBtn({ title, className, onClick, children }) {
   );
 }
 
+/**
+ * 获取工具栏允许活动的边界，优先限制在编辑器工作区内。
+ *
+ * @returns {DOMRect | { left: number, top: number, right: number, bottom: number }} 可用边界
+ */
 function getToolbarBounds() {
   return document.querySelector('.editor-content__workspace')?.getBoundingClientRect() || {
     left: 0,
@@ -40,6 +62,14 @@ function getToolbarBounds() {
   };
 }
 
+/**
+ * 将工具栏位置限制在可用边界内，避免拖出可视区域。
+ *
+ * @param {{ x: number, y: number } | null} position 原始位置
+ * @param {DOMRect | null | undefined} rect 工具栏自身尺寸
+ * @param {DOMRect | { left: number, top: number, right: number, bottom: number }} [bounds=getToolbarBounds()] 可用边界
+ * @returns {{ x: number, y: number } | null} 修正后的坐标
+ */
 function clampPosition(position, rect, bounds = getToolbarBounds()) {
   if (!position || !rect || !bounds) return null;
   const margin = 8;
@@ -53,16 +83,27 @@ function clampPosition(position, rect, bounds = getToolbarBounds()) {
   };
 }
 
+/**
+ * 读取上次持久化的工具栏位置；损坏数据会被忽略。
+ *
+ * @returns {{ x: number, y: number } | null} 已保存位置；不存在或损坏时返回 `null`
+ */
 function readSavedPosition() {
   try {
     const value = JSON.parse(localStorage.getItem(TOOLBAR_POSITION_KEY) || 'null');
     if (typeof value?.x === 'number' && typeof value?.y === 'number') return value;
   } catch (_) {
-    // Ignore corrupt persisted UI state.
+    // 本地持久化位置损坏时直接忽略，回退为默认布局。
   }
   return null;
 }
 
+/**
+ * 渲染悬浮格式工具栏，并把交互动作转发给编辑器宿主。
+ *
+ * @param {{ onInsert?: (action: Record<string, unknown>) => void }} props 组件属性
+ * @returns {JSX.Element} 悬浮工具栏
+ */
 function FloatingToolbar({ onInsert }) {
   const { t } = useTranslation();
   const visible = useEditorStore((s) => s.toolbarVisible);
@@ -72,19 +113,41 @@ function FloatingToolbar({ onInsert }) {
   const [position, setPosition] = useState(() => readSavedPosition());
   const [headingOpen, setHeadingOpen] = useState(false);
 
+  /**
+   * 统一分发插入动作，并在执行后关闭标题面板。
+   *
+   * @param {Record<string, unknown>} action 规范化后的工具栏动作
+   */
   const runAction = useCallback((action) => {
     onInsert?.(action);
     setHeadingOpen(false);
   }, [onInsert]);
 
+  /**
+   * 对当前选区包裹前后缀，适用于粗体、斜体、链接等行内语法。
+   *
+   * @param {string} command 动作标识
+   * @param {string} before 选区前缀
+   * @param {string} [after] 选区后缀；缺省时复用前缀
+   */
   const wrap = useCallback((command, before, after) => {
     runAction({ type: 'wrap', command, before, after: after ?? before });
   }, [runAction]);
 
+  /**
+   * 直接插入块级模板内容。
+   *
+   * @param {string} text 待插入的模板文本
+   */
   const insertBlock = useCallback((text) => {
     runAction({ type: 'insert', text });
   }, [runAction]);
 
+  /**
+   * 开始拖拽工具栏，把当前指针位置与工具栏初始位置记录下来。
+   *
+   * @param {import('react').PointerEvent<HTMLDivElement>} event 指针事件
+   */
   const handleGripPointerDown = useCallback((event) => {
     if (event.button !== 0 || !toolbarRef.current) return;
     event.preventDefault();
@@ -108,6 +171,11 @@ function FloatingToolbar({ onInsert }) {
     event.currentTarget.setPointerCapture?.(event.pointerId);
   }, [position]);
 
+  /**
+   * 根据指针位移实时更新工具栏位置。
+   *
+   * @param {import('react').PointerEvent<HTMLDivElement>} event 指针事件
+   */
   const handleGripPointerMove = useCallback((event) => {
     const drag = dragRef.current;
     if (!drag || drag.pointerId !== event.pointerId) return;
@@ -119,6 +187,11 @@ function FloatingToolbar({ onInsert }) {
     setPosition(next);
   }, []);
 
+  /**
+   * 结束拖拽后再次做边界修正，并把最终位置写入本地存储。
+   *
+   * @param {import('react').PointerEvent<HTMLDivElement>} event 指针事件
+   */
   const handleGripPointerUp = useCallback((event) => {
     const drag = dragRef.current;
     if (!drag || drag.pointerId !== event.pointerId) return;
@@ -131,6 +204,7 @@ function FloatingToolbar({ onInsert }) {
     });
   }, []);
 
+  // 窗口尺寸变化后重新约束工具栏位置，避免越界。
   useEffect(() => {
     const handleResize = () => {
       setPosition((current) => {

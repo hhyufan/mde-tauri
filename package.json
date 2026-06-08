@@ -8,6 +8,7 @@
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
+    "generate:showcase-data": "node scripts/generate-showcase-data.mjs",
     "tauri": "tauri",
     "tauri:dev": "tauri dev",
     "tauri:build": "powershell -NoProfile -ExecutionPolicy Bypass -Command \"$env:CARGO_TARGET_DIR = (Resolve-Path 'src-tauri').Path + '\\target'; tauri build --bundles msi nsis\"",

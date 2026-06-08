@@ -1,3 +1,14 @@
+/**
+ * 路径展示与回拼工具模块。
+ *
+ * 为面包屑、文件名提取和路径片段回组装提供跨平台的轻量辅助函数。
+ */
+/**
+ * 路径拆分工具集。
+ *
+ * 主要服务于面包屑与路径展示场景，兼容 Windows 盘符路径、Unix 绝对路径
+ * 以及普通相对路径。
+ */
 export const splitPath = (filePath) => {
   if (!filePath || typeof filePath !== 'string') {
     return [];
@@ -17,6 +28,9 @@ export const splitPath = (filePath) => {
   return filePath.split(/[\\/]/).filter(Boolean);
 };
 
+/**
+ * 根据路径片段与目标下标回拼到当前位置的完整路径。
+ */
 export const buildFullPath = (pathSegments, index) => {
   if (!pathSegments || index < 0 || index >= pathSegments.length) {
     return '';
@@ -34,6 +48,9 @@ export const buildFullPath = (pathSegments, index) => {
   return '/' + segments.join('/');
 };
 
+/**
+ * 提取路径中的最终文件名部分。
+ */
 export const getFileName = (filePath) => {
   if (!filePath || typeof filePath !== 'string') {
     return '';

@@ -1,3 +1,9 @@
+/**
+ * 冲突处理弹窗模块。
+ *
+ * 提供同步冲突场景下的可视化差异比较与决策入口，负责组织 Monaco Diff
+ * Editor、冲突元数据展示，以及保留本地或采用远端版本的动作触发。
+ */
 import { useEffect, useMemo, useRef, useState } from 'react';
 import * as monaco from 'monaco-editor';
 import '@/monaco-worker';
@@ -9,11 +15,35 @@ import { getFileLanguage } from '@utils/fileLanguage';
 import { initMonacoShiki, isMonacoShikiReady, getMonacoThemeName } from '@utils/monacoShiki';
 import './conflict-dialog.scss';
 
+/**
+ * 统计文本行数，为差异编辑器动态计算行号列宽提供依据。
+ *
+ * @param {string} content 待统计的文本内容。
+ * @returns {number} 文本行数，空内容至少返回 1。
+ */
 function countLines(content = '') {
   if (!content) return 1;
   return content.split('\n').length;
 }
 
+/**
+ * 冲突对比视图。
+ *
+ * 使用 Monaco Diff Editor 并排展示本地与远端版本，方便用户在解决同步冲突
+ * 时快速判断差异并选择保留哪一侧内容。
+ *
+ * @param {object} props 组件属性。
+ * @param {string} props.original 本地版本内容。
+ * @param {string} props.modified 远端版本内容。
+ * @param {string} props.fileName 当前文件名，用于推断语言。
+ * @param {string} props.localLabel 左侧标签文案。
+ * @param {string} props.remoteLabel 右侧标签文案。
+ * @param {string} props.theme 当前主题标识。
+ * @param {number} props.fontSize 编辑器字体大小。
+ * @param {string} props.fontFamily 编辑器字体族。
+ * @param {number} props.lineHeight 编辑器行高。
+ * @param {number} props.tabSize 制表符宽度。
+ */
 function MonacoConflictDiff({
   original,
   modified,
@@ -117,6 +147,9 @@ function MonacoConflictDiff({
   useEffect(() => {
     if (!wrapperRef.current) return undefined;
 
+    /**
+     * 同步左右编辑窗格的实际宽度，用于让顶部标签栏与 Monaco 分栏保持对齐。
+     */
     const syncPaneWidths = () => {
       const root = wrapperRef.current;
       if (!root) return;
@@ -202,6 +235,17 @@ function MonacoConflictDiff({
   );
 }
 
+/**
+ * 同步冲突弹窗。
+ *
+ * 每次展示一个冲突条目，并提供“保留本地”与“使用远端”两种显式决策入口。
+ *
+ * @param {object} props 组件属性。
+ * @param {boolean} props.open 控制弹窗显示状态。
+ * @param {Array<object>} props.conflicts 待处理的冲突列表。
+ * @param {(fileId: string, decision: 'local' | 'remote') => void} props.onResolve 处理冲突决策的回调。
+ * @param {() => void} props.onClose 关闭弹窗的回调。
+ */
 function ConflictDialog({ open, conflicts, onResolve, onClose }) {
   const { t } = useTranslation();
   const theme = useThemeStore((s) => s.theme);

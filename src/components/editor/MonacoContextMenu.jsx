@@ -6,12 +6,17 @@ import './monaco-context-menu.scss';
 const isMac = /Mac|iPod|iPhone|iPad/.test(navigator.platform);
 const Mod = isMac ? '\u2318' : 'Ctrl';
 
+/**
+ * Monaco 编辑器自定义右键菜单。
+ * 仅负责菜单展示、关闭交互以及将菜单项映射到 Monaco 内建命令。
+ */
 export default function MonacoContextMenu({ visible, x, y, onClose, editorRef }) {
   const { t } = useTranslation();
   const menuRef = useRef(null);
 
   useEffect(() => {
     if (!visible) return;
+    // 点击菜单外部或按下 Esc 时关闭菜单，行为与原生上下文菜单保持一致。
     const handlePointerDown = (e) => {
       if (menuRef.current && !menuRef.current.contains(e.target)) {
         onClose();
@@ -30,6 +35,7 @@ export default function MonacoContextMenu({ visible, x, y, onClose, editorRef })
 
   if (!visible) return null;
 
+  // 统一通过 Monaco 的 command id 触发内建动作，避免在这里复制编辑逻辑。
   const trigger = (actionId) => (e) => {
     e.preventDefault();
     e.stopPropagation();
@@ -40,6 +46,7 @@ export default function MonacoContextMenu({ visible, x, y, onClose, editorRef })
     setTimeout(() => editor.focus(), 50);
   };
 
+  // 菜单项顺序与常见编辑器右键菜单保持一致，分隔项仅用于视觉分组。
   const items = [
     { key: 'undo', label: t('editor.menu.undo'), shortcut: `${Mod}+Z`, action: trigger('undo') },
     { key: 'redo', label: t('editor.menu.redo'), shortcut: `${Mod}+Y`, action: trigger('redo') },

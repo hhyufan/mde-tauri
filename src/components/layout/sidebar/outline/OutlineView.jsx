@@ -4,6 +4,9 @@ import useEditorStore from '@store/useEditorStore';
 import { useEditorBufferContent } from '@hooks/useEditorBufferContent';
 import './outline.scss';
 
+/**
+ * 从 Markdown 文本中提取标题与列表项，供侧边栏大纲展示。
+ */
 function extractItems(content) {
   if (!content) return [];
   const lines = content.split('\n');
@@ -19,7 +22,7 @@ function extractItems(content) {
     }
     if (inCodeBlock) continue;
 
-    // Heading
+    // 标题行。
     const hm = line.match(/^(#{1,6})\s+(.+)/);
     if (hm) {
       currentHeadingLevel = hm[1].length;
@@ -32,7 +35,7 @@ function extractItems(content) {
       continue;
     }
 
-    // Ordered list:  "1. " or "1) "
+    // 有序列表：支持 `1.` 与 `1)` 两种前缀。
     const om = line.match(/^(\s*)(\d+)[.)]\s+(.+)/);
     if (om) {
       items.push({
@@ -46,7 +49,7 @@ function extractItems(content) {
       continue;
     }
 
-    // Unordered list: "- ", "* ", "+ "
+    // 无序列表：支持 `-`、`*`、`+` 三种前缀。
     const um = line.match(/^(\s*)[-*+]\s+(.+)/);
     if (um) {
       items.push({
@@ -79,6 +82,12 @@ function ListBadge({ type, order }) {
   );
 }
 
+/**
+ * Markdown 大纲视图。
+ *
+ * 解析当前缓冲区中的标题与列表层级，支持折叠、展开以及与编辑区/预览区的
+ * 双向跳转联动。
+ */
 function OutlineView() {
   const { t } = useTranslation();
   const activeTabId = useEditorStore((s) => s.activeTabId);
@@ -108,33 +117,26 @@ function OutlineView() {
     return false;
   }, [items]);
 
-  // Determine which items are hidden due to a collapsed ancestor heading.
+  // 根据祖先标题的折叠态判断条目是否应隐藏。
   //
-  // Correct tree semantics: every heading/list item belongs to the nearest
-  // preceding heading of STRICTLY LOWER level, and that heading in turn
-  // belongs to the nearest preceding heading of strictly lower level than
-  // itself, and so on — this forms the ancestor chain.
+  // 语义上，每个标题或列表项都隶属于“最近且层级更低”的前置标题；该标题再
+  // 继续向上寻找最近且层级更低的标题，于是形成完整祖先链。
   //
-  // Algorithm: walk backward tracking `minLevel`. A previous heading is an
-  // ancestor iff its level < minLevel. When found, it narrows `minLevel`
-  // to its own level, so only strictly higher-ranked headings can match
-  // next. This correctly handles cases like:
+  // 实现上通过倒序遍历并维护 `minLevel`：
+  // 1. 只有 `level < minLevel` 的前置标题才可能成为祖先；
+  // 2. 一旦命中，就把 `minLevel` 收窄到该标题层级；
+  // 3. 后续只能继续匹配更高层祖先。
   //
-  //   # H1-A
-  //   ## H2-A           (collapsed)
-  //   ### H3-A
-  //   # H1-B
-  //   - list item       <- NOT hidden: its ancestor chain is only H1-B
-  //                        (H2-A is not an ancestor; it was closed by H1-B)
+  // 这样可以正确处理不同一级标题之间的边界，避免前一个分支的折叠状态误伤
+  // 后一个并列分支中的列表项。
   const isHiddenByCollapse = useCallback((idx) => {
     const item = items[idx];
     let minLevel;
     if (item.type === 'heading') {
       minLevel = item.level;
     } else {
-      // List item belongs to the most recent heading (at item.parentLevel).
-      // Setting minLevel = parentLevel + 1 makes that parent heading match
-      // on the first hit so it becomes the first ancestor.
+      // 列表项归属于最近标题。把 `minLevel` 设为 `parentLevel + 1`，可以让
+      // 该标题在第一次命中时立即成为祖先节点。
       minLevel = (item.parentLevel || 0) + 1;
     }
 
@@ -150,7 +152,7 @@ function OutlineView() {
     return false;
   }, [items, collapsed]);
 
-  // Wire up collapse-all / expand-all toolbar events
+  // 监听工具栏发出的全局折叠/展开事件。
   useEffect(() => {
     const handleCollapseAll = () => {
       const next = {};

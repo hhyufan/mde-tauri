@@ -1,12 +1,17 @@
 /**
- * Parse [^id] references and [^id]: definitions in Markdown text.
- * Returns { content } where content has inline refs replaced with
- * anchor HTML and a footnotes section appended at the bottom.
+ * 解析 Markdown 中的脚注引用与定义。
+ *
+ * 返回 `{ content }`，其中内联 `[^id]` 会被替换成可跳转锚点，文末则追加
+ * 一段统一的脚注列表 HTML。
+ */
+/**
+ * ?? Markdown ??????????????? HTML ???
  */
 export function parseFootnotes(content) {
   if (!content) return { content: '' };
 
   const definitions = new Map();
+  // 支持多行脚注定义，后续缩进内容会被并入同一条脚注正文。
   const defRe = /^\[(\^[^\]]+)\]:\s*(.+(?:\n(?:    .+|\t.+))*)$/gm;
   let m;
   while ((m = defRe.exec(content)) !== null) {
@@ -19,6 +24,7 @@ export function parseFootnotes(content) {
   const seen = new Set();
 
   processed = processed.replace(/\[(\^[^\]]+)\]/g, (full, id) => {
+    // 同一个脚注引用只在脚注列表中生成一次，避免重复条目。
     const cleanId = id.substring(1).trim().replace(/\s+/g, '');
     const refId = `fnref-${cleanId}`;
     const targetId = `fn-${cleanId}`;
@@ -47,12 +53,15 @@ export function parseFootnotes(content) {
 }
 
 /**
- * After the preview DOM is rendered, wire click handlers on
- * footnote anchors so they scroll to their targets.
+ * 预览 DOM 渲染完成后，为脚注锚点补充平滑滚动跳转行为。
+ */
+/**
+ * ?????????????????????????
  */
 export function addFootnoteJumpHandlers(container) {
   if (!container) return;
 
+  // 采用事件委托，并通过 data 标记避免重复绑定监听器。
   if (container.dataset.footnoteDelegatedHandler) return;
   container.dataset.footnoteDelegatedHandler = '1';
   container.addEventListener('click', (e) => {

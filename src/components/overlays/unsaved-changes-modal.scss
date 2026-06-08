@@ -1,3 +1,8 @@
+/**
+ * @file unsaved-changes-modal.scss
+ * @description 定义未保存更改弹窗在 antd Modal 容器中的内容区、文件列表与操作按钮样式。
+ */
+
 .mde-unsaved-modal-root {
   .header-modal {
     user-select: none;

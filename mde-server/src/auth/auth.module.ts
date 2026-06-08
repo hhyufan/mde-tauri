@@ -8,6 +8,9 @@ import { JwtStrategy } from './strategies/jwt.strategy';
 import { LocalStrategy } from './strategies/local.strategy';
 import { UsersModule } from '../users/users.module';
 
+/**
+ * 认证模块，负责组装控制器、鉴权策略与 JWT 签发能力。
+ */
 @Module({
   imports: [
     UsersModule,
@@ -15,6 +18,7 @@ import { UsersModule } from '../users/users.module';
     JwtModule.registerAsync({
       imports: [ConfigModule],
       inject: [ConfigService],
+      // 通过环境变量驱动签名配置，避免在测试和部署环境中重复维护同类设置。
       useFactory: (config: ConfigService) => ({
         secret: config.get<string>('JWT_SECRET', 'mde-dev-secret'),
         signOptions: { expiresIn: config.get<string>('JWT_EXPIRES_IN', '7d') },

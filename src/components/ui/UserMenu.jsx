@@ -5,6 +5,11 @@ import useAuthStore from '@store/useAuthStore';
 import { syncEngine } from '@/services/syncEngine';
 import './user-menu.scss';
 
+/**
+ * 侧边栏底部用户菜单。
+ *
+ * 未登录时显示登录入口；已登录时展示头像、邮箱、手动同步与退出登录操作。
+ */
 function UserMenu({ onOpenLogin }) {
   const { t } = useTranslation();
   const { user, isLoggedIn, logout } = useAuthStore();

@@ -1,3 +1,9 @@
+/**
+ * @file 主侧边栏模块。
+ *
+ * 该文件组织 Explorer、Outline、Recent 三种侧边栏视图，以及底部主题、
+ * 用户和设置等全局入口，是编辑器左侧工作流的主装配层。
+ */
 import { useState, useRef, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Dropdown, Tooltip, Button, Tag } from 'antd';
@@ -19,6 +25,18 @@ import FileTypeIcon from '@components/ui/FileTypeIcon';
 import { cn } from '@utils/classNames';
 import './sidebar.scss';
 
+/**
+ * 侧边栏工具按钮。
+ *
+ * 统一封装浮层提示与视觉样式，减少 Explorer / Outline / Recent
+ * 三组工具条里重复的按钮模板代码。
+ *
+ * @param {object} props 组件属性。
+ * @param {string} props.title 按钮提示文案。
+ * @param {Function} [props.onClick] 点击回调。
+ * @param {import('react').ReactNode} props.children 按钮图标或内容。
+ * @returns {JSX.Element} 统一样式的工具栏按钮。
+ */
 function ToolbarButton({ title, onClick, children }) {
   return (
     <Tooltip title={title} placement="bottom" mouseEnterDelay={0.3}>
@@ -29,6 +47,15 @@ function ToolbarButton({ title, onClick, children }) {
   );
 }
 
+/**
+ * Explorer 排序菜单内容生成器。
+ *
+ * 用工厂函数而不是内联 JSX，是为了让 antd `popupRender` 在每次打开时
+ * 都拿到最新排序状态，同时保持主组件结构可读。
+ *
+ * @param {object} options 排序菜单所需的状态与动作。
+ * @returns {Function} 供 `Dropdown.popupRender` 调用的渲染函数。
+ */
 function renderSortDropdown({ sortBy, sortOrder, setSortBy, setSortOrder, t, close }) {
   return () => (
     <div className="sort-dropdown" onClick={(e) => e.stopPropagation()}>
@@ -72,6 +99,9 @@ function renderSortDropdown({ sortBy, sortOrder, setSortBy, setSortOrder, t, clo
   );
 }
 
+/**
+ * 资源管理器工具栏：排序、新建、保存、打开目录。
+ */
 function ExplorerToolbar() {
   const { t } = useTranslation();
   const { sortBy, sortOrder, setSortBy, setSortOrder } = useFileStore();
@@ -113,6 +143,9 @@ function ExplorerToolbar() {
   );
 }
 
+/**
+ * 大纲工具栏：向 `OutlineView` 广播全局展开/折叠事件。
+ */
 function OutlineToolbar() {
   const { t } = useTranslation();
   return (
@@ -134,6 +167,13 @@ function OutlineToolbar() {
   );
 }
 
+/**
+ * 最近文件工具栏：统计入口与清空列表操作。
+ *
+ * @param {object} props 组件属性。
+ * @param {Function} props.onOpenStats 打开统计面板的回调。
+ * @returns {JSX.Element} 最近文件视图工具栏。
+ */
 function RecentToolbar({ onOpenStats }) {
   const { t } = useTranslation();
   const { clearRecentFiles } = useFileStore();
@@ -151,6 +191,16 @@ function RecentToolbar({ onOpenStats }) {
   );
 }
 
+/**
+ * 最近文件与云端书签列表。
+ *
+ * 这里把本地最近文件、书签优先级、云端仅在线文档三类数据聚合成同一
+ * 个展示列表，保证侧边栏 recent 视图能同时覆盖本地与云同步入口。
+ *
+ * @param {object} props 组件属性。
+ * @param {Function} props.onOpenStats 打开统计面板的回调。
+ * @returns {JSX.Element} 聚合后的最近文件列表。
+ */
 function RecentList({ onOpenStats }) {
   const { t } = useTranslation();
   const userId = useAuthStore((s) => s.user?.id || GUEST_USER_SCOPE);
@@ -176,6 +226,15 @@ function RecentList({ onOpenStats }) {
     [syncDocsMap, userId],
   );
 
+  // Recent 视图里的删除行为需要同时考虑本地最近记录、书签映射以及
+  // 云端外部文档，因此统一收敛到这里处理，避免 UI 分支各自漏清理。
+  /**
+   * 从最近列表中移除一项，并同步处理书签或云端文档关联状态。
+   *
+   * @param {MouseEvent} e 删除按钮点击事件。
+   * @param {object} f 待移除的最近文件或云端文档项。
+   * @returns {Promise<void>}
+   */
   const handleRemove = useCallback(async (e, f) => {
     e.stopPropagation();
     if (f.cloud) {
@@ -278,6 +337,13 @@ function RecentList({ onOpenStats }) {
   );
 }
 
+/**
+ * 根据侧边栏页签类型返回对应图标。
+ *
+ * @param {object} props 组件属性。
+ * @param {string} props.id 侧边栏页签标识。
+ * @returns {JSX.Element} 对应页签图标。
+ */
 function SidebarTabIcon({ id }) {
   if (id === 'explorer') {
     return (
@@ -304,6 +370,12 @@ function SidebarTabIcon({ id }) {
   );
 }
 
+/**
+ * 侧边栏主体。
+ *
+ * 承载 Explorer / Outline / Recent 三个核心工作流，同时在底部集中提供
+ * 用户、主题、更新检查和设置入口。
+ */
 function Sidebar({ onOpenSettings, onOpenStats, onOpenLogin }) {
   const { t } = useTranslation();
   const { sidebarVisible, sidebarView, setSidebarView } = useEditorStore();
@@ -317,6 +389,14 @@ function Sidebar({ onOpenSettings, onOpenStats, onOpenLogin }) {
     { id: 'recent', label: t('sidebar.tab.recent') },
   ];
   const activeIndex = Math.max(0, tabs.findIndex((tab) => tab.id === sidebarView));
+
+  // 主题切换优先使用 View Transition API 做径向过渡；若运行环境不支持，
+  // 则自动回退为直接切换，确保旧环境不受影响。
+  /**
+   * 在支持时以 View Transition 动画切换主题，否则直接切换。
+   *
+   * @returns {void}
+   */
   function handleThemeSwitch() {
     const element = themeButtonRef.current;
     if (!element) { toggleTheme(); return; }

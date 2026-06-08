@@ -17,14 +17,17 @@ import {
 } from './dto/push.dto';
 
 /**
- * Names of indexes from earlier schema versions that must be dropped before
- * the current `(userId, fileId)` model can write. Specifically the legacy
- * `userId_1_relativePath_1` unique index treats every new document (which
- * no longer has a `relativePath` field, so it serializes as `null`) as a
- * duplicate after the very first insert, which surfaces as E11000.
+ * 旧版 schema 遗留的索引名称，必须在当前 `(userId, fileId)` 模型写入前删除。
+ * 其中历史唯一索引 `userId_1_relativePath_1` 会把所有新文档
+ * （它们已不再包含 `relativePath` 字段，因此会被序列化为 `null`）
+ * 视为重复记录，导致从第二次插入开始就触发 E11000。
  */
 const LEGACY_DOC_INDEXES = ['userId_1_relativePath_1'];
 
+/**
+ * 同步核心服务。
+ * 负责文档清单、增量同步、单文件冲突控制以及用户同步配置读写。
+ */
 @Injectable()
 export class SyncService implements OnModuleInit {
   private readonly logger = new Logger(SyncService.name);
@@ -35,14 +38,13 @@ export class SyncService implements OnModuleInit {
   ) {}
 
   /**
-   * One-shot self-heal on boot:
-   * 1. Drop indexes left behind by previous schema versions.
-   * 2. Hard-delete documents whose `fileId` is empty/null — these are
-   *    orphans from the old `relativePath`-keyed schema that can never be
-   *    addressed by fileId and therefore pollute every manifest response.
+   * 启动时执行一次自修复：
+   * 1. 删除旧版 schema 留下的索引。
+   * 2. 硬删除 `fileId` 为空或为 null 的文档，这些文档来自旧的
+   *    `relativePath` 键模型，无法再通过 fileId 访问，只会污染 manifest 返回结果。
    */
   async onModuleInit() {
-    // ── 1. Legacy index cleanup ──────────────────────────────────────────
+    // ── 1. 清理旧索引 ───────────────────────────────────────────────────
     try {
       const existing = await this.docModel.collection.indexes();
       const existingNames = new Set(existing.map((i) => i.name));
@@ -66,11 +68,11 @@ export class SyncService implements OnModuleInit {
       );
     }
 
-    // ── 2. Purge orphan documents with no fileId ─────────────────────────
-    // Old schema stored documents keyed by `relativePath`; those records
-    // never received a `fileId`, so the field is null/undefined/empty.
-    // They surface in every manifest response as un-deletable ghosts
-    // because the client can only address documents by fileId.
+    // ── 2. 清理没有 fileId 的孤儿文档 ────────────────────────────────────
+    // 旧 schema 以 `relativePath` 作为主键保存文档，这些记录从未拿到 `fileId`，
+    // 因此对应字段会是 null / undefined / 空字符串。
+    // 由于客户端现在只能通过 fileId 操作文档，它们会在每次 manifest 响应中
+    // 像无法删除的“幽灵记录”一样反复出现。
     try {
       const result = await this.docModel.deleteMany({
         $or: [{ fileId: null }, { fileId: '' }, { fileId: { $exists: false } }],
@@ -89,14 +91,17 @@ export class SyncService implements OnModuleInit {
     }
   }
 
+  /** 将字符串形式的用户 ID 转成 Mongo ObjectId。 */
   private userObjectId(userId: string): Types.ObjectId {
     return new Types.ObjectId(userId);
   }
 
+  /** Mongo 键名不能包含 `.` 和 `$`，设备 ID 入库前需做最小清洗。 */
   private sanitizeDeviceId(deviceId?: string): string {
     return deviceId ? deviceId.replace(/[.$]/g, '_') : '';
   }
 
+  /** 提取允许持久化和返回给客户端的同步配置字段。 */
   private pickConfigFields(config: Record<string, any>): Record<string, any> {
     return {
       theme: config.theme ?? 'light',
@@ -116,12 +121,14 @@ export class SyncService implements OnModuleInit {
       updatedAt:
         typeof config.updatedAt === 'number'
           ? config.updatedAt
+          // 历史数据中配置更新时间存放在 `updatedAtMs` 字段中。
           : typeof config.updatedAtMs === 'number'
             ? config.updatedAtMs
             : 0,
     };
   }
 
+  /** 序列化文档，按需决定是否带上正文内容。 */
   private serializeDoc(
     doc: Partial<SyncDocument> & {
       fileId?: string;
@@ -161,6 +168,7 @@ export class SyncService implements OnModuleInit {
     };
   }
 
+  /** 统一抛出修订号冲突错误，并附带当前服务端版本。 */
   private throwRevisionConflict(current: any): never {
     throw new ConflictException({
       code: 'revision_conflict',
@@ -169,8 +177,8 @@ export class SyncService implements OnModuleInit {
   }
 
   /**
-   * Returns the metadata-only manifest of every (non-deleted) document the
-   * user has on the cloud. Clients use it to decide what to push / pull.
+   * 返回用户云端全部未删除文档的纯元数据 manifest，
+   * 供客户端判断哪些内容需要推送或拉取。
    */
   async getManifest(userId: string) {
     const docs = await this.docModel
@@ -184,6 +192,7 @@ export class SyncService implements OnModuleInit {
     return docs.map((doc) => this.serializeDoc(doc));
   }
 
+  /** 根据时间游标返回用户文档的增量变化列表。 */
   async getChanges(userId: string, since?: string) {
     const sinceDate = since ? new Date(since) : null;
     const filter: Record<string, any> = {
@@ -206,6 +215,10 @@ export class SyncService implements OnModuleInit {
     };
   }
 
+  /**
+   * 写入单个文件。
+   * 通过 `baseRev` 和 `mutationId` 同时处理并发冲突与客户端重试去重。
+   */
   async pushFile(userId: string, fileId: string, doc: PushFileDto) {
     const userObjectId = this.userObjectId(userId);
     const safeDeviceId = this.sanitizeDeviceId(doc.deviceId);
@@ -213,6 +226,7 @@ export class SyncService implements OnModuleInit {
       .findOne({ userId: userObjectId, fileId })
       .lean<any>();
 
+    // 相同 mutation 代表客户端在重试同一次写入，直接返回现状即可。
     if (existing?.lastMutationId && existing.lastMutationId === doc.mutationId) {
       return this.serializeDoc(existing);
     }
@@ -239,6 +253,7 @@ export class SyncService implements OnModuleInit {
 
     try {
       if (!existing) {
+        // 新文件只能基于 rev=0 创建，避免把已有文件误当成首次上传。
         if ((doc.baseRev ?? 0) !== 0) {
           this.throwRevisionConflict(null);
         }
@@ -251,6 +266,7 @@ export class SyncService implements OnModuleInit {
         return this.serializeDoc(created.toObject());
       }
 
+      // 版本不一致时提示客户端先拉取最新内容再合并。
       if ((doc.baseRev ?? 0) !== existing.rev) {
         this.throwRevisionConflict(existing);
       }
@@ -291,8 +307,8 @@ export class SyncService implements OnModuleInit {
   }
 
   /**
-   * Legacy batch push, kept for callers that still send <= a few small
-   * files at once. New clients should use `pushFile()` per file.
+   * 兼容旧调用方的批量推送接口，适用于一次仍只发送少量小文件的场景。
+   * 新客户端应改为逐文件调用 `pushFile()`。
    */
   async pushDocuments(userId: string, documents: PushFileDto[]) {
     let pushed = 0;
@@ -305,8 +321,8 @@ export class SyncService implements OnModuleInit {
   }
 
   /**
-   * Fetch a single document's full body. Per-file pull keeps response
-   * sizes well under Vercel's response budget.
+   * 拉取单个文档的完整正文。
+   * 按文件拆分拉取可将响应体积稳定控制在 Vercel 的限制之内。
    */
   async pullFile(userId: string, fileId: string) {
     const doc = await this.docModel
@@ -320,7 +336,7 @@ export class SyncService implements OnModuleInit {
     return this.serializeDoc(doc, true);
   }
 
-  /** Legacy multi-file pull, by `fileIds`. */
+  /** 兼容旧客户端的多文件拉取接口，按 `fileIds` 查询。 */
   async pullDocuments(userId: string, fileIds: string[]) {
     const docs = await this.docModel
       .find({
@@ -332,12 +348,14 @@ export class SyncService implements OnModuleInit {
     return docs.map((doc) => this.serializeDoc(doc, true));
   }
 
+  /** 为指定设备记录文件在本机上的保存路径。 */
   async bindPath(userId: string, fileId: string, dto: BindPathDto) {
     const userObjectId = this.userObjectId(userId);
     const existing = await this.docModel
       .findOne({ userId: userObjectId, fileId, deleted: false })
       .lean<any>();
     if (!existing) return null;
+    // 绑定路径也支持幂等重试，避免客户端重复提交造成无意义写入。
     if (dto.mutationId && existing.lastMutationId === dto.mutationId) {
       return this.serializeDoc(existing);
     }
@@ -355,6 +373,10 @@ export class SyncService implements OnModuleInit {
     return updated ? this.serializeDoc(updated) : null;
   }
 
+  /**
+   * 删除单个文件。
+   * 采用墓碑标记保留版本信息，便于其他设备感知删除事件。
+   */
   async deleteFile(userId: string, fileId: string, dto: DeleteFileDto) {
     const userObjectId = this.userObjectId(userId);
     const existing = await this.docModel
@@ -363,6 +385,7 @@ export class SyncService implements OnModuleInit {
     if (!existing) {
       return { fileId, deleted: true, rev: 0 };
     }
+    // 重试同一次删除时直接返回现有墓碑状态。
     if (existing.lastMutationId && existing.lastMutationId === dto.mutationId) {
       return this.serializeDoc(existing);
     }
@@ -390,6 +413,7 @@ export class SyncService implements OnModuleInit {
     return this.serializeDoc(updated);
   }
 
+  /** 兼容旧客户端的批量删除包装器。 */
   async deleteDocuments(userId: string, fileIds: string[]) {
     let deleted = 0;
     for (const fileId of fileIds) {
@@ -406,6 +430,7 @@ export class SyncService implements OnModuleInit {
     return { deleted };
   }
 
+  /** 清空用户文档并重置配置到当前协议版本。 */
   async resetState(userId: string) {
     const userObjectId = this.userObjectId(userId);
     await this.docModel.deleteMany({ userId: userObjectId });
@@ -423,6 +448,7 @@ export class SyncService implements OnModuleInit {
     return { reset: true };
   }
 
+  /** 读取用户同步配置，不存在时自动初始化默认配置。 */
   async getConfig(userId: string) {
     let config = await this.configModel
       .findOne({ userId: this.userObjectId(userId) })
@@ -439,6 +465,7 @@ export class SyncService implements OnModuleInit {
     return this.pickConfigFields(rest);
   }
 
+  /** 更新用户同步配置，并同步写入毫秒级更新时间字段。 */
   async updateConfig(userId: string, data: UpdateConfigDto) {
     const sanitized = this.pickConfigFields({
       ...data,

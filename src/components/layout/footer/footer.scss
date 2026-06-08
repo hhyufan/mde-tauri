@@ -1,3 +1,6 @@
+/**
+ * 底部状态栏样式，定义布局结构以及常用状态与操作入口的视觉表现。
+ */
 .footer {
   height: 28px;
   display: flex;
@@ -81,7 +84,7 @@
   min-width: 0;
   position: relative;
 
-  // Right-edge fog to indicate overflow
+  // 右侧边缘的渐隐效果，用于提示内容还有溢出
   &::after {
     content: '';
     position: absolute;
@@ -115,18 +118,18 @@
   &::-webkit-scrollbar { display: none; }
 }
 
-// Custom horizontal scrollbar for the footer breadcrumb
+// 页脚面包屑的自定义横向滚动条
 .footer__breadcrumb-scrollbar {
   position: absolute;
   bottom: 1px;
   left: 8px;
   right: 8px;
-  height: 6px; // taller hit area so thumb is easier to grab
+  height: 6px; // 增大命中区域，让滑块更容易拖拽
   border-radius: 3px;
-  overflow: visible; // don't clip thumb events
+  overflow: visible; // 不裁剪滑块事件区域
   opacity: 0;
   transition: opacity 0.2s;
-  pointer-events: none; // track itself doesn't need events
+  pointer-events: none; // 轨道本身不需要接收事件
 
   .footer__breadcrumb:hover & {
     opacity: 1;
@@ -142,7 +145,7 @@
   transition: left 0.05s linear;
   display: none;
   cursor: grab;
-  pointer-events: all; // thumb must receive mouse events
+  pointer-events: all; // 滑块必须接收鼠标事件
 
   &:active { cursor: grabbing; }
 }
@@ -235,9 +238,9 @@
     height: auto;
     padding: 6px 10px;
     gap: 8px;
-    // .app__main already reserves env(safe-area-inset-bottom); we only have
-    // to add room here when the IME is open (.app__main drops its own
-    // padding via html.mde--kb-open in App.scss).
+    // .app__main 已经预留了 env(safe-area-inset-bottom)；
+    // 这里只需要在 IME 打开时额外补出空间
+    // （.app__main 会通过 App.scss 中的 html.mde--kb-open 去掉自身 padding）。
     padding-bottom: calc(6px + var(--mde-kb-inset, 0px));
   }
 

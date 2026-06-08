@@ -1,3 +1,9 @@
+/**
+ * 搜索弹窗模块。
+ *
+ * 提供工作区级文件名与内容检索界面，集中处理搜索输入、结果列表展示、
+ * 键盘导航以及与编辑器打开跳转相关的交互编排。
+ */
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Modal, Input } from 'antd';
@@ -10,6 +16,16 @@ import { debounce } from '@utils/debounce';
 import FileTypeIcon from '@components/ui/FileTypeIcon';
 import './search-modal.scss';
 
+/**
+ * 全局搜索弹窗。
+ *
+ * 支持按文件名或文件内容搜索当前工作目录，并提供键盘上下选择、回车打开、
+ * 以及内容匹配后跳转到目标行的联动能力。
+ *
+ * @param {object} props 组件属性。
+ * @param {boolean} props.open 控制弹窗显示状态。
+ * @param {() => void} props.onClose 关闭弹窗的回调。
+ */
 function SearchModal({ open, onClose }) {
   const { t } = useTranslation();
   const [query, setQuery] = useState('');
@@ -33,6 +49,14 @@ function SearchModal({ open, onClose }) {
     }
   }, [open]);
 
+  /**
+   * 以防抖方式执行搜索请求，并在请求完成后刷新结果列表与加载态。
+   *
+   * @param {string} q 当前搜索关键词。
+   * @param {string} dir 当前工作目录。
+   * @param {boolean} isContent 是否执行内容搜索。
+   * @returns {Promise<void>} 搜索完成后更新组件状态。
+   */
   const doSearch = useCallback(
     debounce(async (q, dir, isContent) => {
       if (!q.trim() || !dir) {
@@ -61,6 +85,12 @@ function SearchModal({ open, onClose }) {
     doSearch(query, currentDir, searchContent);
   }, [query, searchContent, currentDir, doSearch]);
 
+  /**
+   * 打开选中的搜索项；如果命中了内容搜索结果，则在文件打开后跳转到对应行。
+   *
+   * @param {object} item 当前选中的搜索结果项。
+   * @returns {Promise<void>} 打开并在需要时定位到目标行。
+   */
   const handleSelect = useCallback(async (item) => {
     await openFileFromPath(item.path, item.name);
     onClose();
@@ -73,6 +103,11 @@ function SearchModal({ open, onClose }) {
     }
   }, [openFileFromPath, onClose]);
 
+  /**
+   * 处理搜索框键盘导航，包括关闭、上下切换与回车确认。
+   *
+   * @param {KeyboardEvent} e 键盘事件对象。
+   */
   const handleKeyDown = useCallback((e) => {
     if (e.key === 'Escape') {
       onClose();
@@ -96,6 +131,12 @@ function SearchModal({ open, onClose }) {
     if (el) el.scrollIntoView({ block: 'nearest' });
   }, [selectedIndex]);
 
+  /**
+   * 将绝对路径裁剪为相对当前工作目录的展示路径，便于结果列表压缩信息密度。
+   *
+   * @param {string} fullPath 待转换的绝对路径。
+   * @returns {string} 相对当前工作目录的展示路径。
+   */
   const getRelativePath = (fullPath) => {
     if (!currentDir || !fullPath) return fullPath;
     const prefix = currentDir.endsWith('\\') || currentDir.endsWith('/')

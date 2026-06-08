@@ -1,0 +1,49 @@
+.ant-app,
+.ant-modal-root {
+  color: var(--text);
+}
+
+.ant-card,
+.ant-modal-content,
+.ant-tree,
+.ant-tree-list-holder-inner,
+.ant-segmented,
+.ant-alert,
+.ant-tag {
+  backdrop-filter: blur(18px);
+}
+
+.ant-card,
+.ant-modal-content,
+.ant-tree,
+.ant-segmented,
+.ant-alert {
+  border-color: var(--border-light) !important;
+}
+
+.ant-btn:not(.ant-btn-primary) {
+  border-color: var(--border-light);
+  background: color-mix(in srgb, var(--surface) 88%, transparent);
+  color: var(--text);
+}
+
+.ant-btn:not(.ant-btn-primary):hover {
+  border-color: color-mix(in srgb, var(--accent) 34%, var(--border-light));
+  color: var(--accent) !important;
+}
+
+.ant-tag {
+  border-radius: 999px;
+}
+
+.ant-tree {
+  background: transparent;
+}
+
+.ant-tree .ant-tree-node-content-wrapper {
+  border-radius: 10px;
+}
+
+.ant-modal .ant-modal-close {
+  color: var(--text-sec);
+}

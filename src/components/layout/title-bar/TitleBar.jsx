@@ -6,6 +6,11 @@ import useEditorStore from '@store/useEditorStore';
 import { useResponsiveLayout } from '@hooks/useResponsiveLayout';
 import './titlebar.scss';
 
+/**
+ * 标题栏按钮封装。
+ *
+ * 桌面端窗口控制按钮和通用入口按钮复用同一套样式与提示行为。
+ */
 function TbBtn({ title, className = 'titlebar__btn', onClick, children }) {
   return (
     <Tooltip title={title} placement="bottom" mouseEnterDelay={0.3}>
@@ -16,6 +21,12 @@ function TbBtn({ title, className = 'titlebar__btn', onClick, children }) {
   );
 }
 
+/**
+ * 顶部标题栏。
+ *
+ * 负责侧边栏开关、搜索入口，以及桌面端的最小化/最大化/关闭窗口控制。
+ * 在移动端与 Android 上则退化成更轻量的导航头。
+ */
 function TitleBar({ onOpenSearch, onRequestClose }) {
   const { t } = useTranslation();
   const { toggleSidebar } = useEditorStore();
@@ -24,6 +35,8 @@ function TitleBar({ onOpenSearch, onRequestClose }) {
   const isDesktopWindow = !isMobileLayout && !isAndroid;
 
   useEffect(() => {
+    // 最大化状态只能从原生窗口层读取；监听 resize 可兼容双击标题栏、
+    // 系统快捷键和窗口控制按钮等多种切换入口。
     if (!isDesktopWindow) return undefined;
     appWindow.isMaximized().then(setIsMaximized);
     const unlisten = appWindow.onResized(() => {

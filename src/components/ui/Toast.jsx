@@ -2,6 +2,11 @@ import { useEffect, useRef } from 'react';
 import useToastStore from '@store/useToastStore';
 import './toast.scss';
 
+/**
+ * 轻量提示条单项。
+ *
+ * 通过底部进度条的宽度动画表现剩余展示时长。
+ */
 function ToastItem({ toast }) {
   const barRef = useRef(null);
 
@@ -24,6 +29,11 @@ function ToastItem({ toast }) {
   );
 }
 
+/**
+ * 页面内轻提示容器。
+ *
+ * 通常用于编辑区内部的即时反馈，不与顶部通知混用。
+ */
 function ToastContainer() {
   const toasts = useToastStore((s) => s.toasts);
 

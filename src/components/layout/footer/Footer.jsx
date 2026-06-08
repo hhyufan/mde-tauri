@@ -1,4 +1,4 @@
-﻿import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useHorizontalDragScroll } from '@hooks/useHorizontalDragScroll';
 import { useTranslation } from 'react-i18next';
 import { Dropdown, Tooltip } from 'antd';
@@ -48,6 +48,12 @@ function ChevronIcon() {
   );
 }
 
+/**
+ * 底部状态栏。
+ *
+ * 汇总当前文件路径、光标位置、字符数、编码、换行符与同步状态，并提供
+ * 侧边栏切换和 Markdown 编辑/预览模式快捷切换。
+ */
 function Footer() {
   const { t } = useTranslation();
   const { toggleSidebar, viewMode, toggleEditPreview } = useEditorStore();
@@ -71,7 +77,7 @@ function Footer() {
   const bcThumbRef = useRef(null);
   const isAndroid = isAndroidRuntime();
 
-  // ── Breadcrumb scroll ─────────────────────────────────────────────────────
+  // 底部路径面包屑的横向滚动与自定义滚动条同步。
   const updateBcScrollbar = useCallback(() => {
     const el = bcScrollRef.current;
     const thumb = bcThumbRef.current;
@@ -92,10 +98,8 @@ function Footer() {
     const el = bcScrollRef.current;
     if (!el) return;
     el.addEventListener('scroll', updateBcScrollbar, { passive: true });
-    // React's synthetic onWheel is always registered as passive, so
-    // preventDefault() triggers a warning. Attach a native non-passive
-    // wheel listener here so vertical wheel scrolls the breadcrumb
-    // horizontally without propagating to the page.
+    // React 合成事件中的 `onWheel` 默认是被动监听，无法安全阻止默认滚动；
+    // 这里改用原生非被动监听，把纵向滚轮转为面包屑横向滚动。
     const onWheel = (e) => {
       if (Math.abs(e.deltaX) > Math.abs(e.deltaY)) return;
       e.preventDefault();

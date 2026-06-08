@@ -1,7 +1,9 @@
-/* Bottom-center fixed toolbar — uses position:fixed to escape overflow:hidden parents */
+/**
+ * 编辑区底部浮动工具栏样式，定义固定定位、显隐动画与拖拽把手外观。
+ */
 .ft {
   position: fixed;
-  bottom: 48px; /* above the footer bar */
+  bottom: 48px; /* 位于底部栏上方 */
   left: 50%;
   transform: translateX(-50%) translateY(12px);
   z-index: 500;
@@ -145,10 +147,10 @@
   .ft {
     left: 8px;
     right: 8px;
-    // When the IME is open we want the toolbar to sit above the keyboard;
-    // otherwise it floats above the footer + system nav bar. --mde-kb-inset
-    // is published by useViewportInsets() and is 0 when no IME is visible.
-    // max() picks whichever inset is larger so we never double-count.
+    // 当 IME 打开时，希望工具栏位于键盘上方；
+    // 否则它应悬浮在底部栏和系统导航栏之上。--mde-kb-inset
+    // 由 useViewportInsets() 提供，在没有可见 IME 时为 0。
+    // max() 取两者中更大的插入值，避免重复计算。
     bottom: calc(56px + max(env(safe-area-inset-bottom), var(--mde-kb-inset, 0px)));
     width: auto;
     max-width: none;

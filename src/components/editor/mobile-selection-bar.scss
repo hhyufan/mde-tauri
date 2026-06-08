@@ -1,6 +1,6 @@
-/* Floating quick-action bar shown above a non-empty Monaco selection on
-   touch devices (primarily Android). Positioned by JS in screen coordinates
-   via translateX(-50%) so the anchor X aligns with the selection midpoint. */
+/**
+ * 触屏端 Monaco 选区快捷操作栏样式，显示在非空选区上方并由脚本按屏幕坐标定位。
+ */
 .mobile-selection-bar {
   position: fixed;
   z-index: 9000;

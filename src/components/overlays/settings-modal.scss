@@ -1,3 +1,8 @@
+/**
+ * @file settings-modal.scss
+ * @description 定义设置弹窗的基础布局、分区导航、设置项表单以及移动端全屏模式样式。
+ */
+
 .settings-overlay {
   position: fixed;
   inset: 0;
@@ -182,8 +187,8 @@
     border-bottom: none;
   }
 
-  // Drop the bottom border when followed by a group header to avoid
-  // a visual double-line with the group's divider line.
+  // 当下一项是分组标题时，去掉当前项底边框，
+  // 避免与分组分割线叠出双线效果。
   &:has(+ .settings-group) {
     border-bottom: none;
   }
@@ -411,10 +416,10 @@
   }
 }
 
-// Full-screen settings modal (Android portrait). The dialog already covers
-// the entire screen via antd-overrides.scss; here we stack the rows so the
-// controls go below their labels instead of sitting on the right edge where
-// they'd overflow narrow phone widths.
+// 设置弹窗全屏模式（Android 竖屏）。
+// 对话框本体已在 antd-overrides.scss 中铺满全屏；
+// 这里将每一行改为纵向堆叠，让控件显示在标签下方，
+// 避免它们在窄屏手机上仍贴在右侧并发生溢出。
 .settings-modal--fullscreen {
   .settings-modal__header {
     padding: 12px 16px;
@@ -444,8 +449,8 @@
       flex-wrap: wrap;
       gap: 8px;
 
-      // Make antd form controls fill the available row so they don't look
-      // tiny next to the label on a phone.
+      // 让 antd 表单控件占满可用行宽，
+      // 避免在手机上紧贴标签时显得过小。
       > .ant-input,
       > .ant-input-affix-wrapper,
       > .ant-input-number,

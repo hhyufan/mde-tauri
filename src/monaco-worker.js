@@ -1,14 +1,22 @@
+/**
+ * Monaco Worker ???????
+ *
+ * ?????????? Worker ????????????????????????????
+ */
 import editorWorker from 'monaco-editor/esm/vs/editor/editor.worker?worker';
 import jsonWorker from 'monaco-editor/esm/vs/language/json/json.worker?worker';
 import cssWorker from 'monaco-editor/esm/vs/language/css/css.worker?worker';
 import htmlWorker from 'monaco-editor/esm/vs/language/html/html.worker?worker';
 import tsWorker from 'monaco-editor/esm/vs/language/typescript/ts.worker?worker';
-// Locale is initialized earlier in src/utils/monacoLocaleBoot.js (imported first in
-// main.jsx) so that it's set BEFORE monaco-editor module code runs. We no longer
-// call initMonacoLocale() here because at this point monaco-editor has already
-// been imported by MonacoEditor.jsx.
+// 语言环境会在更早阶段于 src/utils/monacoLocaleBoot.js 中完成初始化
+// （它会在 main.jsx 里最先被导入），以确保设置发生在 monaco-editor
+// 模块代码执行之前。这里不再调用 initMonacoLocale()，因为在当前时机
+// 下，MonacoEditor.jsx 已经导入过 monaco-editor。
 
 self.MonacoEnvironment = {
+  /**
+   * ?????????? Worker ???
+   */
   getWorker(_, label) {
     if (label === 'json') {
       return new jsonWorker();

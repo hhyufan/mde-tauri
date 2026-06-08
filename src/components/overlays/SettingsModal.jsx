@@ -1,3 +1,9 @@
+/**
+ * 设置弹窗模块。
+ *
+ * 汇总应用配置相关的展示与交互入口，覆盖常规偏好、编辑器外观、
+ * 云同步设置，以及设置快照的导入导出流程。
+ */
 import { useState } from 'react';
 import { Modal, Menu, Switch, Select, Input, InputNumber, Button, Space } from 'antd';
 import { useResponsiveLayout } from '@hooks/useResponsiveLayout';
@@ -38,6 +44,16 @@ const NAV_ICONS = {
 
 const NAV_KEYS = ['general', 'appearance', 'editor', 'cloud'];
 
+/**
+ * 设置弹窗。
+ *
+ * 按分类集中管理工作区、外观、编辑器与云同步相关配置，并提供设置导入导出、
+ * 云端同步与账号状态展示。
+ *
+ * @param {object} props 组件属性。
+ * @param {boolean} props.open 控制弹窗显示状态。
+ * @param {() => void} props.onClose 关闭弹窗的回调。
+ */
 function SettingsModal({ open: openProp, onClose }) {
   const { t, i18n } = useTranslation();
   const [activeNav, setActiveNav] = useState('general');
@@ -47,12 +63,16 @@ function SettingsModal({ open: openProp, onClose }) {
   const { isLoggedIn, user, logout } = useAuthStore();
   const notify = useNotificationStore((s) => s.notify);
   const { isMobileLayout, isPortrait } = useResponsiveLayout();
-  // On phones in portrait we treat the settings dialog as a full-screen sheet
-  // (modal width === screen, no centering) so the inner two-pane layout has
-  // room to stack vertically. Landscape mobile keeps the side-by-side layout
-  // because there's enough horizontal space.
+  // 手机竖屏下把设置面板当作全屏抽屉处理，给内部双栏布局留出纵向堆叠空间；
+  // 横屏移动端横向空间更充足，因此仍保留左右并排布局。
   const fullScreen = isMobileLayout && isPortrait;
 
+  /**
+   * 写入设置项，并在语言切换时同步更新国际化实例。
+   *
+   * @param {string} key 配置键名。
+   * @param {unknown} value 目标配置值。
+   */
   function handleChange(key, value) {
     config.setConfig(key, value);
     if (key === 'language') {
@@ -60,6 +80,11 @@ function SettingsModal({ open: openProp, onClose }) {
     }
   }
 
+  /**
+   * 将本地设置主动推送到云端。
+   *
+   * @returns {Promise<void>} 同步完成后更新忙碌状态并给出通知。
+   */
   async function handleSyncSettings() {
     if (!isLoggedIn) return;
     setCloudBusy(true);
@@ -73,6 +98,11 @@ function SettingsModal({ open: openProp, onClose }) {
     }
   }
 
+  /**
+   * 从云端拉取设置并覆盖当前本地配置快照。
+   *
+   * @returns {Promise<void>} 拉取完成后同步语言并提示结果。
+   */
   async function handlePullSettings() {
     if (!isLoggedIn) return;
     setCloudBusy(true);
@@ -89,6 +119,11 @@ function SettingsModal({ open: openProp, onClose }) {
     }
   }
 
+  /**
+   * 导出当前设置快照为本地 JSON 文件。
+   *
+   * @returns {Promise<void>} 导出结束后重置忙碌状态。
+   */
   async function handleExportJson() {
     setCloudBusy(true);
     try {
@@ -107,6 +142,11 @@ function SettingsModal({ open: openProp, onClose }) {
     }
   }
 
+  /**
+   * 从本地 JSON 文件导入设置快照并立即应用。
+   *
+   * @returns {Promise<void>} 导入完成后同步语言并提示结果。
+   */
   async function handleImportJson() {
     setCloudBusy(true);
     try {
@@ -254,8 +294,61 @@ function SettingsModal({ open: openProp, onClose }) {
                 </SettingRow>
                 <SettingGroup label={t('settings.group.typography')} />
                 <SettingRow
-                  label={t('settings.appearance.fontSize')}
-                  desc={t('settings.appearance.fontSizeDesc')}
+                  label={t('settings.appearance.previewZoomSync')}
+                  desc={t('settings.appearance.previewZoomSyncDesc')}
+                >
+                  <Switch
+                    checked={config.previewZoomSync ?? true}
+                    onChange={(v) => handleChange('previewZoomSync', v)}
+                  />
+                </SettingRow>
+                <SettingRow
+                  label={t('settings.appearance.previewFontSize')}
+                  desc={t('settings.appearance.previewFontSizeDesc')}
+                >
+                  <InputNumber
+                    min={10}
+                    max={24}
+                    step={1}
+                    disabled={config.previewZoomSync ?? true}
+                    value={config.previewFontSize ?? config.fontSize ?? 14}
+                    onChange={(v) => handleChange('previewFontSize', Number(v) || config.fontSize || 14)}
+                    addonBefore={
+                      <Button
+                        type="text"
+                        size="small"
+                        disabled={config.previewZoomSync ?? true}
+                        icon={<MinusOutlined />}
+                        onClick={() => handleChange(
+                          'previewFontSize',
+                          Math.max(10, ((config.previewFontSize ?? config.fontSize) || 14) - 1)
+                        )}
+                      />
+                    }
+                    addonAfter={
+                      <Button
+                        type="text"
+                        size="small"
+                        disabled={config.previewZoomSync ?? true}
+                        icon={<PlusOutlined />}
+                        onClick={() => handleChange(
+                          'previewFontSize',
+                          Math.min(24, ((config.previewFontSize ?? config.fontSize) || 14) + 1)
+                        )}
+                      />
+                    }
+                    style={{ width: 180 }}
+                  />
+                </SettingRow>
+              </div>
+            )}
+
+            {activeNav === 'editor' && (
+              <div className="settings-section">
+                <SettingGroup label={t('settings.group.font')} />
+                <SettingRow
+                  label={t('settings.editor.fontSize')}
+                  desc={t('settings.editor.fontSizeDesc')}
                 >
                   <InputNumber
                     min={10}
@@ -282,12 +375,6 @@ function SettingsModal({ open: openProp, onClose }) {
                     style={{ width: 180 }}
                   />
                 </SettingRow>
-              </div>
-            )}
-
-            {activeNav === 'editor' && (
-              <div className="settings-section">
-                <SettingGroup label={t('settings.group.font')} />
                 <SettingRow
                   label={t('settings.editor.fontFamily')}
                   desc={t('settings.editor.fontFamilyDesc')}
@@ -452,6 +539,12 @@ function SettingsModal({ open: openProp, onClose }) {
   );
 }
 
+/**
+ * 设置分组标题。
+ *
+ * @param {object} props 组件属性。
+ * @param {React.ReactNode} props.label 分组标题文本。
+ */
 function SettingGroup({ label }) {
   return (
     <div className="settings-group">
@@ -460,6 +553,14 @@ function SettingGroup({ label }) {
   );
 }
 
+/**
+ * 单条设置项行布局。
+ *
+ * @param {object} props 组件属性。
+ * @param {React.ReactNode} props.label 设置项名称。
+ * @param {React.ReactNode} props.desc 设置项说明文本。
+ * @param {React.ReactNode} props.children 设置控件内容。
+ */
 function SettingRow({ label, desc, children }) {
   return (
     <div className="setting-row">

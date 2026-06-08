@@ -1,12 +1,26 @@
+/**
+ * ???????
+ *
+ * ?????????????????????????????????
+ */
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 
+/**
+ * 主题 store。
+ *
+ * 统一维护亮暗主题，并把结果同步到 `document.documentElement.dataset.theme`
+ * 供全局样式立即生效。
+ */
 const useThemeStore = create(
   persist(
     (set, get) => ({
       theme: 'light',
       themeUpdatedAt: 0,
 
+      /**
+       * 显式设置主题，同时记录可用于云同步比较的更新时间。
+       */
       setTheme: (theme, meta = {}) => {
         document.documentElement.dataset.theme = theme;
         set({
@@ -15,6 +29,9 @@ const useThemeStore = create(
         });
       },
 
+      /**
+       * 在亮色与暗色主题之间切换。
+       */
       toggleTheme: () => {
         const next = get().theme === 'dark' ? 'light' : 'dark';
         document.documentElement.dataset.theme = next;
@@ -24,8 +41,13 @@ const useThemeStore = create(
         });
       },
 
+      /**
+       * 初始化主题。
+       *
+       * 优先读取持久化结果；若没有历史值，再回退到系统颜色方案偏好。
+       */
       initTheme: () => {
-        // Only fall back to system preference if no persisted value exists
+        // 只有在没有本地持久化结果时才回退到系统主题偏好。
         const persisted = localStorage.getItem('mde-theme');
         const savedTheme = persisted ? JSON.parse(persisted)?.state?.theme : null;
         const initial = savedTheme || (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
@@ -38,7 +60,7 @@ const useThemeStore = create(
     }),
     {
       name: 'mde-theme',
-      // Apply the persisted theme to the DOM as soon as the store rehydrates
+      // store 回填完成后立即把持久化主题应用到 DOM，避免首屏闪烁。
       onRehydrateStorage: () => (state) => {
         if (state?.theme) {
           document.documentElement.dataset.theme = state.theme;

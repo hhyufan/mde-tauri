@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1.0, viewport-fit=cover"
+    />
+    <title>MDE Showcase</title>
+    <style>
+      html,
+      body {
+        margin: 0;
+        padding: 0;
+        height: 100%;
+        overflow: hidden;
+      }
+
+      html {
+        background: #f5f5f7;
+      }
+
+      html[data-theme='dark'] {
+        background: #121212;
+      }
+
+      #root {
+        height: 100%;
+      }
+    </style>
+    <script>
+      (function () {
+        try {
+          var raw = localStorage.getItem('mde-theme');
+          var theme = raw && JSON.parse(raw)?.state?.theme;
+          if (!theme) {
+            theme = window.matchMedia('(prefers-color-scheme: dark)').matches
+              ? 'dark'
+              : 'light';
+          }
+          document.documentElement.dataset.theme = theme;
+        } catch (_) {}
+      })();
+    </script>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/showcase/main.jsx"></script>
+  </body>
+</html>

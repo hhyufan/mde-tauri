@@ -1,3 +1,9 @@
+/**
+ * @file Monaco 编辑器封装模块。
+ *
+ * 该文件负责创建 Monaco 实例、桥接缓冲区与全局状态、同步主题与语言配置，
+ * 并统一接入桌面端右键菜单和移动端选区增强交互。
+ */
 import { useEffect, useRef, useImperativeHandle, forwardRef, useState, useCallback } from 'react';
 import * as monaco from 'monaco-editor';
 import '@/monaco-worker';
@@ -13,15 +19,32 @@ import { useResponsiveLayout } from '@hooks/useResponsiveLayout';
 import { setMonacoLocale } from '@utils/monacoLocale';
 import './monaco-editor.scss';
 
+/**
+ * Monaco 编辑器组件。
+ *
+ * 负责将当前活动标签映射到 Monaco model，并通过 ref 暴露插入、包裹选区等
+ * 编辑能力给外层工具栏与工作区组件使用。
+ *
+ * @param {object} props 组件属性。
+ * @param {string} [props.className] 附加到容器上的样式类名。
+ * @param {Function} [props.onAutoSave] 编辑内容变化后的自动保存回调。
+ * @param {import('react').ForwardedRef<object>} ref 暴露给父组件的编辑器操作句柄。
+ * @returns {JSX.Element} Monaco 编辑器及其配套浮层。
+ */
+/**
+ * Monaco 编辑器封装。
+ *
+ * 负责初始化编辑器实例、同步标签缓冲区、接入右键菜单与移动端选区能力，
+ * 并对主题、字号、语言与自动保存等外部配置变化做增量响应。
+ */
 const MonacoEditorComponent = forwardRef(function MonacoEditorComponent({ className, onAutoSave }, ref) {
   const containerRef = useRef(null);
   const editorRef = useRef(null);
   const currentTabIdRef = useRef(null);
   const suppressModelChangeRef = useRef(false);
 
-  // The editor only needs to know which tab is active; it never
-  // subscribes to content. Typing therefore can never cause this
-  // component (or any other content-aware component) to re-render.
+  // 编辑器只关心当前激活的是哪个标签页，不直接订阅正文内容，因此输入过程
+  // 不会反向触发本组件或其他内容感知组件的 React 重渲染。
   const activeTabId = useEditorStore((s) => s.activeTabId);
   const tabsRevision = useEditorStore((s) => s.tabsRevision);
   const markTabDirty = useEditorStore((s) => s.markTabDirty);
@@ -41,29 +64,31 @@ const MonacoEditorComponent = forwardRef(function MonacoEditorComponent({ classN
 
   const [highlighterReady, setHighlighterReady] = useState(isMonacoShikiReady());
   const [contextMenu, setContextMenu] = useState({ visible: false, x: 0, y: 0 });
-  // We expose Monaco's instance through state (and not just a ref) so the
-  // MobileSelectionBar's effect can re-run as soon as Monaco finishes
-  // initialising; ref objects are stable so a ref-only handoff would leave
-  // the bar's listeners attached to a null editor forever.
+  // 这里通过 state 暴露 Monaco 实例，而不只放在 ref 中，是为了让
+  // `MobileSelectionBar` 在编辑器初始化完成后重新运行副作用；若只传 ref，
+  // 由于 ref 对象本身稳定，工具栏监听可能永远挂在空实例上。
   const [editorInstance, setEditorInstance] = useState(null);
   const { isAndroid, isMobileLayout, isTouchLike } = useResponsiveLayout();
-  // Only enable the mobile selection affordances on actual mobile/touch
-  // layouts (or inside the Android runtime). Hybrid desktop devices such as
-  // touch-screen Windows laptops report touch capability too, but still need
-  // the normal desktop selection + right-click context-menu flow.
+  // 仅在真实移动端触摸布局或 Android 运行时启用移动端选区能力。像带触摸屏的
+  // Windows 笔记本虽然也会上报触摸能力，但交互上仍更适合保留桌面端的
+  // 原生选区与右键菜单流程。
   const useSelectionBar = isAndroid || (isMobileLayout && isTouchLike);
-  // Refs so the editor.onContextMenu callback (registered once at init time)
-  // always sees the latest layout flag without having to re-subscribe.
+  // 使用 ref 保存最新布局标记，让初始化时只注册一次的 `onContextMenu`
+  // 回调也能读到最新状态，而不需要重复订阅。
   const useSelectionBarRef = useRef(useSelectionBar);
   useSelectionBarRef.current = useSelectionBar;
 
+  /**
+   * 关闭桌面端自定义右键菜单并重置其定位状态。
+   *
+   * @returns {void}
+   */
   const closeContextMenu = useCallback(() => {
     setContextMenu({ visible: false, x: 0, y: 0 });
   }, []);
 
-  // Keep Monaco's built-in UI locale in sync with the app language setting.
-  // The NLS proxy intercepts localize() at render-time, so the next time the
-  // user opens a Monaco widget (Find, Command Palette, �? the new locale applies.
+  // 让 Monaco 自带界面文案与应用语言保持同步。NLS 代理会在渲染时拦截
+  // `localize()`，因此用户下次打开查找框、命令面板等控件时就会应用新语言。
   useEffect(() => {
     setMonacoLocale(language);
   }, [language]);
@@ -108,7 +133,7 @@ const MonacoEditorComponent = forwardRef(function MonacoEditorComponent({ classN
   const onAutoSaveRef = useRef(onAutoSave);
   onAutoSaveRef.current = onAutoSave;
 
-  // Init editor exactly once.
+  // Monaco 实例只初始化一次，后续通过 model 与 options 更新内容和表现。
   useEffect(() => {
     if (!containerRef.current) return;
 
@@ -155,6 +180,9 @@ const MonacoEditorComponent = forwardRef(function MonacoEditorComponent({ classN
     let charCountScheduled = false;
     let autoSaveScheduled = false;
 
+    /**
+     * 延迟写入脏标记，避免每次击键都直接触发状态更新。
+     */
     const scheduleDirtyMark = () => {
       if (dirtyMarkScheduled) return;
       dirtyMarkScheduled = true;
@@ -165,6 +193,9 @@ const MonacoEditorComponent = forwardRef(function MonacoEditorComponent({ classN
       }, 200);
     };
 
+    /**
+     * 节流更新字符统计，降低频繁输入时的全局状态写入成本。
+     */
     const scheduleCharCount = () => {
       if (charCountScheduled) return;
       charCountScheduled = true;
@@ -176,6 +207,9 @@ const MonacoEditorComponent = forwardRef(function MonacoEditorComponent({ classN
       }, 250);
     };
 
+    /**
+     * 在短暂空闲后触发自动保存回调，合并连续输入期间的多次变更。
+     */
     const scheduleAutoSave = () => {
       if (autoSaveScheduled) return;
       autoSaveScheduled = true;
@@ -190,11 +224,9 @@ const MonacoEditorComponent = forwardRef(function MonacoEditorComponent({ classN
       const tabId = currentTabIdRef.current;
       if (!tabId) return;
       const value = editor.getValue();
-      // 1. Update the editor buffer synchronously �?preview/outline
-      //    consumers will pick this up on their own debounce.
+      // 1. 先同步写入编辑缓冲区，让预览、大纲等消费者按各自节流节奏读取。
       setBuffer(tabId, value);
-      // 2. Mark dirty + character count + auto-save are throttled so
-      //    typing never goes through Zustand on every keystroke.
+      // 2. 脏标记、字数统计与自动保存统一节流，避免每次击键都穿透 Zustand。
       scheduleDirtyMark();
       scheduleCharCount();
       scheduleAutoSave();
@@ -207,21 +239,17 @@ const MonacoEditorComponent = forwardRef(function MonacoEditorComponent({ classN
       });
     });
 
-    // Unified context-menu / long-press hook. Monaco's `onContextMenu`
-    // fires on desktop right-click AND on Android long-press, and the event
-    // payload carries the target position which we'd otherwise have to
-    // reconstruct from raw client coordinates via getTargetAtClientPoint().
+    // 统一的右键菜单与长按入口。Monaco 的 `onContextMenu` 既会在桌面右键时
+    // 触发，也会在 Android 长按时触发，并且事件负载自带目标位置，省去了
+    // 根据原始坐标手动反查命中位置的步骤。
     //
-    // We use this single event for two flows:
-    //   - Touch (Android): auto-select the word under the finger via
-    //     smartSelect.expand; MobileSelectionBar shows itself by reacting
-    //     to the resulting selection change.
-    //   - Desktop right-click: open the existing MonacoContextMenu anchored
-    //     at the mouse position.
+    // 同一个事件分流为两种交互：
+    // 1. 触摸端：自动补出手指落点处的单词选区，再交给 `MobileSelectionBar`
+    //    监听选区变化后自行展示。
+    // 2. 桌面端：在鼠标位置弹出既有的 `MonacoContextMenu`。
     //
-    // In both cases we must call preventDefault on the underlying browser
-    // event so the WebView's native long-press behaviour (text magnifier on
-    // Android, page-level context menu on desktop) doesn't fight us.
+    // 两种场景下都需要阻止底层浏览器默认行为，避免 WebView 原生长按放大镜
+    // 或页面级右键菜单与应用内交互相互抢占。
     editor.onContextMenu((event) => {
       const browserEvent = event.event?.browserEvent ?? event.event;
       browserEvent?.preventDefault?.();
@@ -232,16 +260,13 @@ const MonacoEditorComponent = forwardRef(function MonacoEditorComponent({ classN
       const selectionEmpty = !selection || selection.isEmpty();
 
       if (useSelectionBarRef.current) {
-        // Touch path: ensure there's a selection to operate on. Place the
-        // cursor where the user pressed, then expand to the surrounding
-        // word � Monaco's smartSelect.expand does the right thing inside
-        // identifiers, strings, markdown phrases, etc.
+        // 触摸路径需要先补出一个可操作选区：先把光标放到按压位置，再扩展到
+        // 周围单词范围，便于后续移动端操作条接管。
         if (targetPosition && selectionEmpty) {
           editor.setPosition(targetPosition);
           editor.focus();
-          // Use the model's word boundaries directly instead of triggering
-          // smartSelect.expand, because the smartSelect contribution isn't
-          // guaranteed to be loaded in the trimmed mobile Monaco bundle.
+          // 这里直接读取 model 的单词边界，而不是依赖 `smartSelect.expand`，
+          // 因为移动端裁剪版 Monaco 未必包含对应 contribution。
           const model = editor.getModel();
           const word = model?.getWordAtPosition(targetPosition);
           if (word) {
@@ -253,13 +278,11 @@ const MonacoEditorComponent = forwardRef(function MonacoEditorComponent({ classN
             });
           }
         }
-        // No native menu shown; MobileSelectionBar's selection listener
-        // will surface the action bar above the new selection.
+        // 触摸端不弹原生菜单，交由 `MobileSelectionBar` 基于新选区自行显示操作条。
         return;
       }
 
-      // Desktop right-click path: pin the existing context menu to the
-      // mouse position, clamped to the viewport.
+      // 桌面端右键路径：把已有上下文菜单钉在鼠标位置，并限制在视口范围内。
       const menuWidth = 220;
       const menuHeight = 340;
       const rawX = browserEvent?.clientX ?? 0;
@@ -281,6 +304,11 @@ const MonacoEditorComponent = forwardRef(function MonacoEditorComponent({ classN
       }
     });
 
+    /**
+     * 响应大纲跳转事件，将编辑器视口定位到目标行。
+     *
+     * @param {CustomEvent} e 包含目标行号的跳转事件。
+     */
     const handleOutlineJump = (e) => {
       const { line } = e.detail ?? {};
       if (!line) return;
@@ -292,6 +320,11 @@ const MonacoEditorComponent = forwardRef(function MonacoEditorComponent({ classN
 
     let jumpDecoration = null;
     let jumpDecorTimer = null;
+    /**
+     * 响应搜索结果跳转事件，并短暂高亮目标行。
+     *
+     * @param {CustomEvent} e 包含目标行号的搜索跳转事件。
+     */
     const handleSearchJump = (e) => {
       const { line } = e.detail ?? {};
       if (!line) return;
@@ -318,6 +351,11 @@ const MonacoEditorComponent = forwardRef(function MonacoEditorComponent({ classN
     };
     window.addEventListener('editor:jump-to-line', handleSearchJump);
 
+    /**
+     * 吞掉已取消请求带来的未处理拒绝，避免无意义的全局报错提示。
+     *
+     * @param {PromiseRejectionEvent} e 浏览器未处理拒绝事件。
+     */
     const handleUnhandledRejection = (e) => {
       if (e.reason?.name === 'Canceled') e.preventDefault();
     };
@@ -334,10 +372,8 @@ const MonacoEditorComponent = forwardRef(function MonacoEditorComponent({ classN
     };
   }, []);
 
-  // Switch the editor's content when the active tab changes. We read the
-  // freshest content out of the editor buffer (or fall back to the tab's
-  // persisted content) so that switching back to a tab keeps unsaved
-  // edits intact.
+  // 激活标签切换时，同步替换编辑器内容。优先读取最新缓冲区内容，必要时再
+  // 回退到标签页持久化内容，保证切回标签时未保存修改仍然保留。
   useEffect(() => {
     const editor = editorRef.current;
     if (!editor) return;
@@ -372,7 +408,7 @@ const MonacoEditorComponent = forwardRef(function MonacoEditorComponent({ classN
     setCharacterCount(newValue.length);
   }, [activeTabId, tabsRevision, setCharacterCount]);
 
-  // Theme switching with Shiki themes
+  // 主题切换时优先使用 Shiki 主题，若高亮器尚未就绪则回退到 Monaco 默认主题。
   useEffect(() => {
     const observer = new MutationObserver(() => {
       const isDark = document.documentElement.dataset.theme === 'dark';
@@ -419,9 +455,8 @@ const MonacoEditorComponent = forwardRef(function MonacoEditorComponent({ classN
       <div
         ref={containerRef}
         className={`monaco-editor-container ${className || ''}`}
-        // Belt-and-braces: also kill the browser-level contextmenu on the
-        // wrapper so any long-press that bubbles past Monaco's view DOM
-        // (e.g. on the gutter / margin) doesn't surface the native menu.
+        // 再额外拦截一层容器级原生右键菜单，避免长按或右键冒泡穿透 Monaco
+        // 视图节点后，又把宿主浏览器默认菜单弹出来。
         onContextMenu={(e) => e.preventDefault()}
       />
       {!useSelectionBar && (

@@ -1,3 +1,9 @@
+/**
+ * 同步状态指示模块。
+ *
+ * 监听同步引擎状态并将其映射为统一的图标、文本与交互入口，
+ * 让用户在界面顶部快速判断当前云同步健康度。
+ */
 import { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Tooltip } from 'antd';
@@ -43,6 +49,13 @@ const STATUS_ICON_MAP = {
   auth_required: AlertIcon,
 };
 
+/**
+ * 云同步状态指示器。
+ *
+ * 根据同步引擎当前状态切换图标与文案，并提供点击手动触发全量同步的入口。
+ *
+ * @returns {JSX.Element | null} 登录后显示同步状态入口，否则不渲染。
+ */
 function SyncStatusIndicator() {
   const { t } = useTranslation();
   const isLoggedIn = useAuthStore((s) => s.isLoggedIn);

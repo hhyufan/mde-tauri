@@ -1,3 +1,8 @@
+/**
+ * @file editor-content.scss
+ * @description 定义编辑区主内容容器、空状态、编辑器与预览分栏，以及拖拽分隔条的响应式布局。
+ */
+
 .editor-content {
   flex: 1;
   display: flex;
@@ -62,7 +67,7 @@
   }
 }
 
-// Bottom fade — overlays the last line of the editor/preview
+// 底部渐隐层，覆盖编辑器/预览区的最后一行
 .editor-content__fade {
   position: absolute;
   bottom: 0;
@@ -82,8 +87,8 @@
   position: relative;
   transition: background 0.15s;
   z-index: 10;
-  // Disable browser default scroll/zoom gestures on the divider so pointer
-  // events reach our drag handler on touchscreens.
+  // 禁用浏览器在分隔条上的默认滚动/缩放手势，
+  // 确保触屏设备上的指针事件能传递给拖拽处理逻辑。
   touch-action: none;
 
   &:hover,
@@ -123,9 +128,9 @@
 
   .editor-content__workspace--mobile-split {
     flex-direction: column;
-    // The whole workspace is the flex parent; children below pull their
-    // sizes from --split-ratio so dragging the divider redistributes the
-    // editor / preview heights live.
+    // 整个工作区是 flex 父容器；下面的子元素通过 --split-ratio
+    // 获取各自尺寸，因此拖动分隔条时会实时重新分配
+    // 编辑器 / 预览区的高度。
     overflow: hidden;
   }
 
@@ -149,8 +154,8 @@
     width: 100%;
     height: 14px;
     cursor: row-resize;
-    // Larger touch target on phones — 14px is the visible slab but the
-    // ::after grip gives the user a thumb-sized anchor.
+    // 在手机上提供更大的触控目标：14px 是可见条本体，
+    // 但 ::after 抓手会给用户一个适合拇指操作的锚点区域。
     touch-action: none;
 
     &::after {

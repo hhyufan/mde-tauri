@@ -1,0 +1,94 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="AutoImportSettings">
+    <option name="autoReloadType" value="SELECTIVE" />
+  </component>
+  <component name="ChangeListManager">
+    <list default="true" id="832a56ea-bc7d-4049-ba85-88010f7899db" name="更改" comment="">
+      <change beforePath="$PROJECT_DIR$/../mde-server/src/auth/auth.controller.ts" beforeDir="false" afterPath="$PROJECT_DIR$/../mde-server/src/auth/auth.controller.ts" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../mde-server/src/auth/auth.service.ts" beforeDir="false" afterPath="$PROJECT_DIR$/../mde-server/src/auth/auth.service.ts" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../mde-server/src/auth/dto/login.dto.ts" beforeDir="false" afterPath="$PROJECT_DIR$/../mde-server/src/auth/dto/login.dto.ts" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../mde-server/src/auth/dto/register.dto.ts" beforeDir="false" afterPath="$PROJECT_DIR$/../mde-server/src/auth/dto/register.dto.ts" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../mde-server/src/auth/guards/jwt-auth.guard.ts" beforeDir="false" afterPath="$PROJECT_DIR$/../mde-server/src/auth/guards/jwt-auth.guard.ts" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../mde-server/src/auth/strategies/jwt.strategy.ts" beforeDir="false" afterPath="$PROJECT_DIR$/../mde-server/src/auth/strategies/jwt.strategy.ts" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../mde-server/src/auth/strategies/local.strategy.ts" beforeDir="false" afterPath="$PROJECT_DIR$/../mde-server/src/auth/strategies/local.strategy.ts" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../mde-server/src/schemas/sync-config.schema.ts" beforeDir="false" afterPath="$PROJECT_DIR$/../mde-server/src/schemas/sync-config.schema.ts" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../mde-server/src/schemas/sync-document.schema.ts" beforeDir="false" afterPath="$PROJECT_DIR$/../mde-server/src/schemas/sync-document.schema.ts" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../mde-server/src/sync/dto/index.ts" beforeDir="false" afterPath="$PROJECT_DIR$/../mde-server/src/sync/dto/index.ts" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../mde-server/src/sync/dto/pull.dto.ts" beforeDir="false" afterPath="$PROJECT_DIR$/../mde-server/src/sync/dto/pull.dto.ts" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../mde-server/src/sync/dto/push.dto.ts" beforeDir="false" afterPath="$PROJECT_DIR$/../mde-server/src/sync/dto/push.dto.ts" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../mde-server/src/sync/sync.controller.ts" beforeDir="false" afterPath="$PROJECT_DIR$/../mde-server/src/sync/sync.controller.ts" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../mde-server/src/sync/sync.service.ts" beforeDir="false" afterPath="$PROJECT_DIR$/../mde-server/src/sync/sync.service.ts" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Cargo.toml" beforeDir="false" afterPath="$PROJECT_DIR$/Cargo.toml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/lib.rs" beforeDir="false" afterPath="$PROJECT_DIR$/src/lib.rs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main.rs" beforeDir="false" afterPath="$PROJECT_DIR$/src/main.rs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../src/App.jsx" beforeDir="false" afterPath="$PROJECT_DIR$/../src/App.jsx" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../src/components/editor/MarkdownPreview.jsx" beforeDir="false" afterPath="$PROJECT_DIR$/../src/components/editor/MarkdownPreview.jsx" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../src/components/editor/MilkdownMarkdownEditor.jsx" beforeDir="false" afterPath="$PROJECT_DIR$/../src/components/editor/MilkdownMarkdownEditor.jsx" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../src/components/editor/markdown-preview.scss" beforeDir="false" afterPath="$PROJECT_DIR$/../src/components/editor/markdown-preview.scss" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../src/components/layout/content/EditorContent.jsx" beforeDir="false" afterPath="$PROJECT_DIR$/../src/components/layout/content/EditorContent.jsx" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../src/components/layout/sidebar/Sidebar.jsx" beforeDir="false" afterPath="$PROJECT_DIR$/../src/components/layout/sidebar/Sidebar.jsx" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../src/components/layout/title-bar/TitleBar.jsx" beforeDir="false" afterPath="$PROJECT_DIR$/../src/components/layout/title-bar/TitleBar.jsx" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../src/components/overlays/SettingsModal.jsx" beforeDir="false" afterPath="$PROJECT_DIR$/../src/components/overlays/SettingsModal.jsx" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../src/hooks/useFileManager.js" beforeDir="false" afterPath="$PROJECT_DIR$/../src/hooks/useFileManager.js" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../src/i18n/locales/en_us.json" beforeDir="false" afterPath="$PROJECT_DIR$/../src/i18n/locales/en_us.json" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../src/i18n/locales/zh_cn.json" beforeDir="false" afterPath="$PROJECT_DIR$/../src/i18n/locales/zh_cn.json" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../src/services/apiClient.js" beforeDir="false" afterPath="$PROJECT_DIR$/../src/services/apiClient.js" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../src/services/syncEngine.js" beforeDir="false" afterPath="$PROJECT_DIR$/../src/services/syncEngine.js" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../src/store/useConfigStore.js" beforeDir="false" afterPath="$PROJECT_DIR$/../src/store/useConfigStore.js" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../src/store/useEditorStore.js" beforeDir="false" afterPath="$PROJECT_DIR$/../src/store/useEditorStore.js" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../src/store/useFileStore.js" beforeDir="false" afterPath="$PROJECT_DIR$/../src/store/useFileStore.js" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../src/store/useSyncStore.js" beforeDir="false" afterPath="$PROJECT_DIR$/../src/store/useSyncStore.js" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../src/utils/markdownAssets.js" beforeDir="false" afterPath="$PROJECT_DIR$/../src/utils/markdownAssets.js" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../src/utils/settingsSync.js" beforeDir="false" afterPath="$PROJECT_DIR$/../src/utils/settingsSync.js" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../src/utils/tauriApi.js" beforeDir="false" afterPath="$PROJECT_DIR$/../src/utils/tauriApi.js" afterDir="false" />
+    </list>
+    <option name="SHOW_DIALOG" value="false" />
+    <option name="HIGHLIGHT_CONFLICTS" value="true" />
+    <option name="HIGHLIGHT_NON_ACTIVE_CHANGELIST" value="false" />
+    <option name="LAST_RESOLUTION" value="IGNORE" />
+  </component>
+  <component name="Git.Settings">
+    <option name="RECENT_GIT_ROOT_PATH" value="$PROJECT_DIR$/.." />
+  </component>
+  <component name="ProjectColorInfo">{
+  &quot;associatedIndex&quot;: 7
+}</component>
+  <component name="ProjectId" id="3EnZf1a3Xunr92RKUSYDIzyQZSg" />
+  <component name="ProjectViewState">
+    <option name="hideEmptyMiddlePackages" value="true" />
+    <option name="showLibraryContents" value="true" />
+  </component>
+  <component name="PropertiesComponent"><![CDATA[{
+  "keyToString": {
+    "ModuleVcsDetector.initialDetectionPerformed": "true",
+    "RunOnceActivity.ShowReadmeOnStart": "true",
+    "com.intellij.ml.llm.matterhorn.ej.ui.settings.DefaultAutoModeForALLUsers.v1": "true",
+    "com.intellij.ml.llm.matterhorn.ej.ui.settings.DefaultModelSelectionForGA.v1": "true",
+    "git-widget-placeholder": "main",
+    "junie.onboarding.icon.badge.shown": "true",
+    "kotlin-language-version-configured": "true",
+    "last_opened_file_path": "C:/Code/React/mde-tauri/src-tauri",
+    "to.speed.mode.migration.done": "true",
+    "vue.rearranger.settings.migration": "true"
+  }
+}]]></component>
+  <component name="SharedIndexes">
+    <attachedChunks>
+      <set>
+        <option value="bundled-jdk-9823dce3aa75-bf35d07a577b-intellij.indexing.shared.core-IU-252.26830.84" />
+      </set>
+    </attachedChunks>
+  </component>
+  <component name="TaskManager">
+    <task active="true" id="Default" summary="默认任务">
+      <changelist id="832a56ea-bc7d-4049-ba85-88010f7899db" name="更改" comment="" />
+      <created>1780816395471</created>
+      <option name="number" value="Default" />
+      <option name="presentableId" value="Default" />
+      <updated>1780816395471</updated>
+      <workItem from="1780816397495" duration="65000" />
+    </task>
+    <servers />
+  </component>
+</project>

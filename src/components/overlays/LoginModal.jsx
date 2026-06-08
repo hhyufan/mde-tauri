@@ -1,3 +1,9 @@
+/**
+ * 登录弹窗模块。
+ *
+ * 负责承载登录与注册双模式表单，统一处理认证动作、成功回调与错误通知，
+ * 为需要账号能力的界面提供独立认证入口。
+ */
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Modal, Tabs, Form, Input, Button } from 'antd';
@@ -5,6 +11,16 @@ import useAuthStore from '@store/useAuthStore';
 import useNotificationStore from '@store/useNotificationStore';
 import './login-modal.scss';
 
+/**
+ * 登录/注册弹窗。
+ *
+ * 通过页签切换登录与注册模式，复用同一套表单提交流程和通知反馈。
+ *
+ * @param {object} props 组件属性。
+ * @param {boolean} props.open 控制弹窗显示状态。
+ * @param {() => void} props.onClose 关闭弹窗的回调。
+ * @param {() => void} [props.onLoggedIn] 登录成功后的附加回调。
+ */
 function LoginModal({ open, onClose, onLoggedIn }) {
   const { t } = useTranslation();
   const [mode, setMode] = useState('login');
@@ -12,6 +28,12 @@ function LoginModal({ open, onClose, onLoggedIn }) {
   const notify = useNotificationStore((s) => s.notify);
   const [form] = Form.useForm();
 
+  /**
+   * 根据当前模式提交登录或注册请求，并在成功后关闭弹窗。
+   *
+   * @param {{ email: string, username?: string, password: string }} values 表单提交值。
+   * @returns {Promise<void>} 认证流程结束后反馈结果。
+   */
   async function handleSubmit(values) {
     const { email, username, password } = values;
     try {

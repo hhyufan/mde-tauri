@@ -8,6 +8,12 @@ import useFileStore, { getScopedRecentFiles } from '@store/useFileStore';
 import { GUEST_USER_SCOPE } from '@store/userScope';
 import './stats-panel.scss';
 
+/**
+ * 使用统计面板。
+ *
+ * 汇总当前打开文件与最近文件的扩展名分布、单文件词数/字符数，以及总体规模
+ * 指标，帮助用户快速查看编辑工作量概况。
+ */
 function StatsPanel({ open, onClose }) {
   const { t } = useTranslation();
   const chartRef = useRef(null);

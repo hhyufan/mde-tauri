@@ -1,3 +1,8 @@
+/**
+ * @file sidebar.scss
+ * @description 定义应用侧边栏的整体布局、标签切换、工具栏、最近文件列表与移动端抽屉态样式。
+ */
+
 .sidebar {
   width: 280px;
   min-width: 280px;
@@ -50,9 +55,9 @@
   position: relative;
   border: 0;
   border-radius: 8px;
-  // Use the themed hover tone so the segmented control sits on top of the
-  // sidebar without looking pasted on — light has a soft grey, dark has a
-  // transparent white tint, both keyed off the active theme.
+  // 使用当前主题的 hover 色作为底板，
+  // 让分段控件贴合侧边栏，而不是像额外贴上去的一层。
+  // 浅色主题是柔和灰色，深色主题是半透明白色调，都会跟随当前主题切换。
   background: var(--hover);
   box-shadow: none;
 }
@@ -115,9 +120,9 @@
   left: 5px;
   bottom: 5px;
   border-radius: 6px;
-  // Surface gives the active tab pill a panel-like fill against the
-  // tabs track. In dark mode --surface is the standard panel color, so
-  // the slider stays a touch lighter than the track without being white.
+  // 使用 surface 颜色为激活态标签提供类似面板的填充效果。
+  // 在深色主题下，--surface 是标准面板色，因此滑块会比轨道略亮，
+  // 但不会亮到接近纯白。
   background: var(--surface);
   box-shadow: 0 1px 2px rgba(0, 0, 0, 0.08);
   transition: transform 0.24s cubic-bezier(0.2, 0.8, 0.2, 1);

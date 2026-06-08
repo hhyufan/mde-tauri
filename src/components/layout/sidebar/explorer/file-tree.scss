@@ -1,3 +1,6 @@
+/**
+ * 文件树侧边栏样式，覆盖资源导航、空态提示与树节点交互表现。
+ */
 .file-tree {
   flex: 1;
   min-height: 0;
@@ -104,13 +107,13 @@
   margin-right: 4px;
 }
 
-// Scrollable inner container — wrapped in a relative box for the right-fade
+// 可滚动的内部容器，外层套一个相对定位盒子以承载右侧渐隐效果
 .file-tree__breadcrumb-scroll-wrap {
   flex: 1;
   min-width: 0;
   position: relative;
 
-  // Right-edge fog — always present, fades when scrolled to end via JS if needed
+  // 右侧边缘雾化效果，默认常驻；如有需要可由 JS 在滚动到末尾时淡出
   &::after {
     content: '';
     position: absolute;
@@ -132,7 +135,7 @@
   overflow-x: auto;
   scrollbar-width: none;
   -ms-overflow-style: none;
-  padding: 6px 0 8px; // extra bottom padding makes room for scrollbar
+  padding: 6px 0 8px; // 额外底部留白，为滚动条预留空间
 
   &::-webkit-scrollbar { display: none; }
 }
@@ -201,13 +204,13 @@
   }
 }
 
-// Custom scrollbar track — sits at the bottom of the breadcrumb row
+// 自定义滚动条轨道，放在面包屑行底部
 .file-tree__breadcrumb-scrollbar {
   position: absolute;
   bottom: 2px;
-  left: 32px; // after the icon
+  left: 32px; // 从图标后方开始
   right: 12px;
-  height: 6px; // taller hit area
+  height: 6px; // 增大可点击区域高度
   border-radius: 3px;
   overflow: visible;
   opacity: 0;

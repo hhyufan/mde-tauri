@@ -1,0 +1,109 @@
+:root {
+  --bg: #eff2f8;
+  --surface: rgba(255, 255, 255, 0.9);
+  --border: #d6ddeb;
+  --border-light: #e6ebf5;
+  --text: #182033;
+  --text-sec: #5f697e;
+  --text-dim: #9098aa;
+  --accent: #2f6bff;
+  --accent-light: rgba(47, 107, 255, 0.14);
+  --accent-bg: rgba(47, 107, 255, 0.08);
+  --hover: rgba(34, 66, 140, 0.08);
+  --success: #38b26d;
+  --warning: #f7a531;
+  --error: #ef5350;
+  --info: #2f6bff;
+  --radius: 18px;
+  --radius-sm: 10px;
+  --shadow: 0 18px 40px rgba(63, 83, 118, 0.12);
+  --shadow-lg: 0 28px 60px rgba(33, 43, 77, 0.18);
+  --font-app: "Segoe UI", "PingFang SC", "Microsoft YaHei", system-ui, sans-serif;
+  --font-editor: "Cascadia Code", "JetBrains Mono", Consolas, monospace;
+}
+
+html[data-theme='dark'] {
+  --bg: #0f1524;
+  --surface: rgba(18, 25, 40, 0.92);
+  --border: #293247;
+  --border-light: #20293c;
+  --text: #edf2ff;
+  --text-sec: #a5b0ca;
+  --text-dim: #6f7890;
+  --accent: #7aa2ff;
+  --accent-light: rgba(122, 162, 255, 0.18);
+  --accent-bg: rgba(122, 162, 255, 0.1);
+  --hover: rgba(255, 255, 255, 0.06);
+  --success: #4dd39a;
+  --warning: #ffc14d;
+  --error: #ff7d73;
+  --info: #7aa2ff;
+  --shadow: 0 22px 48px rgba(0, 0, 0, 0.28);
+  --shadow-lg: 0 32px 72px rgba(0, 0, 0, 0.34);
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html {
+  color: var(--text);
+  font-family: var(--font-app);
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+html,
+body,
+#root {
+  min-height: 100%;
+}
+
+body {
+  margin: 0;
+  background:
+    radial-gradient(circle at top, rgba(47, 107, 255, 0.16), transparent 30%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.42), transparent 32%),
+    var(--bg);
+  color: var(--text);
+  overflow-x: hidden;
+  overflow-y: auto;
+}
+
+body,
+button,
+input,
+select,
+textarea {
+  font-family: inherit;
+}
+
+button {
+  border: 0;
+}
+
+a {
+  color: inherit;
+}
+
+code,
+pre {
+  font-family: var(--font-editor);
+}
+
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(96, 128, 204, 0.3);
+  border-radius: 999px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}

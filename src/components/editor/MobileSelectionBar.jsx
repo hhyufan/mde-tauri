@@ -1,36 +1,43 @@
+/**
+ * Monaco 移动端选区动作条。
+ *
+ * 本文件为触屏环境补齐 Monaco 缺失的系统选区菜单体验，在选中文本后提供
+ * 剪切、复制、粘贴与全选等常用动作，并兼容部分 Android WebView 的长按缺陷。
+ */
 import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useTranslation } from 'react-i18next';
 import './mobile-selection-bar.scss';
 
-// Touch-friendly action bar that floats above the current Monaco selection.
+// 悬浮在当前 Monaco 选区上方、适合触屏操作的动作条。
 //
-// Why this exists:
-//   - Monaco renders text into its own DOM and consumes touch events through
-//     its TouchHandler, so neither the OS text-selection action bar nor the
-//     desktop right-click context menu surface naturally on Android.
-//   - Monaco's built-in clipboard *actions* (`editor.action.clipboardCutAction`
-//     etc.) rely on `document.execCommand`, which is unreliable inside the
-//     Tauri Android WebView. We therefore go through `navigator.clipboard`
-//     directly and apply the edits via `executeEdits`, mirroring the pattern
-//     miaogu-notepad uses for its desktop context menu.
+// 存在原因：
+//   - Monaco 会把文本渲染到自己的 DOM 中，并通过 TouchHandler 接管触摸事件，
+//     因此 Android 上既不会自然出现系统文本选择工具条，也不会自然出现桌面端右键菜单。
+//   - Monaco 内建剪贴板动作（如 `editor.action.clipboardCutAction`）依赖
+//     `document.execCommand`，而它在 Tauri Android WebView 中并不稳定。
+//     因此这里优先直接走 `navigator.clipboard`，并通过 `executeEdits`
+//     应用编辑，和项目桌面端上下文菜单的处理方式保持一致。
 //
-// Trigger paths:
-//   1. `editor.onContextMenu` — registered in MonacoEditor; selects a word
-//      via smartSelect.expand on long-press / right-click and the resulting
-//      selection change makes this bar appear.
-//   2. Touch long-press fallback — some Android WebViews don't fire
-//      `contextmenu` on view nodes with `user-select: none`. The
-//      pointerdown/up timer below catches that case, walks the click coord
-//      through `editor.getTargetAtClientPoint` and selects the word
-//      manually.
+// 触发路径：
+//   1. `editor.onContextMenu`：在 MonacoEditor 中注册，长按或右键后通过
+//      smartSelect.expand 选中单词，随后这里会因选区变化而显示动作条。
+//   2. 触摸长按兜底：部分 Android WebView 对 `user-select: none` 的视图节点
+//      不会派发 `contextmenu`。下面的 pointerdown/up 定时器会兜底处理，
+//      通过 `editor.getTargetAtClientPoint` 找到点击位置并手动选中单词。
 
 const BAR_GAP_ABOVE = 12;
 const BAR_HEIGHT = 40;
 const BAR_MARGIN = 8;
 const LONG_PRESS_MS = 450;
-const LONG_PRESS_MOVE_TOLERANCE = 10; // px before the touch is treated as a drag
+const LONG_PRESS_MOVE_TOLERANCE = 10; // 超过该像素位移后，将触摸视为拖动而不是长按
 
+/**
+ * 依据当前选区的可视位置，计算动作条应该显示的屏幕坐标。
+ *
+ * @param {import('monaco-editor').editor.IStandaloneCodeEditor | null | undefined} editor Monaco 编辑器实例
+ * @returns {{ x: number, y: number } | null} 动作条锚点坐标；无有效选区时返回 `null`
+ */
 function computeBarPosition(editor) {
   if (!editor) return null;
   const selection = editor.getSelection();
@@ -56,6 +63,13 @@ function computeBarPosition(editor) {
   return { x: anchorX, y };
 }
 
+/**
+ * 在指定位置尝试选中整个单词；若该位置不是单词，则仅移动光标。
+ *
+ * @param {import('monaco-editor').editor.IStandaloneCodeEditor | null | undefined} editor Monaco 编辑器实例
+ * @param {{ lineNumber: number, column: number } | null | undefined} position 目标位置
+ * @returns {boolean} 是否成功选中了单词
+ */
 function selectWordAt(editor, position) {
   if (!editor || !position) return false;
   const model = editor.getModel();
@@ -74,12 +88,22 @@ function selectWordAt(editor, position) {
   return true;
 }
 
+/**
+ * 渲染移动端文本选区动作条。
+ *
+ * @param {{
+ *   editor: import('monaco-editor').editor.IStandaloneCodeEditor | null,
+ *   enabled?: boolean,
+ *   containerRef?: import('react').RefObject<HTMLElement | null>
+ * }} props 组件属性
+ * @returns {JSX.Element | null} 动作条门户节点
+ */
 export default function MobileSelectionBar({ editor, enabled = true, containerRef }) {
   const { t } = useTranslation();
   const barRef = useRef(null);
   const [state, setState] = useState({ visible: false, x: 0, y: 0 });
 
-  // --- Long-press fallback (when onContextMenu doesn't fire) ---------------
+  // 长按兜底逻辑：处理某些 WebView 不触发 onContextMenu 的情况。
   useEffect(() => {
     if (!enabled || !editor) return undefined;
     const container = containerRef?.current;
@@ -99,8 +123,7 @@ export default function MobileSelectionBar({ editor, enabled = true, containerRe
     };
 
     const onPointerDown = (e) => {
-      // Only react to a single primary touch; let mouse + multi-touch fall
-      // through to Monaco's own handlers.
+      // 仅处理单个主触点；鼠标与多指触控继续交给 Monaco 自己处理。
       if (e.pointerType !== 'touch' || !e.isPrimary) {
         cancel();
         return;
@@ -146,7 +169,7 @@ export default function MobileSelectionBar({ editor, enabled = true, containerRe
     };
   }, [editor, enabled, containerRef]);
 
-  // --- Bar positioning + visibility ---------------------------------------
+  // 根据选区位置控制工具条的显示与定位。
   useEffect(() => {
     if (!enabled || !editor) {
       setState((s) => (s.visible ? { ...s, visible: false } : s));
@@ -194,10 +217,14 @@ export default function MobileSelectionBar({ editor, enabled = true, containerRe
     };
   }, [editor, enabled]);
 
-  // --- Action handlers ----------------------------------------------------
-  // Clipboard ops go through navigator.clipboard so they work reliably in
-  // the Android WebView (Monaco's built-in actions rely on execCommand and
-  // often fail silently on mobile).
+  // 动作处理。
+  // 剪贴板优先通过 navigator.clipboard 执行，以提高 Android WebView
+  // 中的稳定性；Monaco 内建动作依赖 execCommand，在移动端经常静默失败。
+  /**
+   * 读取当前选区文本。
+   *
+   * @returns {string} 当前选区内容；无有效选区时返回空字符串
+   */
   const getSelectionText = () => {
     if (!editor) return '';
     const selection = editor.getSelection();
@@ -206,6 +233,12 @@ export default function MobileSelectionBar({ editor, enabled = true, containerRe
     return model.getValueInRange(selection);
   };
 
+  /**
+   * 复制当前选区内容。
+   *
+   * @param {Event | import('react').SyntheticEvent | undefined} e 触发事件
+   * @returns {Promise<void>}
+   */
   const handleCopy = async (e) => {
     e?.preventDefault?.();
     e?.stopPropagation?.();
@@ -214,12 +247,18 @@ export default function MobileSelectionBar({ editor, enabled = true, containerRe
     try {
       await navigator.clipboard.writeText(text);
     } catch (_) {
-      // Last resort: fall back to Monaco's action (uses execCommand).
+      // 最后兜底回退到 Monaco 自带动作，它内部仍然使用 execCommand。
       editor?.trigger('selection-bar', 'editor.action.clipboardCopyAction', null);
     }
     editor?.focus();
   };
 
+  /**
+   * 剪切当前选区内容。
+   *
+   * @param {Event | import('react').SyntheticEvent | undefined} e 触发事件
+   * @returns {Promise<void>}
+   */
   const handleCut = async (e) => {
     e?.preventDefault?.();
     e?.stopPropagation?.();
@@ -236,6 +275,12 @@ export default function MobileSelectionBar({ editor, enabled = true, containerRe
     editor.focus();
   };
 
+  /**
+   * 从剪贴板读取文本并插入到当前光标或选区位置。
+   *
+   * @param {Event | import('react').SyntheticEvent | undefined} e 触发事件
+   * @returns {Promise<void>}
+   */
   const handlePaste = async (e) => {
     e?.preventDefault?.();
     e?.stopPropagation?.();
@@ -243,8 +288,7 @@ export default function MobileSelectionBar({ editor, enabled = true, containerRe
     try {
       const text = await navigator.clipboard.readText();
       if (!text) return;
-      // Use the current selection if there is one (replace); otherwise
-      // synthesize a zero-width range at the cursor (pure insert).
+      // 有选区时执行替换；没有选区时在当前光标处构造一个零宽范围用于纯插入。
       const selection = editor.getSelection();
       const pos = editor.getPosition();
       const range = selection ?? (pos
@@ -258,6 +302,11 @@ export default function MobileSelectionBar({ editor, enabled = true, containerRe
     editor.focus();
   };
 
+  /**
+   * 选中当前模型中的全部文本。
+   *
+   * @param {Event | import('react').SyntheticEvent | undefined} e 触发事件
+   */
   const handleSelectAll = (e) => {
     e?.preventDefault?.();
     e?.stopPropagation?.();
@@ -283,8 +332,7 @@ export default function MobileSelectionBar({ editor, enabled = true, containerRe
       ref={barRef}
       className="mobile-selection-bar"
       style={{ left: `${state.x}px`, top: `${state.y}px` }}
-      // Prevent the editor from losing focus / collapsing the selection on
-      // the touch-down phase, before our click handler runs.
+      // 阻止按下阶段导致编辑器失焦或选区提前折叠，确保后续点击动作能正常执行。
       onPointerDown={(e) => e.preventDefault()}
       onMouseDown={(e) => e.preventDefault()}
     >

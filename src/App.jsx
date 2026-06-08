@@ -1,3 +1,9 @@
+/**
+ * @file 应用入口模块。
+ *
+ * 该文件负责组装主界面框架、全局快捷键、窗口关闭保护、拖拽投放以及
+ * 各类顶层浮层的懒加载入口，是桌面端与 Web 容器共同使用的根级协调层。
+ */
 import { lazy, Suspense, useEffect, useState, useCallback, useMemo, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { listen } from '@tauri-apps/api/event';
@@ -22,9 +28,14 @@ import { GUEST_USER_SCOPE, isOwnedByUser } from '@store/userScope';
 import { cn } from '@utils/classNames';
 import '@styles/App.scss';
 
-// Every overlay below is invisible at startup — lazy them so their (often
-// heavy) dependency trees don't ship with the entry chunk. StatsPanel alone
-// drags in @antv/g2 (≈1.3 MB).
+/**
+ * 应用根组件。
+ *
+ * 负责串起主题与认证初始化、目录恢复、全局快捷键、窗口关闭保护、
+ * Tauri/浏览器双通道拖拽投放，以及所有顶层浮层的懒加载挂载。
+ */
+// 顶层浮层默认都不会在首屏出现，因此统一使用懒加载，避免把较重的依赖
+// 提前打进入口包；其中 `StatsPanel` 还会额外引入体积较大的 `@antv/g2`。
 const SearchModal = lazy(() => import('@components/overlays/SearchModal'));
 const SettingsModal = lazy(() => import('@components/overlays/SettingsModal'));
 const StatsPanel = lazy(() => import('@components/overlays/StatsPanel'));
@@ -34,11 +45,23 @@ const UnsavedChangesModal = lazy(() => import('@components/overlays/UnsavedChang
 
 const ASSOCIATED_MARKDOWN_EXTENSIONS = new Set(['md', 'markdown', 'mdown', 'mdwn', 'mkd', 'mkdn']);
 
+/**
+ * 判断命令行参数里的路径是否应当被当作 Markdown 关联文件打开。
+ *
+ * @param {string} path 待判断的文件路径。
+ * @returns {boolean} 是否属于支持的 Markdown 关联文件。
+ */
 function isAssociatedMarkdownPath(path) {
   const ext = String(path || '').split(/[\\/]/).pop()?.split('.').pop()?.toLowerCase();
   return ASSOCIATED_MARKDOWN_EXTENSIONS.has(ext);
 }
 
+/**
+ * 根应用组件。
+ *
+ * 统一协调主题、认证、目录恢复、窗口事件、拖拽投放和全局弹窗状态，
+ * 并渲染编辑器主布局与顶层模态层。
+ */
 function App() {
   const { t } = useTranslation();
   const initTheme = useThemeStore((s) => s.initTheme);
@@ -87,22 +110,26 @@ function App() {
     [autoSave, tabs],
   );
 
+  /**
+   * 打开未保存变更确认弹窗，并预选当前待处理标签。
+   *
+   * @param {Array<object>} [pendingTabs=unsavedTabs] 需要参与关闭确认的未保存标签集合。
+   */
   const openUnsavedClosePrompt = useCallback((pendingTabs = unsavedTabs) => {
     setSelectedUnsavedTabIds(pendingTabs.map((tab) => tab.id));
     setWindowClosePromptOpen(true);
   }, [unsavedTabs]);
 
   useEffect(() => {
-    // Theme + auth are needed for the very first render; do them inline.
+    // 主题与登录态会影响首屏渲染结果，因此在首次挂载时立即初始化。
     initTheme();
     loadToken();
 
-    // The OS window has already been shown by the inline bootstrap script in
-    // index.html — no need to invoke `show_main_window` again here.
+    // 原生窗口已由 `index.html` 内联启动脚本提前显示，这里无需再次触发
+    // `show_main_window`，避免重复窗口控制调用。
 
-    // Anything that doesn't gate the first paint (sync engine reset, restoring
-    // the explorer tree) runs after the browser is idle so it never delays
-    // time-to-interactive.
+    // 不影响首屏可见内容的工作统一延后到浏览器空闲期执行，避免阻塞交互就绪：
+    // 例如同步引擎重置、资源管理器目录恢复等。
     const idle = window.requestIdleCallback || ((cb) => setTimeout(cb, 1));
     idle(() => {
       syncEngine.ensureLocalReset();
@@ -147,6 +174,11 @@ function App() {
     };
   }, [isAndroid, openFileFromPath]);
 
+  /**
+   * 处理应用级快捷键，包括搜索、保存、打开文件、侧边栏与视图切换。
+   *
+   * @param {KeyboardEvent} e 键盘事件对象。
+   */
   const handleKeyDown = useCallback((e) => {
     const mod = e.ctrlKey || e.metaKey;
 
@@ -196,6 +228,11 @@ function App() {
     return () => document.removeEventListener('keydown', handleKeyDown, true);
   }, [handleKeyDown]);
 
+  /**
+   * 请求关闭窗口；若存在未保存标签，则先转入确认流程。
+   *
+   * @returns {void}
+   */
   const requestWindowClose = useCallback(() => {
     if (unsavedTabs.length > 0) {
       openUnsavedClosePrompt(unsavedTabs);
@@ -223,6 +260,11 @@ function App() {
     };
   }, [isDesktopWindow, openUnsavedClosePrompt]);
 
+  /**
+   * 保存已勾选的未保存标签，并在成功后继续关闭窗口。
+   *
+   * @returns {Promise<void>}
+   */
   const handleSaveAndCloseWindow = useCallback(async () => {
     const selectedIds = new Set(selectedUnsavedTabIds);
     const tabsToSave = unsavedTabs.filter((tab) => selectedIds.has(tab.id));
@@ -243,6 +285,11 @@ function App() {
     appWindow.close();
   }, [isDesktopWindow, saveTab, selectedUnsavedTabIds, unsavedTabs]);
 
+  /**
+   * 放弃未保存修改并直接关闭窗口。
+   *
+   * @returns {void}
+   */
   const handleDiscardAndCloseWindow = useCallback(() => {
     if (!isDesktopWindow) {
       setWindowClosePromptOpen(false);
@@ -252,6 +299,12 @@ function App() {
     appWindow.close();
   }, [isDesktopWindow]);
 
+  /**
+   * 在关闭确认弹窗中切换某个未保存标签是否参与保存。
+   *
+   * @param {object} tab 待切换的标签对象。
+   * @param {boolean} checked 当前复选状态。
+   */
   const handleToggleUnsavedTab = useCallback((tab, checked) => {
     setSelectedUnsavedTabIds((prev) => {
       if (checked) {
@@ -261,11 +314,19 @@ function App() {
     });
   }, []);
 
+  /**
+   * 根据拖拽坐标判断当前命中的投放区域，并返回对应高亮矩形。
+   *
+   * @param {{x?: number, y?: number}|null} position 当前拖拽坐标。
+   * @returns {{target: 'explorer'|'editor', rect: DOMRect}|null} 命中的投放区域与高亮矩形。
+   */
   const getDropRegion = useCallback((position) => {
     if (!position) return null;
     const rawX = position.x ?? 0;
     const rawY = position.y ?? 0;
     const scale = window.devicePixelRatio || 1;
+    // Tauri 原生拖拽事件在高 DPI 屏幕上可能给出物理像素，而浏览器命中测试
+    // 依赖 CSS 像素，因此这里在必要时做一次兜底换算。
     const x = rawX > window.innerWidth && scale > 1 ? rawX / scale : rawX;
     const y = rawY > window.innerHeight && scale > 1 ? rawY / scale : rawY;
     const target = document.elementFromPoint(x, y);
@@ -290,6 +351,11 @@ function App() {
     let disposed = false;
     const unlisteners = [];
 
+    /**
+     * 收集异步注册成功后的解绑函数，统一放到卸载阶段回收。
+     *
+     * @param {Promise<Function>} promise Tauri 事件监听注册 Promise。
+     */
     const register = (promise) => {
       promise
         .then((handler) => {
@@ -302,6 +368,11 @@ function App() {
         .catch(console.error);
     };
 
+    /**
+     * 根据最近一次拖拽事件刷新覆盖层高亮与命中区域状态。
+     *
+     * @param {{position?: {x?: number, y?: number}}} [payload={}] 拖拽事件负载。
+     */
     const updateDragState = (payload = {}) => {
       const position = payload.position || lastDragPositionRef.current;
       if (position) {
@@ -313,9 +384,8 @@ function App() {
       setIsDragOver(true);
     };
 
-    // Drag/drop listeners aren't needed for the first paint — defer their
-    // registration until idle so we don't block time-to-interactive on a
-    // batch of Tauri IPC calls (each `listen` is a roundtrip).
+    // 拖拽监听不会影响首屏展示，因此延迟到空闲期再注册，避免一批 Tauri IPC
+    // `listen` 调用抢占首屏交互时间。
     const idle = window.requestIdleCallback || ((cb) => setTimeout(cb, 1));
     let cancelled = false;
     const idleHandle = idle(() => {
@@ -323,7 +393,12 @@ function App() {
       registerListeners();
     });
 
+    /**
+     * 注册桌面端与浏览器两条拖拽事件通路，并将结果汇聚到统一投放逻辑。
+     */
     function registerListeners() {
+    // Tauri 原生窗口拖拽事件负责桌面端文件拖入；浏览器事件分支兜底 H5
+    // 与部分 WebView 场景，两条通路最终都汇聚到同一套区域判定逻辑。
     register(listen('tauri://drag-enter', (event) => {
       updateDragState(event.payload);
     }));

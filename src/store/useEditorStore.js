@@ -1,3 +1,8 @@
+/**
+ * ?????????????
+ *
+ * ???????????????????????????????????????????
+ */
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import {
@@ -10,6 +15,15 @@ import {
 
 let untitledCounter = 1;
 
+/**
+ * 编辑器主 store。
+ *
+ * 拆分保存中的“标签持久化快照”和“用于 UI 渲染的 tab 元信息”，并把
+ * 高频编辑内容外置到 `editorBuffer`，从而避免输入过程中反复触发全局渲染。
+ */
+/**
+ * ?????? UI ?????????????
+ */
 function toTabMeta(tab) {
   if (!tab) return null;
   return {
@@ -30,9 +44,9 @@ const useEditorStore = create(
       tabs: [],
       tabRenderList: [],
       activeTabId: null,
-      // Increments whenever we programmatically replace a tab's content.
-      // MonacoEditor subscribes to this to refresh the model without
-      // subscribing to content objects (avoids React getSnapshot warnings).
+      // 每当代码层主动替换标签内容时递增。
+      // MonacoEditor 订阅这个版本号刷新 model，避免直接订阅内容对象引发
+      // 过于频繁的快照比较与 React `getSnapshot` 警告。
       tabsRevision: 0,
       sidebarVisible: true,
       sidebarView: 'explorer',
@@ -42,6 +56,12 @@ const useEditorStore = create(
       cursorPosition: { lineNumber: 1, column: 1 },
       characterCount: 0,
 
+      /**
+       * 打开本地文件。
+       *
+       * `tabs` 保留持久化内容快照，`tabRenderList` 只保留渲染所需轻量元数据；
+       * 真正的实时编辑内容交给 `editorBuffer` 托管。
+       */
       openFile: (file) => {
         const { tabs } = get();
         const existing = tabs.find((t) => t.path === file.path);
@@ -67,6 +87,9 @@ const useEditorStore = create(
         });
       },
 
+      /**
+       * 打开只存在于云端缓存区的 external 文档。
+       */
       openExternalFile: (file) => {
         const { tabs } = get();
         const tabId = `external-${file.fileId}`;
@@ -94,6 +117,9 @@ const useEditorStore = create(
         });
       },
 
+      /**
+       * 创建未命名标签，初始内容只落在内存缓冲中，等待首次保存拿到真实路径。
+       */
       createUntitledTab: () => {
         const { tabs } = get();
         const id = `untitled-${Date.now()}`;
@@ -116,6 +142,7 @@ const useEditorStore = create(
         });
       },
 
+      /** ????????????????????? */
       renameTab: (tabId, newName) => {
         set((state) => ({
           tabs: state.tabs.map((t) =>
@@ -127,6 +154,12 @@ const useEditorStore = create(
         }));
       },
 
+      /**
+       * 为标签绑定真实路径。
+       *
+       * 常用于未命名标签首次保存或外部云文档“认领”为本地文件后，顺带把
+       * `editorBuffer` 的键也从旧 tabId 迁移到新路径。
+       */
       updateTabPath: (tabId, path, name) => {
         renameBuffer(tabId, path);
         set((state) => ({
@@ -158,9 +191,12 @@ const useEditorStore = create(
         }));
       },
 
+      /** ??????????????? */
       setCursorPosition: (pos) => set({ cursorPosition: pos }),
+      /** ?????????????? */
       setCharacterCount: (count) => set({ characterCount: count }),
 
+      /** ??????????????????????? */
       closeTab: (tabId) => {
         clearBuffer(tabId);
         const { tabs, activeTabId } = get();
@@ -176,12 +212,14 @@ const useEditorStore = create(
         });
       },
 
+      /** ??????????? */
       setActiveTab: (tabId) => set({ activeTabId: tabId }),
 
       /**
-       * Mark a tab as dirty (or clean) without touching its content.
-       * Editing flows call this once on the first keystroke after a save
-       * — the actual content lives in the editor buffer until persisted.
+       * 只更新标签脏状态，不直接改写内容本身。
+       *
+       * 编辑流程通常在“保存后第一次输入”时调用它；实时正文仍保存在
+       * `editorBuffer` 中，等到持久化成功后再回写到 `tabs`。
        */
       markTabDirty: (tabId, modified = true) => {
         if (!tabId) return;
@@ -200,8 +238,10 @@ const useEditorStore = create(
       },
 
       /**
-       * Replace stored content for a tab (e.g. on save / file watcher).
-       * Caller is responsible for syncing the editor buffer.
+       * 用外部内容快照替换指定标签的持久化内容。
+       *
+       * 常用于文件监听器回写、远端同步落盘等场景；如果 patch 中包含文本，
+       * 会先同步更新 `editorBuffer`，再推进 `tabsRevision` 通知编辑器刷新。
        */
       replaceTabContent: (tabId, patch) => {
         if (patch && typeof patch.content === 'string') {
@@ -229,6 +269,7 @@ const useEditorStore = create(
         }));
       },
 
+      /** ?????????????????????????? */
       replaceTabContentByPath: (path, patch) => {
         const tab = get().tabs.find((t) => t.path === path);
         if (tab && patch && typeof patch.content === 'string') {
@@ -256,6 +297,7 @@ const useEditorStore = create(
         }));
       },
 
+      /** ????? `fileId` ????????? */
       replaceTabContentByExternalFileId: (externalFileId, patch) => {
         if (!externalFileId) return;
         const tab = get().tabs.find((t) => t.externalFileId === externalFileId);
@@ -284,6 +326,9 @@ const useEditorStore = create(
         }));
       },
 
+      /**
+       * 保存成功后把实时缓冲快照回写到持久化标签对象，并清除脏标记。
+       */
       markTabSaved: (tabId) => {
         if (!tabId) return;
         const content = getBuffer(tabId, undefined);
@@ -303,12 +348,18 @@ const useEditorStore = create(
         }));
       },
 
+      /** ???????????????????????? */
       getTabContent: (tabId) => {
         if (!tabId) return '';
         if (hasBuffer(tabId)) return getBuffer(tabId, '');
         return get().tabs.find((t) => t.id === tabId)?.content || '';
       },
 
+      /**
+       * 获取当前激活标签的“实时视图”。
+       *
+       * 返回值会优先合并缓冲区中的最新正文与 `tabRenderList` 中的脏状态。
+       */
       getActiveTab: () => {
         const { tabs, activeTabId } = get();
         const tab = tabs.find((t) => t.id === activeTabId) || null;
@@ -322,6 +373,7 @@ const useEditorStore = create(
         };
       },
 
+      /** ?????????????????????? */
       getTabByPath: (path) => {
         if (!path) return null;
         const tab = get().tabs.find((t) => t.path === path) || null;
@@ -336,6 +388,7 @@ const useEditorStore = create(
         };
       },
 
+      /** ????? `fileId` ?????????? */
       getTabByExternalFileId: (externalFileId) => {
         if (!externalFileId) return null;
         const tab = get().tabs.find((t) => t.externalFileId === externalFileId) || null;
@@ -349,10 +402,12 @@ const useEditorStore = create(
         };
       },
 
+      /** ??????????? UI ?????? */
       toggleSidebar: () => set((s) => ({
         sidebarVisible: !s.sidebarVisible,
         uiStateUpdatedAt: Date.now(),
       })),
+      /** ???????????? */
       setSidebarVisible: (visible, meta = {}) => set({
         sidebarVisible: visible,
         uiStateUpdatedAt: meta.updatedAt ?? Date.now(),
@@ -362,6 +417,7 @@ const useEditorStore = create(
         uiStateUpdatedAt: meta.updatedAt ?? Date.now(),
       }),
 
+      /** ?????????? */
       setViewMode: (mode, meta = {}) => set({
         viewMode: mode,
         uiStateUpdatedAt: meta.updatedAt ?? Date.now(),
@@ -374,6 +430,7 @@ const useEditorStore = create(
             uiStateUpdatedAt: Date.now(),
           };
         }),
+      /** ????????????????? */
       toggleSplit: () =>
         set((s) => ({
           viewMode: s.viewMode === 'split' ? 'edit' : 'split',
@@ -388,6 +445,13 @@ const useEditorStore = create(
         toolbarVisible: v,
         uiStateUpdatedAt: meta.updatedAt ?? Date.now(),
       }),
+
+      /**
+       * 应用来自云同步的 UI 布局状态。
+       *
+       * 只覆盖可同步的界面字段，避免把本地运行时状态（如标签列表）误当成
+       * 配置从远端整包替换。
+       */
       applySyncedUiState: (uiState = {}, meta = {}) => set((state) => ({
         sidebarVisible: typeof uiState.sidebarVisible === 'boolean'
           ? uiState.sidebarVisible

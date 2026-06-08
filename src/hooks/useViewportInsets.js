@@ -1,20 +1,20 @@
+/**
+ * 视口安全区与软键盘遮挡同步 Hook。
+ *
+ * 本文件负责从 WebView 与 Visual Viewport API 读取安全区和软键盘占位信息，
+ * 并把结果写入 `<html>` 上的 CSS 变量，避免高频事件触发 React 大面积重渲染。
+ */
 import { useEffect } from 'react';
-
-// Reads safe-area insets from the WebView (notch + system bars) and overlays
-// the on-screen keyboard inset from the Visual Viewport API. Everything is
-// published as CSS custom properties on <html> so the rest of the app can
-// consume them via env(safe-area-inset-*) and var(--mde-kb-inset).
-//
-// Why CSS variables instead of state: this fires on every keyboard frame and
-// orientation change. Pushing it through React would re-render half the tree.
 
 const KB_VAR = '--mde-kb-inset';
 const KB_OPEN_CLASS = 'mde--kb-open';
-// Below this on-screen keyboard size we treat the difference as Android nav
-// bar / browser chrome jitter rather than the IME being open. Keeps the UI
-// from "twitching" when the system status bar height fluctuates by a few px.
+// 低于该阈值时，将高度差视为 Android 导航栏或浏览器外壳抖动，而不是输入法已打开，
+// 以免系统栏高度轻微波动时页面跟着抖动。
 const KB_OPEN_THRESHOLD = 100;
 
+/**
+ * 计算当前软键盘遮挡高度，并同步到根元素 CSS 变量与状态类名上。
+ */
 function applyKeyboardInset() {
   const vv = window.visualViewport;
   if (!vv) {
@@ -23,10 +23,10 @@ function applyKeyboardInset() {
     return;
   }
 
-  // visualViewport.height is the visible area; subtracting from layout
-  // viewport height (window.innerHeight) gives the part covered by the
-  // keyboard or other system UI. Negative values can occur during
-  // orientation changes; clamp to 0.
+  // `visualViewport.height` 表示当前可见区域高度；
+  // 用布局视口高度（`window.innerHeight`）减去它，
+  // 就能得到被键盘或其他系统 UI 遮挡的部分。
+  // 横竖屏切换过程中可能出现负值，因此这里强制限制为 0。
   const layoutHeight = window.innerHeight;
   const visibleHeight = vv.height + vv.offsetTop;
   const inset = Math.max(0, layoutHeight - visibleHeight);
@@ -39,6 +39,9 @@ function applyKeyboardInset() {
   }
 }
 
+/**
+ * 监听视口尺寸变化，并持续维护软键盘遮挡高度对应的 CSS 变量。
+ */
 export function useViewportInsets() {
   useEffect(() => {
     applyKeyboardInset();

@@ -2,15 +2,15 @@ import * as dns from 'dns';
 import { INestApplication, ValidationPipe } from '@nestjs/common';
 
 /**
- * Force Node's DNS resolver to use public DNS servers that reliably support
- * SRV record lookups required by `mongodb+srv://` connection strings.
+ * 强制 Node 的 DNS 解析器使用可靠支持 SRV 记录查询的公共 DNS，
+ * 以满足 `mongodb+srv://` 连接串的解析需求。
  *
- * Many home routers and Chinese ISP DNS servers silently drop or time out
- * on SRV queries, which manifests as `querySrv ETIMEOUT` when Mongoose
- * tries to discover Atlas shard hosts. Vercel's runtime DNS is fine, so
- * this is a no-op there in practice, but harmless.
+ * 许多家用路由器和国内 ISP DNS 会静默丢弃 SRV 查询或直接超时，
+ * 导致 Mongoose 在发现 Atlas 分片主机时出现 `querySrv ETIMEOUT`。
+ * Vercel 运行时的 DNS 通常没有这个问题，因此这里在那边基本等同于无操作，
+ * 但保留也没有副作用。
  *
- * Override by setting `DNS_SERVERS=1.1.1.1,8.8.8.8` in the environment.
+ * 如需覆盖，可通过环境变量设置 `DNS_SERVERS=1.1.1.1,8.8.8.8`。
  */
 function ensureDnsServers(): void {
   const fromEnv = process.env.DNS_SERVERS?.split(',')
@@ -22,16 +22,15 @@ function ensureDnsServers(): void {
   try {
     dns.setServers(servers);
   } catch {
-    // setServers throws on malformed addresses; fall back silently.
+    // `setServers` 遇到非法地址会抛错，这里静默回退到默认行为。
   }
 }
 
 ensureDnsServers();
 
 /**
- * Shared Nest application configuration used by both the local
- * standalone bootstrap (`main.ts`) and the Vercel serverless
- * handler (`api/index.ts`).
+ * 本地独立启动入口（`main.ts`）与 Vercel serverless handler
+ * 共用的 Nest 应用配置。
  */
 export function setupApp(app: INestApplication): void {
   app.use((req, res, next) => {

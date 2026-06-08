@@ -9,6 +9,9 @@ const EXTENSION_ALIASES = {
   text: 'txt',
 };
 
+/**
+ * 归一化扩展名，兼容别名与文件名回退推断。
+ */
 function normalizeExtension(extension = '', fileName = '') {
   const fromExtension = String(extension || '').trim();
   const raw =
@@ -21,6 +24,9 @@ function normalizeExtension(extension = '', fileName = '') {
   return EXTENSION_ALIASES[normalized] || normalized;
 }
 
+/**
+ * 为 VS Code 风格图标组件补全可识别的文件名。
+ */
 function buildFileName(extension = '', fileName = '') {
   const normalizedExtension = normalizeExtension(extension, fileName);
   const normalizedFileName = String(fileName || '').trim();
@@ -28,6 +34,11 @@ function buildFileName(extension = '', fileName = '') {
   return normalizedExtension ? `file.${normalizedExtension}` : 'file.txt';
 }
 
+/**
+ * 文件类型图标封装。
+ *
+ * 对第三方 VS Code 图标组件做一层适配，统一处理扩展名别名、文件夹态与默认名。
+ */
 function FileTypeIcon({
   extension = '',
   fileName = '',

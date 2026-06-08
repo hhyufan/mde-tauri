@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1.0, viewport-fit=cover"
+    />
+    <meta
+      name="description"
+      content="独立运行的论文代码展示端，支持章节 F 徽标、功能弹窗、代码树与代码片段展示。"
+    />
+    <title>MDE 论文展示端</title>
+    <script>
+      (function () {
+        try {
+          var raw = localStorage.getItem('mde-showcase-theme');
+          var theme = raw && JSON.parse(raw)?.state?.theme;
+          if (!theme) {
+            theme = window.matchMedia('(prefers-color-scheme: dark)').matches
+              ? 'dark'
+              : 'light';
+          }
+          document.documentElement.dataset.theme = theme;
+        } catch (_) {
+          document.documentElement.dataset.theme = 'light';
+        }
+      })();
+    </script>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.jsx"></script>
+  </body>
+  </html>

@@ -1,3 +1,8 @@
+/**
+ * Monaco ????????
+ *
+ * ??? Monaco ?????????????????????????????????
+ */
 import zhHans from 'monaco-editor-nls-adapter/locales/zh-hans.json';
 
 const globalObj =
@@ -8,6 +13,9 @@ const globalObj =
       : // eslint-disable-next-line no-undef
         global;
 
+/**
+ * ??????? Monaco NLS ?????????
+ */
 function setAdapterLocaleData(data, locale = 'custom') {
   globalObj.__MONACO_NLS_ADAPTER_STATE__ =
     globalObj.__MONACO_NLS_ADAPTER_STATE__ || { data: null, name: '' };
@@ -16,8 +24,8 @@ function setAdapterLocaleData(data, locale = 'custom') {
 }
 
 /**
- * Read the persisted language from Zustand's localStorage entry (mde-config).
- * Called synchronously so the locale is set before Monaco renders any UI.
+ * 从 Zustand 持久化到 localStorage 的 `mde-config` 中读取语言配置。
+ * 这里必须同步执行，确保 Monaco 在渲染任何内置界面之前就拿到目标语言。
  */
 function readPersistedLang() {
   try {
@@ -26,11 +34,14 @@ function readPersistedLang() {
       return JSON.parse(raw)?.state?.language || 'en';
     }
   } catch {
-    // ignore – fall through to default
+    // 读取失败时忽略，继续回退到默认语言。
   }
   return 'en';
 }
 
+/**
+ * ????????????????????????
+ */
 function readRuntimeLang() {
   const runtimeLang =
     globalObj.i18next?.language
@@ -40,26 +51,28 @@ function readRuntimeLang() {
 }
 
 /**
- * Switch Monaco Editor's built-in UI language.
- * Passing 'zh' loads the Simplified-Chinese locale; anything else resets to English.
- * Runtime-only widgets (Find, Command Palette, context menu, etc.) pick up the
- * change the next time they open because the proxy intercepts localize() calls
- * at render time. Module-scope strings captured during monaco's initial load
- * use whatever locale was active at that moment, which is why this must be
- * called before `monaco-editor` is first imported (see monacoLocaleBoot.js).
+ * 切换 Monaco Editor 内置界面的语言。
+ * 传入 `zh` 时加载简体中文词典，其他值则回退为英文。
+ *
+ * 查找框、命令面板、右键菜单这类运行时才创建的控件，会在下次打开时读取新语言，
+ * 因为代理层会在渲染阶段拦截 `localize()` 调用。
+ *
+ * 但 Monaco 首次加载时就在模块顶层缓存下来的文案，只会使用当时的语言状态，
+ * 所以这个初始化必须发生在第一次 `import 'monaco-editor'` 之前。
+ * 相关启动顺序见 `monacoLocaleBoot.js`。
  */
 export function setMonacoLocale(lang) {
   if (lang === 'zh') {
     setAdapterLocaleData(zhHans, 'zh-hans');
   } else {
-    // Passing null causes every localize() call to fall back to its defaultMessage (English).
+    // 传入 null 后，各处 `localize()` 会回退到默认文案，也就是英文。
     setAdapterLocaleData(null, 'en');
   }
 }
 
 /**
- * Must be called once, before monaco.editor.create() runs.
- * Reads the user's saved language preference and sets Monaco's locale accordingly.
+ * 只需在 `monaco.editor.create()` 之前调用一次。
+ * 它会读取用户当前保存或运行时生效的语言偏好，并据此设置 Monaco 的界面语言。
  */
 export function initMonacoLocale() {
   const lang = readRuntimeLang() || readPersistedLang();

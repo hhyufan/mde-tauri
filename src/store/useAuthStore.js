@@ -1,7 +1,18 @@
+/**
+ * ?????????
+ *
+ * ?????????????????????????????????????
+ */
 import { create } from 'zustand';
 import apiClient from '@/services/apiClient';
 
 let tauriStore = null;
+
+/**
+ * 懒加载 Tauri 持久化存储实例。
+ *
+ * 浏览器开发环境下该插件可能不存在，因此读取逻辑都放在运行时兜底。
+ */
 async function getTauriStore() {
   if (!tauriStore) {
     const { load } = await import('@tauri-apps/plugin-store');
@@ -10,12 +21,20 @@ async function getTauriStore() {
   return tauriStore;
 }
 
+/**
+ * 认证会话 store。
+ *
+ * 负责登录、注册、刷新令牌和本地凭据持久化，是前端鉴权状态的唯一入口。
+ */
 const useAuthStore = create((set, get) => ({
   user: null,
   token: null,
   isLoggedIn: false,
   loading: false,
 
+  /**
+   * 启动时从本地存储恢复会话。
+   */
   loadToken: async () => {
     try {
       const store = await getTauriStore();
@@ -25,10 +44,13 @@ const useAuthStore = create((set, get) => ({
         set({ token, user, isLoggedIn: true });
       }
     } catch {
-      // Tauri store not available (e.g. in browser dev)
+      // 开发中的浏览器环境可能没有 Tauri store，这里静默降级。
     }
   },
 
+  /**
+   * 使用邮箱密码登录，并把会话写入本地存储。
+   */
   login: async (email, password) => {
     set({ loading: true });
     try {
@@ -45,6 +67,9 @@ const useAuthStore = create((set, get) => ({
     }
   },
 
+  /**
+   * 注册成功后直接建立登录态，复用同一套持久化流程。
+   */
   register: async (email, username, password) => {
     set({ loading: true });
     try {
@@ -61,6 +86,9 @@ const useAuthStore = create((set, get) => ({
     }
   },
 
+  /**
+   * 刷新访问令牌；失败时主动登出，避免继续使用失效凭据。
+   */
   refreshToken: async () => {
     try {
       const { data } = await apiClient.post('/auth/refresh');
@@ -74,6 +102,9 @@ const useAuthStore = create((set, get) => ({
     }
   },
 
+  /**
+   * 清空内存态与本地存储中的认证信息。
+   */
   logout: async () => {
     set({ user: null, token: null, isLoggedIn: false });
     try {
@@ -82,7 +113,7 @@ const useAuthStore = create((set, get) => ({
       await store.delete('user');
       await store.save();
     } catch {
-      // ignore
+      // 持久层清理失败不影响前端立即退出登录态。
     }
   },
 }));
