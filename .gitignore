@@ -49,6 +49,8 @@ src-tauri/gen/android/app/src/main/java/com/mde/app/*
 # ===========================
 logs/
 *.log
+*.docx
+*.doc
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
