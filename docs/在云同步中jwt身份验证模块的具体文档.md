@@ -17,8 +17,8 @@
 当前项目的设计不是让 `syncEngine` 自己拼 JWT，也不是让每个同步接口单独校验 token，而是把这部分能力拆到了两端的公共层：
 
 - 前端公共层：[`useAuthStore.js`](../src/store/useAuthStore.js#L29-L119) 和 [`apiClient.js`](../src/services/apiClient.js#L70-L107)
-- 后端公共层：[`auth.module.ts`](../mde-server/src/auth/auth.module.ts#L14-L32)、[`jwt.strategy.ts`](../mde-server/src/auth/strategies/jwt.strategy.ts#L12-L24)、[`jwt-auth.guard.ts`](../mde-server/src/auth/guards/jwt-auth.guard.ts#L4-L6)
-- 同步模块只负责业务：[`sync.controller.ts`](../mde-server/src/sync/sync.controller.ts#L28-L67) 和 [`sync.service.ts`](../mde-server/src/sync/sync.service.ts)
+- 后端公共层：[`auth.module.ts`](https://github.com/hhyufan/mde-server/blob/main/src/auth/auth.module.ts#L14-L32)、[`jwt.strategy.ts`](https://github.com/hhyufan/mde-server/blob/main/src/auth/strategies/jwt.strategy.ts#L12-L24)、[`jwt-auth.guard.ts`](https://github.com/hhyufan/mde-server/blob/main/src/auth/guards/jwt-auth.guard.ts#L4-L6)
+- 同步模块只负责业务：[`sync.controller.ts`](https://github.com/hhyufan/mde-server/blob/main/src/sync/sync.controller.ts#L28-L67) 和 [`sync.service.ts`](https://github.com/hhyufan/mde-server/blob/main/src/sync/sync.service.ts)
 
 所以真正理解这套实现的关键，不是盯着某一个同步接口看，而是理解下面两件事：
 
@@ -165,9 +165,9 @@ async fullSync() {
 
 ## 7. 后端 JWT 是在哪里配置和签发的
 
-后端 JWT 的配置入口在 [`auth.module.ts`](../mde-server/src/auth/auth.module.ts#L14-L32)。
+后端 JWT 的配置入口在 [`auth.module.ts`](https://github.com/hhyufan/mde-server/blob/main/src/auth/auth.module.ts#L14-L32)。
 
-代码位置：[auth.module.ts:L14-L25](../mde-server/src/auth/auth.module.ts#L14-L25)
+代码位置：[auth.module.ts:L14-L25](https://github.com/hhyufan/mde-server/blob/main/src/auth/auth.module.ts#L14-L25)
 
 ```ts
 @Module({
@@ -191,9 +191,9 @@ async fullSync() {
 - 过期时间来自环境变量 `JWT_EXPIRES_IN`
 - 默认过期时间是 `7d`
 
-真正签发 token 的地方在 [`auth.service.ts`](../mde-server/src/auth/auth.service.ts#L18-L68)。
+真正签发 token 的地方在 [`auth.service.ts`](https://github.com/hhyufan/mde-server/blob/main/src/auth/auth.service.ts#L18-L68)。
 
-代码位置：[auth.service.ts:L56-L67](../mde-server/src/auth/auth.service.ts#L56-L67)
+代码位置：[auth.service.ts:L56-L67](https://github.com/hhyufan/mde-server/blob/main/src/auth/auth.service.ts#L56-L67)
 
 ```ts
 private buildTokenResponse(user: any) {
@@ -219,9 +219,9 @@ private buildTokenResponse(user: any) {
 
 ## 8. 登录、注册、刷新接口是怎么工作的
 
-后端认证控制器在 [`auth.controller.ts`](../mde-server/src/auth/auth.controller.ts#L15-L39)。
+后端认证控制器在 [`auth.controller.ts`](https://github.com/hhyufan/mde-server/blob/main/src/auth/auth.controller.ts#L15-L39)。
 
-代码位置：[auth.controller.ts:L15-L39](../mde-server/src/auth/auth.controller.ts#L15-L39)
+代码位置：[auth.controller.ts:L15-L39](https://github.com/hhyufan/mde-server/blob/main/src/auth/auth.controller.ts#L15-L39)
 
 ```ts
 /** 注册新用户并返回初始访问令牌。 */
@@ -256,9 +256,9 @@ async refresh(@Request() req) {
 
 ## 9. JWT Bearer Token 在后端是怎么验证的
 
-JWT 校验逻辑在 [`jwt.strategy.ts`](../mde-server/src/auth/strategies/jwt.strategy.ts#L12-L24)。
+JWT 校验逻辑在 [`jwt.strategy.ts`](https://github.com/hhyufan/mde-server/blob/main/src/auth/strategies/jwt.strategy.ts#L12-L24)。
 
-代码位置：[jwt.strategy.ts:L12-L23](../mde-server/src/auth/strategies/jwt.strategy.ts#L12-L23)
+代码位置：[jwt.strategy.ts:L12-L23](https://github.com/hhyufan/mde-server/blob/main/src/auth/strategies/jwt.strategy.ts#L12-L23)
 
 ```ts
 constructor(config: ConfigService) {
@@ -289,11 +289,11 @@ async validate(payload: { sub: string; email: string }) {
 
 守卫本身非常薄，只是复用了 Passport 的 JWT 策略。
 
-代码位置：[jwt-auth.guard.ts:L4-L6](../mde-server/src/auth/guards/jwt-auth.guard.ts#L4-L6)
+代码位置：[jwt-auth.guard.ts:L4-L6](https://github.com/hhyufan/mde-server/blob/main/src/auth/guards/jwt-auth.guard.ts#L4-L6)
 
 然后在同步控制器上统一挂载：
 
-代码位置：[sync.controller.ts:L28-L29](../mde-server/src/sync/sync.controller.ts#L28-L29)
+代码位置：[sync.controller.ts:L28-L29](https://github.com/hhyufan/mde-server/blob/main/src/sync/sync.controller.ts#L28-L29)
 
 ```ts
 @UseGuards(JwtAuthGuard)
@@ -305,7 +305,7 @@ export class SyncController {
 
 后面每个同步接口都直接使用 `req.user.userId`：
 
-代码位置：[sync.controller.ts:L33-L67](../mde-server/src/sync/sync.controller.ts#L33-L67)
+代码位置：[sync.controller.ts:L33-L67](https://github.com/hhyufan/mde-server/blob/main/src/sync/sync.controller.ts#L33-L67)
 
 ```ts
 /** 返回当前用户的云端文件清单，不包含正文。 */
@@ -389,8 +389,8 @@ refreshToken: async () => {
 
 证据有两条：
 
-1. `/auth/refresh` 本身受 [`JwtAuthGuard`](../mde-server/src/auth/auth.controller.ts#L34-L39) 保护
-2. [`jwt.strategy.ts:L15-L15`](../mde-server/src/auth/strategies/jwt.strategy.ts#L15-L15) 明确设置了 `ignoreExpiration: false`
+1. `/auth/refresh` 本身受 [`JwtAuthGuard`](https://github.com/hhyufan/mde-server/blob/main/src/auth/auth.controller.ts#L34-L39) 保护
+2. [`jwt.strategy.ts:L15-L15`](https://github.com/hhyufan/mde-server/blob/main/src/auth/strategies/jwt.strategy.ts#L15-L15) 明确设置了 `ignoreExpiration: false`
 
 这意味着：
 
@@ -409,7 +409,7 @@ refreshToken: async () => {
 
 1. 用户在 [`LoginModal.jsx`](../src/components/overlays/LoginModal.jsx#L37-L53) 中提交登录
 2. 前端调用 [`useAuthStore.login()`](../src/store/useAuthStore.js#L54-L68)
-3. 后端 [`AuthController.login`](../mde-server/src/auth/auth.controller.ts#L21-L25) -> [`AuthService.login`](../mde-server/src/auth/auth.service.ts#L42-L47)
+3. 后端 [`AuthController.login`](https://github.com/hhyufan/mde-server/blob/main/src/auth/auth.controller.ts#L21-L25) -> [`AuthService.login`](https://github.com/hhyufan/mde-server/blob/main/src/auth/auth.service.ts#L42-L47)
 4. `AuthService.buildTokenResponse()` 返回 `access_token`
 5. 前端把 token 写入内存和 Tauri Store
 6. `syncEngine.fullSync()` 发起同步请求时使用 `apiClient`
@@ -432,13 +432,13 @@ refreshToken: async () => {
    - 再看 Bearer 注入和 401 重试
 3. [syncEngine.js:L1153-L1189](../src/services/syncEngine.js#L1153-L1189)
    - 看同步入口如何依赖登录态
-4. [auth.module.ts:L14-L32](../mde-server/src/auth/auth.module.ts#L14-L32)
+4. [auth.module.ts:L14-L32](https://github.com/hhyufan/mde-server/blob/main/src/auth/auth.module.ts#L14-L32)
    - 看 JWT 模块怎么配置
-5. [auth.service.ts:L42-L67](../mde-server/src/auth/auth.service.ts#L42-L67)
+5. [auth.service.ts:L42-L67](https://github.com/hhyufan/mde-server/blob/main/src/auth/auth.service.ts#L42-L67)
    - 看 JWT 怎么签发
-6. [jwt.strategy.ts:L12-L23](../mde-server/src/auth/strategies/jwt.strategy.ts#L12-L23)
+6. [jwt.strategy.ts:L12-L23](https://github.com/hhyufan/mde-server/blob/main/src/auth/strategies/jwt.strategy.ts#L12-L23)
    - 看 Bearer Token 怎么变成 `req.user`
-7. [sync.controller.ts:L28-L67](../mde-server/src/sync/sync.controller.ts#L28-L67)
+7. [sync.controller.ts:L28-L67](https://github.com/hhyufan/mde-server/blob/main/src/sync/sync.controller.ts#L28-L67)
    - 最后看同步接口如何消费认证上下文
 
 ---

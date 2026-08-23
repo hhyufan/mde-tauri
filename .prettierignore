@@ -2,8 +2,6 @@ dist
 node_modules
 src-tauri/target
 src-tauri/gen
-mde-server/dist
-mde-server/node_modules
 showcase/node_modules
 mde-tauri
 *.lock

@@ -134,15 +134,12 @@ mde-tauri/
 │   ├── i18n/                 # 国际化资源
 │   └── App.jsx               # 前端入口组件
 ├── src-tauri/                # Tauri Rust 侧（命令、能力、打包配置）
-├── mde-server/               # NestJS 云同步服务
-│   ├── src/auth/             # 认证模块
-│   ├── src/sync/             # 同步模块
-│   ├── src/users/            # 用户模块
-│   └── src/schemas/          # Mongo Schema
 ├── public/                   # 静态资源
 ├── UI/                       # 设计/演示素材（非 README 正式截图目录）
 └── README.md
 ```
+
+云同步服务已拆分为独立仓库：[hhyufan/mde-server](https://github.com/hhyufan/mde-server)。
 
 ***
 
@@ -152,11 +149,10 @@ mde-tauri/
 
 | 工具                         | 建议版本            | 说明                   |
 | -------------------------- | --------------- | -------------------- |
-| Node.js                    | 18+             | 前后端依赖安装与构建           |
+| Node.js                    | 18+             | 前端依赖安装与构建            |
 | Rust                       | 1.77+           | Tauri 编译             |
 | Android Studio / SDK / NDK | Android SDK 35+ | Android APK 构建       |
 | JDK                        | 17 - 21         | Gradle / Android 构建  |
-| MongoDB                    | 6+              | 服务端存储                |
 | WebView2                   | 系统自带            | Windows 下 Tauri 运行环境 |
 
 ### 1) 启动桌面端（当前目录）
@@ -175,6 +171,7 @@ npm run tauri:dev
 ### 2) 启动云服务（mde-server）
 
 ```bash
+git clone https://github.com/hhyufan/mde-server.git
 cd mde-server
 npm install
 

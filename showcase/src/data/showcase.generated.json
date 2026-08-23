@@ -1468,7 +1468,7 @@
         "第一步看 [syncEngine.js](../../../src/services/syncEngine.js) 中的 `SyncEngine`，其作用是：负责前端同步调度、冲突处理、配置同步和状态切换。",
         "第二步看 [useSyncStore.js](../../../src/store/useSyncStore.js) 中的 `useSyncStore`，其作用是：负责同步文档镜像、mutation 队列、冲突和错误状态。",
         "第三步看 [useAuthStore.js](../../../src/store/useAuthStore.js) 中的 `useAuthStore`，其作用是：负责登录态、令牌刷新和认证信息持久化。",
-        "第四步看 [sync.controller.ts](../../../mde-server/src/sync/sync.controller.ts) 中的 `SyncController`，其作用是：负责文档同步与配置同步的 HTTP 接口。",
+        "第四步看 [sync.controller.ts](https://github.com/hhyufan/mde-server/blob/main/src/sync/sync.controller.ts) 中的 `SyncController`，其作用是：负责文档同步与配置同步的 HTTP 接口。",
         "最后回看其余支撑文件，补齐该功能的边界条件、状态变化和平台差异。"
       ],
       "collaborationNotes": [
@@ -1543,7 +1543,7 @@
           ]
         },
         {
-          "path": "mde-server/src/sync/sync.controller.ts",
+          "path": "https://github.com/hhyufan/mde-server/blob/main/src/sync/sync.controller.ts",
           "symbol": "SyncController",
           "explanation": "负责文档同步与配置同步的 HTTP 接口。",
           "language": "typescript",
@@ -1560,7 +1560,7 @@
           ]
         },
         {
-          "path": "mde-server/src/sync/sync.service.ts",
+          "path": "https://github.com/hhyufan/mde-server/blob/main/src/sync/sync.service.ts",
           "symbol": "SyncService",
           "explanation": "负责服务端版本控制、幂等、冲突和设备绑定逻辑。",
           "language": "typescript",
@@ -1577,7 +1577,7 @@
           ]
         },
         {
-          "path": "mde-server/src/auth/auth.service.ts",
+          "path": "https://github.com/hhyufan/mde-server/blob/main/src/auth/auth.service.ts",
           "symbol": "AuthService",
           "explanation": "负责认证、密码校验和 JWT 签发。",
           "language": "typescript",
@@ -5031,8 +5031,8 @@
       "readingGuide": [
         "第一步看 [useAuthStore.js](../../../src/store/useAuthStore.js) 中的 `login / loadToken`，其作用是：前端登录动作和会话恢复入口。",
         "第二步看 [LoginModal.jsx](../../../src/components/overlays/LoginModal.jsx) 中的 `handleSubmit`，其作用是：登录表单提交入口。",
-        "第三步看 [auth.controller.ts](../../../mde-server/src/auth/auth.controller.ts) 中的 `login`，其作用是：服务端登录接口。",
-        "第四步看 [auth.service.ts](../../../mde-server/src/auth/auth.service.ts) 中的 `validateUser / login`，其作用是：用户校验和 JWT 签发。"
+        "第三步看 [auth.controller.ts](https://github.com/hhyufan/mde-server/blob/main/src/auth/auth.controller.ts) 中的 `login`，其作用是：服务端登录接口。",
+        "第四步看 [auth.service.ts](https://github.com/hhyufan/mde-server/blob/main/src/auth/auth.service.ts) 中的 `validateUser / login`，其作用是：用户校验和 JWT 签发。"
       ],
       "collaborationNotes": [
         "上级模块：[云同步模块](./F-03-云同步模块.md)",
@@ -5075,7 +5075,7 @@
           ]
         },
         {
-          "path": "mde-server/src/auth/auth.controller.ts",
+          "path": "https://github.com/hhyufan/mde-server/blob/main/src/auth/auth.controller.ts",
           "symbol": "login",
           "explanation": "服务端登录接口。",
           "language": "typescript",
@@ -5092,7 +5092,7 @@
           ]
         },
         {
-          "path": "mde-server/src/auth/auth.service.ts",
+          "path": "https://github.com/hhyufan/mde-server/blob/main/src/auth/auth.service.ts",
           "symbol": "validateUser / login",
           "explanation": "用户校验和 JWT 签发。",
           "language": "typescript",
@@ -5145,8 +5145,8 @@
       "readingGuide": [
         "第一步看 [useAuthStore.js](../../../src/store/useAuthStore.js) 中的 `register`，其作用是：前端注册动作。",
         "第二步看 [LoginModal.jsx](../../../src/components/overlays/LoginModal.jsx) 中的 `register mode`，其作用是：注册模式表单与 UI 入口。",
-        "第三步看 [auth.controller.ts](../../../mde-server/src/auth/auth.controller.ts) 中的 `register`，其作用是：服务端注册接口。",
-        "第四步看 [auth.service.ts](../../../mde-server/src/auth/auth.service.ts) 中的 `register`，其作用是：创建用户并返回登录态。"
+        "第三步看 [auth.controller.ts](https://github.com/hhyufan/mde-server/blob/main/src/auth/auth.controller.ts) 中的 `register`，其作用是：服务端注册接口。",
+        "第四步看 [auth.service.ts](https://github.com/hhyufan/mde-server/blob/main/src/auth/auth.service.ts) 中的 `register`，其作用是：创建用户并返回登录态。"
       ],
       "collaborationNotes": [
         "上级模块：[云同步模块](./F-03-云同步模块.md)",
@@ -5189,7 +5189,7 @@
           ]
         },
         {
-          "path": "mde-server/src/auth/auth.controller.ts",
+          "path": "https://github.com/hhyufan/mde-server/blob/main/src/auth/auth.controller.ts",
           "symbol": "register",
           "explanation": "服务端注册接口。",
           "language": "typescript",
@@ -5206,7 +5206,7 @@
           ]
         },
         {
-          "path": "mde-server/src/auth/auth.service.ts",
+          "path": "https://github.com/hhyufan/mde-server/blob/main/src/auth/auth.service.ts",
           "symbol": "register",
           "explanation": "创建用户并返回登录态。",
           "language": "typescript",
@@ -5267,8 +5267,8 @@
       "readingGuide": [
         "第一步看 [apiClient.js](../../../src/services/apiClient.js) 中的 `request/response interceptors`，其作用是：负责注入 Bearer Token 和 401 后刷新重试。",
         "第二步看 [useAuthStore.js](../../../src/store/useAuthStore.js) 中的 `refreshToken / logout`，其作用是：维护认证状态生命周期。",
-        "第三步看 [jwt.strategy.ts](../../../mde-server/src/auth/strategies/jwt.strategy.ts) 中的 `JwtStrategy`，其作用是：服务端解析 JWT 并把用户信息挂到请求对象。",
-        "第四步看 [jwt-auth.guard.ts](../../../mde-server/src/auth/guards/jwt-auth.guard.ts) 中的 `JwtAuthGuard`，其作用是：保护需要认证的接口。"
+        "第三步看 [jwt.strategy.ts](https://github.com/hhyufan/mde-server/blob/main/src/auth/strategies/jwt.strategy.ts) 中的 `JwtStrategy`，其作用是：服务端解析 JWT 并把用户信息挂到请求对象。",
+        "第四步看 [jwt-auth.guard.ts](https://github.com/hhyufan/mde-server/blob/main/src/auth/guards/jwt-auth.guard.ts) 中的 `JwtAuthGuard`，其作用是：保护需要认证的接口。"
       ],
       "collaborationNotes": [
         "上级模块：[云同步模块](./F-03-云同步模块.md)",
@@ -5311,7 +5311,7 @@
           ]
         },
         {
-          "path": "mde-server/src/auth/strategies/jwt.strategy.ts",
+          "path": "https://github.com/hhyufan/mde-server/blob/main/src/auth/strategies/jwt.strategy.ts",
           "symbol": "JwtStrategy",
           "explanation": "服务端解析 JWT 并把用户信息挂到请求对象。",
           "language": "typescript",
@@ -5328,7 +5328,7 @@
           ]
         },
         {
-          "path": "mde-server/src/auth/guards/jwt-auth.guard.ts",
+          "path": "https://github.com/hhyufan/mde-server/blob/main/src/auth/guards/jwt-auth.guard.ts",
           "symbol": "JwtAuthGuard",
           "explanation": "保护需要认证的接口。",
           "language": "typescript",
@@ -5404,8 +5404,8 @@
       "childFeatureIds": [],
       "readingGuide": [
         "第一步看 [syncEngine.js](../../../src/services/syncEngine.js) 中的 `fullSync / queueLocalUpsert / pullRemoteChanges`，其作用是：前端文档同步主流程。",
-        "第二步看 [sync.controller.ts](../../../mde-server/src/sync/sync.controller.ts) 中的 `getManifest / getChanges / pushFile / pullFile`，其作用是：服务端文档同步接口。",
-        "第三步看 [sync.service.ts](../../../mde-server/src/sync/sync.service.ts) 中的 `pushFile / getChanges / getFile`，其作用是：服务端版本控制和内容读写。"
+        "第二步看 [sync.controller.ts](https://github.com/hhyufan/mde-server/blob/main/src/sync/sync.controller.ts) 中的 `getManifest / getChanges / pushFile / pullFile`，其作用是：服务端文档同步接口。",
+        "第三步看 [sync.service.ts](https://github.com/hhyufan/mde-server/blob/main/src/sync/sync.service.ts) 中的 `pushFile / getChanges / getFile`，其作用是：服务端版本控制和内容读写。"
       ],
       "collaborationNotes": [
         "上级模块：[云同步模块](./F-03-云同步模块.md)",
@@ -5431,7 +5431,7 @@
           ]
         },
         {
-          "path": "mde-server/src/sync/sync.controller.ts",
+          "path": "https://github.com/hhyufan/mde-server/blob/main/src/sync/sync.controller.ts",
           "symbol": "getManifest / getChanges / pushFile / pullFile",
           "explanation": "服务端文档同步接口。",
           "language": "typescript",
@@ -5448,7 +5448,7 @@
           ]
         },
         {
-          "path": "mde-server/src/sync/sync.service.ts",
+          "path": "https://github.com/hhyufan/mde-server/blob/main/src/sync/sync.service.ts",
           "symbol": "pushFile / getChanges / getFile",
           "explanation": "服务端版本控制和内容读写。",
           "language": "typescript",
@@ -5517,8 +5517,8 @@
       "readingGuide": [
         "第一步看 [syncEngine.js](../../../src/services/syncEngine.js) 中的 `setupConfigSubscriptions / syncConfig`，其作用是：监听本地设置变更并做双向同步。",
         "第二步看 [settingsSync.js](../../../src/utils/settingsSync.js) 中的 `getLocalSettingsSnapshot / applySettingsSnapshot`，其作用是：序列化和回放设置快照。",
-        "第三步看 [sync.controller.ts](../../../mde-server/src/sync/sync.controller.ts) 中的 `getConfig / updateConfig`，其作用是：服务端配置同步接口。",
-        "第四步看 [sync-config.schema.ts](../../../mde-server/src/schemas/sync-config.schema.ts) 中的 `SyncConfig`，其作用是：配置同步的数据库模型。"
+        "第三步看 [sync.controller.ts](https://github.com/hhyufan/mde-server/blob/main/src/sync/sync.controller.ts) 中的 `getConfig / updateConfig`，其作用是：服务端配置同步接口。",
+        "第四步看 [sync-config.schema.ts](https://github.com/hhyufan/mde-server/blob/main/src/schemas/sync-config.schema.ts) 中的 `SyncConfig`，其作用是：配置同步的数据库模型。"
       ],
       "collaborationNotes": [
         "上级模块：[云同步模块](./F-03-云同步模块.md)",
@@ -5561,7 +5561,7 @@
           ]
         },
         {
-          "path": "mde-server/src/sync/sync.controller.ts",
+          "path": "https://github.com/hhyufan/mde-server/blob/main/src/sync/sync.controller.ts",
           "symbol": "getConfig / updateConfig",
           "explanation": "服务端配置同步接口。",
           "language": "typescript",
@@ -5578,7 +5578,7 @@
           ]
         },
         {
-          "path": "mde-server/src/schemas/sync-config.schema.ts",
+          "path": "https://github.com/hhyufan/mde-server/blob/main/src/schemas/sync-config.schema.ts",
           "symbol": "SyncConfig",
           "explanation": "配置同步的数据库模型。",
           "language": "typescript",
@@ -5655,8 +5655,8 @@
       "readingGuide": [
         "第一步看 [useSyncStore.js](../../../src/store/useSyncStore.js) 中的 `cursor state`，其作用是：保存增量同步游标。",
         "第二步看 [syncEngine.js](../../../src/services/syncEngine.js) 中的 `pullRemoteChanges / processQueue`，其作用是：先处理本地队列，再按 cursor 拉远端变化。",
-        "第三步看 [sync.controller.ts](../../../mde-server/src/sync/sync.controller.ts) 中的 `getChanges`，其作用是：增量拉取接口。",
-        "第四步看 [sync.service.ts](../../../mde-server/src/sync/sync.service.ts) 中的 `getChanges`，其作用是：按更新时间返回变更集和新游标。"
+        "第三步看 [sync.controller.ts](https://github.com/hhyufan/mde-server/blob/main/src/sync/sync.controller.ts) 中的 `getChanges`，其作用是：增量拉取接口。",
+        "第四步看 [sync.service.ts](https://github.com/hhyufan/mde-server/blob/main/src/sync/sync.service.ts) 中的 `getChanges`，其作用是：按更新时间返回变更集和新游标。"
       ],
       "collaborationNotes": [
         "上级模块：[云同步模块](./F-03-云同步模块.md)",
@@ -5699,7 +5699,7 @@
           ]
         },
         {
-          "path": "mde-server/src/sync/sync.controller.ts",
+          "path": "https://github.com/hhyufan/mde-server/blob/main/src/sync/sync.controller.ts",
           "symbol": "getChanges",
           "explanation": "增量拉取接口。",
           "language": "typescript",
@@ -5716,7 +5716,7 @@
           ]
         },
         {
-          "path": "mde-server/src/sync/sync.service.ts",
+          "path": "https://github.com/hhyufan/mde-server/blob/main/src/sync/sync.service.ts",
           "symbol": "getChanges",
           "explanation": "按更新时间返回变更集和新游标。",
           "language": "typescript",
@@ -5785,7 +5785,7 @@
       "readingGuide": [
         "第一步看 [syncEngine.js](../../../src/services/syncEngine.js) 中的 `getRemoteConflictDecision / applyRemoteDoc`，其作用是：前端检测本地正文和远端正文是否冲突。",
         "第二步看 [syncEngine.js](../../../src/services/syncEngine.js) 中的 `processMutation 409 branch`，其作用是：服务端返回 revision conflict 时在前端生成冲突对象。",
-        "第三步看 [sync.service.ts](../../../mde-server/src/sync/sync.service.ts) 中的 `throwRevisionConflict / pushFile rev check`，其作用是：服务端基于 baseRev 和当前 rev 检测冲突。"
+        "第三步看 [sync.service.ts](https://github.com/hhyufan/mde-server/blob/main/src/sync/sync.service.ts) 中的 `throwRevisionConflict / pushFile rev check`，其作用是：服务端基于 baseRev 和当前 rev 检测冲突。"
       ],
       "collaborationNotes": [
         "上级模块：[云同步模块](./F-03-云同步模块.md)",
@@ -5828,7 +5828,7 @@
           ]
         },
         {
-          "path": "mde-server/src/sync/sync.service.ts",
+          "path": "https://github.com/hhyufan/mde-server/blob/main/src/sync/sync.service.ts",
           "symbol": "throwRevisionConflict / pushFile rev check",
           "explanation": "服务端基于 baseRev 和当前 rev 检测冲突。",
           "language": "typescript",
@@ -6201,8 +6201,8 @@
       "readingGuide": [
         "第一步看 [useDeviceStore.js](../../../src/store/useDeviceStore.js) 中的 `newDeviceId / getId`，其作用是：生成并持久化当前设备 ID。",
         "第二步看 [syncEngine.js](../../../src/services/syncEngine.js) 中的 `bindLocalPath / rebindLocalPath`，其作用是：把 fileId 和本地路径绑定起来，或在重命名后迁移绑定。",
-        "第三步看 [sync.service.ts](../../../mde-server/src/sync/sync.service.ts) 中的 `bindPath`，其作用是：服务端写入 deviceBindings 映射。",
-        "第四步看 [sync-document.schema.ts](../../../mde-server/src/schemas/sync-document.schema.ts) 中的 `deviceBindings`，其作用是：数据库中保存多设备路径关系。"
+        "第三步看 [sync.service.ts](https://github.com/hhyufan/mde-server/blob/main/src/sync/sync.service.ts) 中的 `bindPath`，其作用是：服务端写入 deviceBindings 映射。",
+        "第四步看 [sync-document.schema.ts](https://github.com/hhyufan/mde-server/blob/main/src/schemas/sync-document.schema.ts) 中的 `deviceBindings`，其作用是：数据库中保存多设备路径关系。"
       ],
       "collaborationNotes": [
         "上级模块：[云同步模块](./F-03-云同步模块.md)",
@@ -6245,7 +6245,7 @@
           ]
         },
         {
-          "path": "mde-server/src/sync/sync.service.ts",
+          "path": "https://github.com/hhyufan/mde-server/blob/main/src/sync/sync.service.ts",
           "symbol": "bindPath",
           "explanation": "服务端写入 deviceBindings 映射。",
           "language": "typescript",
@@ -6262,7 +6262,7 @@
           ]
         },
         {
-          "path": "mde-server/src/schemas/sync-document.schema.ts",
+          "path": "https://github.com/hhyufan/mde-server/blob/main/src/schemas/sync-document.schema.ts",
           "symbol": "deviceBindings",
           "explanation": "数据库中保存多设备路径关系。",
           "language": "typescript",
@@ -6411,8 +6411,8 @@
       "readingGuide": [
         "第一步看 [syncEngine.js](../../../src/services/syncEngine.js) 中的 `COMPRESS_THRESHOLD_BYTES / MAX_REQUEST_BYTES`，其作用是：定义压缩阈值和请求上限。",
         "第二步看 [syncEngine.js](../../../src/services/syncEngine.js) 中的 `encodeBody / decodeBody`，其作用是：负责压缩、解压和 checksum 计算。",
-        "第三步看 [push.dto.ts](../../../mde-server/src/sync/dto/push.dto.ts) 中的 `content / compressed / size`，其作用是：服务端接收压缩传输的协议字段。",
-        "第四步看 [sync-document.schema.ts](../../../mde-server/src/schemas/sync-document.schema.ts) 中的 `compressed / size / checksum`，其作用是：服务端持久化压缩内容和校验信息。"
+        "第三步看 [push.dto.ts](https://github.com/hhyufan/mde-server/blob/main/src/sync/dto/push.dto.ts) 中的 `content / compressed / size`，其作用是：服务端接收压缩传输的协议字段。",
+        "第四步看 [sync-document.schema.ts](https://github.com/hhyufan/mde-server/blob/main/src/schemas/sync-document.schema.ts) 中的 `compressed / size / checksum`，其作用是：服务端持久化压缩内容和校验信息。"
       ],
       "collaborationNotes": [
         "上级模块：[云同步模块](./F-03-云同步模块.md)",
@@ -6455,7 +6455,7 @@
           ]
         },
         {
-          "path": "mde-server/src/sync/dto/push.dto.ts",
+          "path": "https://github.com/hhyufan/mde-server/blob/main/src/sync/dto/push.dto.ts",
           "symbol": "content / compressed / size",
           "explanation": "服务端接收压缩传输的协议字段。",
           "language": "typescript",
@@ -6472,7 +6472,7 @@
           ]
         },
         {
-          "path": "mde-server/src/schemas/sync-document.schema.ts",
+          "path": "https://github.com/hhyufan/mde-server/blob/main/src/schemas/sync-document.schema.ts",
           "symbol": "compressed / size / checksum",
           "explanation": "服务端持久化压缩内容和校验信息。",
           "language": "typescript",

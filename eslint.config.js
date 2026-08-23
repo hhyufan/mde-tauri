@@ -11,7 +11,6 @@ export default [
       'node_modules/**',
       'src-tauri/target/**',
       'src-tauri/gen/**',
-      'mde-server/**',
       'showcase/**',
       'mde-tauri/**',
     ],

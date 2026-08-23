@@ -144,15 +144,12 @@ mde-tauri/
 │   ├── i18n/                 # locale resources
 │   └── App.jsx               # app root
 ├── src-tauri/                # Tauri Rust backend
-├── mde-server/               # NestJS cloud service
-│   ├── src/auth/             # auth module
-│   ├── src/sync/             # sync module
-│   ├── src/users/            # users module
-│   └── src/schemas/          # Mongo schemas
 ├── public/                   # static assets
 ├── README.md                 # Chinese README
 └── README_EN.md              # English README
 ```
+
+The cloud sync service now lives in a separate repository: [hhyufan/mde-server](https://github.com/hhyufan/mde-server).
 
 ***
 
@@ -162,9 +159,8 @@ mde-tauri/
 
 | Tool     | Version           | Notes                         |
 | -------- | ----------------- | ----------------------------- |
-| Node.js  | 18+               | frontend/backend dependencies |
+| Node.js  | 18+               | frontend dependencies         |
 | Rust     | 1.77+             | Tauri build                   |
-| MongoDB  | 6+                | backend storage               |
 | JDK      | 17 - 21           | Gradle / Android builds       |
 | WebView2 | bundled on Win10+ | runtime for Windows           |
 
@@ -185,6 +181,7 @@ npm run dev
 ### 2) Run Cloud Service
 
 ```bash
+git clone https://github.com/hhyufan/mde-server.git
 cd mde-server
 npm install
 cp .env.example .env
