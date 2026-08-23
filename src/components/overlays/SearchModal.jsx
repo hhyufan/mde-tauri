@@ -11,7 +11,7 @@ import { SearchOutlined } from '@ant-design/icons';
 import useFileStore from '@store/useFileStore';
 import { useFileManager } from '@hooks/useFileManager';
 import { useResponsiveLayout } from '@hooks/useResponsiveLayout';
-import { searchFiles } from '@utils/tauriApi';
+import { cancelSearch, searchFiles } from '@utils/tauriApi';
 import { debounce } from '@utils/debounce';
 import FileTypeIcon from '@components/ui/FileTypeIcon';
 import './search-modal.scss';
@@ -35,6 +35,7 @@ function SearchModal({ open, onClose }) {
   const [selectedIndex, setSelectedIndex] = useState(0);
   const inputRef = useRef(null);
   const resultsRef = useRef(null);
+  const taskIdRef = useRef(null);
   const currentDir = useFileStore((s) => s.currentDir);
   const { openFileFromPath } = useFileManager();
   const { isMobileLayout } = useResponsiveLayout();
@@ -65,7 +66,11 @@ function SearchModal({ open, onClose }) {
         return;
       }
       try {
-        const res = await searchFiles(dir, q.trim(), isContent, 80);
+        if (taskIdRef.current) await cancelSearch(taskIdRef.current).catch(() => {});
+        const taskId = crypto.randomUUID?.() || `search-${Date.now()}`;
+        taskIdRef.current = taskId;
+        const res = await searchFiles(dir, q.trim(), isContent, 80, taskId);
+        if (taskIdRef.current !== taskId) return;
         setResults(res);
         setSelectedIndex(0);
       } catch (_) {
@@ -83,6 +88,9 @@ function SearchModal({ open, onClose }) {
     }
     setLoading(true);
     doSearch(query, currentDir, searchContent);
+    return () => {
+      if (taskIdRef.current) cancelSearch(taskIdRef.current).catch(() => {});
+    };
   }, [query, searchContent, currentDir, doSearch]);
 
   /**

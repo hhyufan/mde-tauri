@@ -3,9 +3,13 @@ use encoding_rs::{Encoding, UTF_8};
 use notify::{Event, EventKind, RecursiveMode, Watcher};
 use once_cell::sync::Lazy;
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
-use std::fs;
-use std::path::Path;
+use sha2::{Digest, Sha256};
+use std::collections::{HashMap, HashSet};
+#[cfg(unix)]
+use std::fs::File;
+use std::fs::{self, OpenOptions};
+use std::io::Write;
+use std::path::{Path, PathBuf};
 #[cfg(not(target_os = "android"))]
 use std::process::Command;
 use std::sync::{Arc, Mutex};
@@ -53,10 +57,77 @@ struct BinaryFileResult {
 
 /// 磁盘上的被监听文件发生变化时，发送给前端的事件载荷。
 #[derive(Serialize, Deserialize, Debug, Clone)]
+#[serde(rename_all = "camelCase")]
 struct FileChangeEvent {
-    file_path: String,
-    event_type: String,
-    timestamp: u64,
+    path: String,
+    kind: String,
+    modified_at: u64,
+    size: u64,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+#[serde(rename_all = "camelCase")]
+struct RecoveryTabInput {
+    recovery_id: String,
+    tab_id: String,
+    name: String,
+    path: String,
+    encoding: String,
+    line_ending: String,
+    last_saved_hash: String,
+    recovery_hash: String,
+    modified: bool,
+    content: String,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+#[serde(rename_all = "camelCase")]
+struct RecoverySnapshotInput {
+    schema_version: u8,
+    updated_at: u64,
+    active_tab_id: Option<String>,
+    tabs: Vec<RecoveryTabInput>,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+#[serde(rename_all = "camelCase")]
+struct RecoveryTabManifest {
+    recovery_id: String,
+    tab_id: String,
+    name: String,
+    path: String,
+    encoding: String,
+    line_ending: String,
+    last_saved_hash: String,
+    recovery_hash: String,
+    modified: bool,
+    content_file: String,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+#[serde(rename_all = "camelCase")]
+struct RecoveryManifestV1 {
+    schema_version: u8,
+    updated_at: u64,
+    active_tab_id: Option<String>,
+    tabs: Vec<RecoveryTabManifest>,
+}
+
+#[derive(Serialize, Debug, Clone)]
+#[serde(rename_all = "camelCase")]
+struct RecoveredTab {
+    #[serde(flatten)]
+    meta: RecoveryTabManifest,
+    content: String,
+}
+
+#[derive(Serialize, Debug, Clone)]
+#[serde(rename_all = "camelCase")]
+struct RecoveredSnapshot {
+    schema_version: u8,
+    updated_at: u64,
+    active_tab_id: Option<String>,
+    tabs: Vec<RecoveredTab>,
 }
 
 /// 进程内共享的文件监听注册表，
@@ -76,6 +147,11 @@ static FILE_WATCHER_STATE: Lazy<Arc<Mutex<FileWatcherState>>> = Lazy::new(|| {
         watched_files: HashMap::new(),
     }))
 });
+
+static CANCELLED_SEARCHES: Lazy<Mutex<HashSet<String>>> = Lazy::new(|| Mutex::new(HashSet::new()));
+static DIAGNOSTIC_LOG_LOCK: Lazy<Mutex<()>> = Lazy::new(|| Mutex::new(()));
+const DIAGNOSTIC_LOG_LIMIT: u64 = 2 * 1024 * 1024;
+const DIAGNOSTIC_LOG_FILES: usize = 5;
 
 /// 检测读取文件时应使用的文本编码。
 ///
@@ -107,6 +183,95 @@ fn detect_line_ending(content: &str) -> String {
     } else {
         "LF".to_string()
     }
+}
+
+fn sha256_hex(bytes: &[u8]) -> String {
+    format!("{:x}", Sha256::digest(bytes))
+}
+
+fn unique_temp_path(target: &Path) -> Result<PathBuf, String> {
+    let parent = target
+        .parent()
+        .ok_or_else(|| "Target has no parent directory".to_string())?;
+    let name = target
+        .file_name()
+        .and_then(|value| value.to_str())
+        .unwrap_or("document");
+    let nonce = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_nanos();
+    Ok(parent.join(format!(".{name}.{nonce}.mde-recovery.tmp")))
+}
+
+#[cfg(windows)]
+fn replace_existing_file(temp: &Path, target: &Path) -> Result<(), String> {
+    use std::os::windows::ffi::OsStrExt;
+    use windows_sys::Win32::Storage::FileSystem::{ReplaceFileW, REPLACEFILE_IGNORE_MERGE_ERRORS};
+
+    let target_wide: Vec<u16> = target.as_os_str().encode_wide().chain(Some(0)).collect();
+    let temp_wide: Vec<u16> = temp.as_os_str().encode_wide().chain(Some(0)).collect();
+    let result = unsafe {
+        ReplaceFileW(
+            target_wide.as_ptr(),
+            temp_wide.as_ptr(),
+            std::ptr::null(),
+            REPLACEFILE_IGNORE_MERGE_ERRORS,
+            std::ptr::null_mut(),
+            std::ptr::null_mut(),
+        )
+    };
+    if result == 0 {
+        Err(format!(
+            "atomic replace failed: {}",
+            std::io::Error::last_os_error()
+        ))
+    } else {
+        Ok(())
+    }
+}
+
+#[cfg(not(windows))]
+fn replace_existing_file(temp: &Path, target: &Path) -> Result<(), String> {
+    fs::rename(temp, target).map_err(|error| format!("atomic replace failed: {error}"))
+}
+
+/// Write into the destination directory, flush bytes to stable storage and only then
+/// replace the destination. On failure the temporary file is intentionally retained as
+/// a recovery copy and its path is included in the error.
+fn atomic_write(target: &Path, bytes: &[u8]) -> Result<(), String> {
+    let parent = target
+        .parent()
+        .ok_or_else(|| "Target has no parent directory".to_string())?;
+    fs::create_dir_all(parent).map_err(|error| format!("Failed to create directory: {error}"))?;
+    let temp = unique_temp_path(target)?;
+    let write_result = (|| -> Result<(), String> {
+        let mut file = OpenOptions::new()
+            .write(true)
+            .create_new(true)
+            .open(&temp)
+            .map_err(|error| format!("Failed to create recovery file: {error}"))?;
+        file.write_all(bytes)
+            .map_err(|error| format!("Failed to write recovery file: {error}"))?;
+        file.sync_all()
+            .map_err(|error| format!("Failed to flush recovery file: {error}"))?;
+        drop(file);
+
+        if target.exists() {
+            replace_existing_file(&temp, target)?;
+        } else {
+            fs::rename(&temp, target)
+                .map_err(|error| format!("Failed to move recovery file into place: {error}"))?;
+        }
+
+        #[cfg(unix)]
+        File::open(parent)
+            .and_then(|directory| directory.sync_all())
+            .map_err(|error| format!("Failed to flush destination directory: {error}"))?;
+        Ok(())
+    })();
+
+    write_result.map_err(|error| format!("{error}; recovery copy: {}", temp.display()))
 }
 
 /// 读取文本文件，并返回解码后的内容与基础编辑器元数据。
@@ -178,15 +343,7 @@ async fn read_binary_file(path: String) -> Result<BinaryFileResult, String> {
 /// 如果父目录不存在则自动创建。
 #[tauri::command]
 async fn write_file_content(path: String, content: String) -> Result<(), String> {
-    if let Some(parent) = Path::new(&path).parent() {
-        if let Err(e) = fs::create_dir_all(parent) {
-            return Err(format!("Failed to create directory: {}", e));
-        }
-    }
-    match fs::write(&path, content) {
-        Ok(_) => Ok(()),
-        Err(e) => Err(format!("Failed to write file: {}", e)),
-    }
+    atomic_write(Path::new(&path), content.as_bytes())
 }
 
 /// 按指定编码保存编辑器内容，
@@ -228,7 +385,7 @@ async fn save_file(
     let encoding_obj = Encoding::for_label(target_encoding.as_bytes()).unwrap_or(UTF_8);
     let (encoded_bytes, _, _) = encoding_obj.encode(&content);
 
-    match fs::write(&file_path, &encoded_bytes) {
+    match atomic_write(path, &encoded_bytes) {
         Ok(_) => {
             let file_name = path
                 .file_name()
@@ -256,6 +413,239 @@ async fn save_file(
             line_ending: None,
         }),
     }
+}
+
+fn recovery_directory(app_handle: &AppHandle) -> Result<PathBuf, String> {
+    app_handle
+        .path()
+        .app_data_dir()
+        .map(|path| path.join("recovery"))
+        .map_err(|error| format!("Failed to resolve recovery directory: {error}"))
+}
+
+#[tauri::command]
+async fn write_recovery_snapshot(
+    app_handle: AppHandle,
+    snapshot: RecoverySnapshotInput,
+) -> Result<(), String> {
+    if snapshot.schema_version != 1 {
+        return Err("Unsupported recovery schema version".to_string());
+    }
+    let directory = recovery_directory(&app_handle)?;
+    fs::create_dir_all(&directory)
+        .map_err(|error| format!("Failed to create recovery directory: {error}"))?;
+
+    let mut keep_files = std::collections::HashSet::new();
+    let mut manifest_tabs = Vec::with_capacity(snapshot.tabs.len());
+    for tab in snapshot.tabs {
+        let content_hash = sha256_hex(tab.content.as_bytes());
+        if !tab.recovery_hash.is_empty() && tab.recovery_hash != content_hash {
+            return Err(format!("Recovery hash mismatch for tab {}", tab.tab_id));
+        }
+        let content_file = format!("{}.draft", sha256_hex(tab.recovery_id.as_bytes()));
+        atomic_write(&directory.join(&content_file), tab.content.as_bytes())?;
+        keep_files.insert(content_file.clone());
+        manifest_tabs.push(RecoveryTabManifest {
+            recovery_id: tab.recovery_id,
+            tab_id: tab.tab_id,
+            name: tab.name,
+            path: tab.path,
+            encoding: tab.encoding,
+            line_ending: tab.line_ending,
+            last_saved_hash: tab.last_saved_hash,
+            recovery_hash: content_hash,
+            modified: tab.modified,
+            content_file,
+        });
+    }
+
+    let manifest = RecoveryManifestV1 {
+        schema_version: 1,
+        updated_at: snapshot.updated_at,
+        active_tab_id: snapshot.active_tab_id,
+        tabs: manifest_tabs,
+    };
+    let manifest_bytes = serde_json::to_vec_pretty(&manifest)
+        .map_err(|error| format!("Failed to serialize recovery manifest: {error}"))?;
+    atomic_write(&directory.join("manifest.json"), &manifest_bytes)?;
+
+    if let Ok(entries) = fs::read_dir(&directory) {
+        for entry in entries.flatten() {
+            let name = entry.file_name().to_string_lossy().to_string();
+            if name.ends_with(".draft") && !keep_files.contains(&name) {
+                let _ = fs::remove_file(entry.path());
+            }
+        }
+    }
+    Ok(())
+}
+
+#[tauri::command]
+async fn read_recovery_snapshot(
+    app_handle: AppHandle,
+) -> Result<Option<RecoveredSnapshot>, String> {
+    let directory = recovery_directory(&app_handle)?;
+    let manifest_path = directory.join("manifest.json");
+    if !manifest_path.exists() {
+        return Ok(None);
+    }
+    let manifest: RecoveryManifestV1 = serde_json::from_slice(
+        &fs::read(&manifest_path)
+            .map_err(|error| format!("Failed to read recovery manifest: {error}"))?,
+    )
+    .map_err(|error| format!("Failed to parse recovery manifest: {error}"))?;
+    if manifest.schema_version != 1 {
+        return Err("Unsupported recovery schema version".to_string());
+    }
+
+    let tabs = manifest
+        .tabs
+        .into_iter()
+        .filter_map(|meta| {
+            let content = fs::read_to_string(directory.join(&meta.content_file)).ok()?;
+            if sha256_hex(content.as_bytes()) != meta.recovery_hash {
+                return None;
+            }
+            Some(RecoveredTab { meta, content })
+        })
+        .collect();
+    Ok(Some(RecoveredSnapshot {
+        schema_version: manifest.schema_version,
+        updated_at: manifest.updated_at,
+        active_tab_id: manifest.active_tab_id,
+        tabs,
+    }))
+}
+
+#[tauri::command]
+async fn clear_recovery_snapshot(app_handle: AppHandle) -> Result<(), String> {
+    let directory = recovery_directory(&app_handle)?;
+    if !directory.exists() {
+        return Ok(());
+    }
+    for entry in fs::read_dir(&directory)
+        .map_err(|error| format!("Failed to read recovery directory: {error}"))?
+        .flatten()
+    {
+        let path = entry.path();
+        if path.is_file() {
+            fs::remove_file(&path)
+                .map_err(|error| format!("Failed to remove {}: {error}", path.display()))?;
+        }
+    }
+    Ok(())
+}
+
+const CREDENTIAL_SERVICE: &str = "com.mde.app";
+const REFRESH_TOKEN_ACCOUNT: &str = "refresh-token";
+
+#[tauri::command]
+async fn set_refresh_credential(token: String) -> Result<(), String> {
+    keyring::Entry::new(CREDENTIAL_SERVICE, REFRESH_TOKEN_ACCOUNT)
+        .map_err(|error| format!("Failed to open credential store: {error}"))?
+        .set_password(&token)
+        .map_err(|error| format!("Failed to save credential: {error}"))
+}
+
+#[tauri::command]
+async fn get_refresh_credential() -> Result<Option<String>, String> {
+    let entry = keyring::Entry::new(CREDENTIAL_SERVICE, REFRESH_TOKEN_ACCOUNT)
+        .map_err(|error| format!("Failed to open credential store: {error}"))?;
+    match entry.get_password() {
+        Ok(token) => Ok(Some(token)),
+        Err(keyring::Error::NoEntry) => Ok(None),
+        Err(error) => Err(format!("Failed to read credential: {error}")),
+    }
+}
+
+#[tauri::command]
+async fn delete_refresh_credential() -> Result<(), String> {
+    let entry = keyring::Entry::new(CREDENTIAL_SERVICE, REFRESH_TOKEN_ACCOUNT)
+        .map_err(|error| format!("Failed to open credential store: {error}"))?;
+    match entry.delete_credential() {
+        Ok(()) | Err(keyring::Error::NoEntry) => Ok(()),
+        Err(error) => Err(format!("Failed to delete credential: {error}")),
+    }
+}
+
+fn diagnostic_directory(app_handle: &AppHandle) -> Result<PathBuf, String> {
+    app_handle
+        .path()
+        .app_data_dir()
+        .map(|path| path.join("diagnostics"))
+        .map_err(|error| format!("Failed to resolve diagnostics directory: {error}"))
+}
+
+fn rotate_diagnostic_logs(directory: &Path) -> Result<(), String> {
+    let current = directory.join("mde-0.jsonl");
+    if fs::metadata(&current).map(|meta| meta.len()).unwrap_or(0) < DIAGNOSTIC_LOG_LIMIT {
+        return Ok(());
+    }
+    for index in (1..DIAGNOSTIC_LOG_FILES).rev() {
+        let source = directory.join(format!("mde-{}.jsonl", index - 1));
+        let target = directory.join(format!("mde-{index}.jsonl"));
+        if target.exists() {
+            let _ = fs::remove_file(&target);
+        }
+        if source.exists() {
+            fs::rename(source, target).map_err(|error| error.to_string())?;
+        }
+    }
+    Ok(())
+}
+
+#[tauri::command]
+async fn record_diagnostic(
+    app_handle: AppHandle,
+    category: String,
+    duration_ms: Option<u64>,
+) -> Result<(), String> {
+    let _guard = DIAGNOSTIC_LOG_LOCK.lock().unwrap();
+    let directory = diagnostic_directory(&app_handle)?;
+    fs::create_dir_all(&directory).map_err(|error| error.to_string())?;
+    rotate_diagnostic_logs(&directory)?;
+    let safe_category: String = category
+        .chars()
+        .filter(|value| value.is_ascii_alphanumeric() || matches!(value, '_' | '-'))
+        .take(64)
+        .collect();
+    let entry = serde_json::json!({
+        "timestamp": SystemTime::now().duration_since(UNIX_EPOCH).unwrap_or_default().as_millis(),
+        "category": safe_category,
+        "durationMs": duration_ms,
+    });
+    let mut file = OpenOptions::new()
+        .create(true)
+        .append(true)
+        .open(directory.join("mde-0.jsonl"))
+        .map_err(|error| error.to_string())?;
+    writeln!(file, "{entry}").map_err(|error| error.to_string())?;
+    Ok(())
+}
+
+#[tauri::command]
+async fn export_diagnostics(app_handle: AppHandle, destination: String) -> Result<(), String> {
+    let directory = diagnostic_directory(&app_handle)?;
+    let mut logs = Vec::new();
+    for index in 0..DIAGNOSTIC_LOG_FILES {
+        let path = directory.join(format!("mde-{index}.jsonl"));
+        if let Ok(content) = fs::read_to_string(path) {
+            logs.push(content);
+        }
+    }
+    let bundle = serde_json::json!({
+        "schemaVersion": 1,
+        "appVersion": env!("CARGO_PKG_VERSION"),
+        "platform": std::env::consts::OS,
+        "architecture": std::env::consts::ARCH,
+        "exportedAt": SystemTime::now().duration_since(UNIX_EPOCH).unwrap_or_default().as_millis(),
+        "privacy": "No document content, tokens, or file paths are recorded.",
+        "logs": logs,
+    });
+    atomic_write(
+        Path::new(&destination),
+        serde_json::to_string_pretty(&bundle).unwrap().as_bytes(),
+    )
 }
 
 /// 返回给定路径当前是否存在于磁盘上。
@@ -515,7 +905,7 @@ async fn start_file_watching(app_handle: AppHandle, file_path: String) -> Result
             .map(|time| {
                 time.duration_since(UNIX_EPOCH)
                     .unwrap_or_default()
-                    .as_secs()
+                    .as_millis() as u64
             })
             .unwrap_or(0),
         Err(_) => 0,
@@ -523,35 +913,44 @@ async fn start_file_watching(app_handle: AppHandle, file_path: String) -> Result
 
     let mut watcher = match notify::recommended_watcher(move |res: Result<Event, notify::Error>| {
         if let Ok(event) = res {
-            if let EventKind::Modify(_) = event.kind {
-                for path in event.paths {
-                    if path.to_string_lossy() == file_path_clone {
-                        let timestamp = SystemTime::now()
-                            .duration_since(UNIX_EPOCH)
-                            .unwrap_or_default()
-                            .as_secs();
+            let event_kind = match event.kind {
+                EventKind::Modify(notify::event::ModifyKind::Name(_)) => "renamed",
+                EventKind::Modify(_) | EventKind::Create(_) => "modified",
+                EventKind::Remove(_) => "removed",
+                _ => return,
+            };
+            for path in event.paths {
+                if path.to_string_lossy() == file_path_clone {
+                    let metadata = fs::metadata(&path).ok();
+                    let modified_at = metadata
+                        .as_ref()
+                        .and_then(|value| value.modified().ok())
+                        .and_then(|value| value.duration_since(UNIX_EPOCH).ok())
+                        .map(|value| value.as_millis() as u64)
+                        .unwrap_or_else(|| {
+                            SystemTime::now()
+                                .duration_since(UNIX_EPOCH)
+                                .unwrap_or_default()
+                                .as_millis() as u64
+                        });
 
-                        // 对比最近一次观察到的修改时间，避免重复的
-                        // notify 事件继续扩散成多次 UI 更新。
-                        let should_emit = {
-                            let mut state = FILE_WATCHER_STATE.lock().unwrap();
-                            if let Some(last_modified) =
-                                state.watched_files.get_mut(&file_path_clone)
-                            {
-                                if let Ok(metadata) = fs::metadata(&path) {
-                                    if let Ok(modified_time) = metadata.modified() {
-                                        let current_modified = modified_time
-                                            .duration_since(UNIX_EPOCH)
-                                            .unwrap_or_default()
-                                            .as_secs();
-                                        if current_modified != *last_modified {
-                                            *last_modified = current_modified;
-                                            true
-                                        } else {
-                                            false
-                                        }
-                                    } else {
+                    // 对比最近一次观察到的修改时间，避免重复的
+                    // notify 事件继续扩散成多次 UI 更新。
+                    let should_emit = {
+                        let mut state = FILE_WATCHER_STATE.lock().unwrap();
+                        if let Some(last_modified) = state.watched_files.get_mut(&file_path_clone) {
+                            if let Some(metadata) = metadata.as_ref() {
+                                if let Ok(modified_time) = metadata.modified() {
+                                    let current_modified = modified_time
+                                        .duration_since(UNIX_EPOCH)
+                                        .unwrap_or_default()
+                                        .as_millis()
+                                        as u64;
+                                    if current_modified != *last_modified {
+                                        *last_modified = current_modified;
                                         true
+                                    } else {
+                                        false
                                     }
                                 } else {
                                     true
@@ -559,16 +958,19 @@ async fn start_file_watching(app_handle: AppHandle, file_path: String) -> Result
                             } else {
                                 true
                             }
-                        };
-
-                        if should_emit {
-                            let change_event = FileChangeEvent {
-                                file_path: path.to_string_lossy().to_string(),
-                                event_type: "modified".to_string(),
-                                timestamp,
-                            };
-                            let _ = app_handle_clone.emit("file-changed", &change_event);
+                        } else {
+                            true
                         }
+                    };
+
+                    if should_emit {
+                        let change_event = FileChangeEvent {
+                            path: path.to_string_lossy().to_string(),
+                            kind: event_kind.to_string(),
+                            modified_at,
+                            size: metadata.as_ref().map(|value| value.len()).unwrap_or(0),
+                        };
+                        let _ = app_handle_clone.emit("file-changed", &change_event);
                     }
                 }
             }
@@ -609,86 +1011,6 @@ async fn stop_file_watching(file_path: String) -> Result<bool, String> {
     }
 }
 
-/// 通过桌面桥接层支持的平台运行时执行本地脚本文件。
-///
-/// 这里只允许少量白名单脚本扩展名，
-/// 这样桥接层才能分发到明确的解释器（`node` 或 `python`），并把标准输出返回给调用方。
-#[tauri::command]
-async fn execute_file(file_path: String) -> Result<String, String> {
-    #[cfg(target_os = "android")]
-    {
-        let _ = file_path;
-        return Err("Executing local files is not supported on Android".to_string());
-    }
-
-    #[cfg(not(target_os = "android"))]
-    {
-    let path = Path::new(&file_path);
-    if !path.exists() {
-        return Err("File does not exist".to_string());
-    }
-
-    let extension = path.extension().and_then(|ext| ext.to_str()).unwrap_or("");
-
-    match extension.to_lowercase().as_str() {
-        "js" => match Command::new("node").arg(&file_path).output() {
-            Ok(output) => Ok(String::from_utf8_lossy(&output.stdout).to_string()),
-            Err(e) => Err(format!("Failed to execute JS: {}", e)),
-        },
-        "py" => match Command::new("python").arg(&file_path).output() {
-            Ok(output) => Ok(String::from_utf8_lossy(&output.stdout).to_string()),
-            Err(e) => Err(format!("Failed to execute Python: {}", e)),
-        },
-        _ => Err(format!("Unsupported file type: {}", extension)),
-    }
-    }
-}
-
-/// 执行内存中的代码片段，并返回 stdout 或 stderr，
-/// 便于前端直接展示运行结果。
-///
-/// 这与 `execute_file` 的行为类似，但会直接执行编辑器传入的源码，
-/// 不会在磁盘上创建临时文件。
-#[tauri::command]
-async fn run_code_snippet(code: String, language: String) -> Result<String, String> {
-    #[cfg(target_os = "android")]
-    {
-        let _ = (code, language);
-        return Err("Running code snippets is not supported on Android".to_string());
-    }
-
-    #[cfg(not(target_os = "android"))]
-    {
-    match language.as_str() {
-        "javascript" | "js" => {
-            match Command::new("node").arg("-e").arg(&code).output() {
-                Ok(output) => {
-                    if output.status.success() {
-                        Ok(String::from_utf8_lossy(&output.stdout).to_string())
-                    } else {
-                        Err(String::from_utf8_lossy(&output.stderr).to_string())
-                    }
-                }
-                Err(e) => Err(format!("Failed to run code: {}", e)),
-            }
-        }
-        "python" | "py" => {
-            match Command::new("python").arg("-c").arg(&code).output() {
-                Ok(output) => {
-                    if output.status.success() {
-                        Ok(String::from_utf8_lossy(&output.stdout).to_string())
-                    } else {
-                        Err(String::from_utf8_lossy(&output.stderr).to_string())
-                    }
-                }
-                Err(e) => Err(format!("Failed to run code: {}", e)),
-            }
-        }
-        _ => Err(format!("Unsupported language: {}", language)),
-    }
-    }
-}
-
 /// 返回给前端的搜索结果项，
 /// 用于表示文件名命中或 Markdown 文件内容命中。
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -715,7 +1037,10 @@ fn is_markdown_ext(path: &Path) -> bool {
 
 /// 内容搜索的第一阶段辅助函数：
 /// 先收集 Markdown 文件路径，不立即读取文件内容。
-fn collect_md_paths(dir: &Path, out: &mut Vec<std::path::PathBuf>) {
+fn collect_md_paths(dir: &Path, out: &mut Vec<std::path::PathBuf>, task_id: &str) {
+    if CANCELLED_SEARCHES.lock().unwrap().contains(task_id) || out.len() >= 10_000 {
+        return;
+    }
     let entries = match fs::read_dir(dir) {
         Ok(e) => e,
         Err(_) => return,
@@ -727,7 +1052,7 @@ fn collect_md_paths(dir: &Path, out: &mut Vec<std::path::PathBuf>) {
             continue;
         }
         if path.is_dir() {
-            collect_md_paths(&path, out);
+            collect_md_paths(&path, out, task_id);
         } else if is_markdown_ext(&path) {
             out.push(path);
         }
@@ -736,11 +1061,7 @@ fn collect_md_paths(dir: &Path, out: &mut Vec<std::path::PathBuf>) {
 
 /// 内容搜索的第二阶段辅助函数：
 /// 扫描已加载的文件内容，并提取命中行的预览文本。
-fn search_content_lines(
-    path: &Path,
-    content: &str,
-    query_lower: &str,
-) -> Vec<SearchResult> {
+fn search_content_lines(path: &Path, content: &str, query_lower: &str) -> Vec<SearchResult> {
     let name = path
         .file_name()
         .unwrap_or_default()
@@ -769,12 +1090,7 @@ fn search_content_lines(
 
 /// 当前端只请求路径匹配而不读取文件内容时，
 /// 使用的递归文件名遍历逻辑。
-fn walk_names(
-    dir: &Path,
-    query_lower: &str,
-    results: &mut Vec<SearchResult>,
-    limit: usize,
-) {
+fn walk_names(dir: &Path, query_lower: &str, results: &mut Vec<SearchResult>, limit: usize) {
     if results.len() >= limit {
         return;
     }
@@ -788,11 +1104,7 @@ fn walk_names(
         }
         let path = entry.path();
         let name = entry.file_name().to_string_lossy().to_string();
-        if name.starts_with('.')
-            || name == "node_modules"
-            || name == "target"
-            || name == "dist"
-        {
+        if name.starts_with('.') || name == "node_modules" || name == "target" || name == "dist" {
             continue;
         }
         if path.is_dir() {
@@ -817,6 +1129,7 @@ async fn search_files(
     query: String,
     search_content: bool,
     max_results: Option<usize>,
+    task_id: Option<String>,
 ) -> Result<Vec<SearchResult>, String> {
     use std::path::PathBuf;
 
@@ -827,14 +1140,25 @@ async fn search_files(
 
     let query_lower: Arc<str> = query.to_lowercase().into();
     let limit = max_results.unwrap_or(100);
+    let task_id = task_id.unwrap_or_else(|| {
+        format!(
+            "search-{}",
+            SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .unwrap_or_default()
+                .as_nanos()
+        )
+    });
+    CANCELLED_SEARCHES.lock().unwrap().remove(&task_id);
 
     if search_content {
         // 在执行内容扫描前，先在线程池中收集候选 Markdown 路径，
         // 让异步执行器线程继续留给 UI 相关任务使用。
         let root_clone = root_path.clone();
+        let collect_task_id = task_id.clone();
         let md_paths = async_runtime::spawn_blocking(move || {
             let mut paths = Vec::new();
-            collect_md_paths(&root_clone, &mut paths);
+            collect_md_paths(&root_clone, &mut paths, &collect_task_id);
             paths
         })
         .await
@@ -842,33 +1166,42 @@ async fn search_files(
 
         // 在线程池中并行读取和扫描文件，
         // 避免大工作区搜索在单线程上串行执行。
-        let handles: Vec<_> = md_paths
-            .into_iter()
-            .map(|path| {
-                let q = Arc::clone(&query_lower);
-                async_runtime::spawn_blocking(move || match fs::read_to_string(&path) {
-                    Ok(content) => search_content_lines(&path, &content, &q),
-                    Err(_) => vec![],
-                })
-            })
-            .collect();
-
-        // 按发现顺序合并各文件的命中结果，
-        // 一旦达到请求的结果上限就停止继续收集。
         let mut results = Vec::new();
-        for handle in handles {
-            if results.len() >= limit {
+        for batch in md_paths.chunks(4) {
+            if results.len() >= limit || CANCELLED_SEARCHES.lock().unwrap().contains(&task_id) {
                 break;
             }
-            if let Ok(file_results) = handle.await {
-                for r in file_results {
-                    if results.len() >= limit {
-                        break;
+            let handles: Vec<_> = batch
+                .iter()
+                .cloned()
+                .map(|path| {
+                    let q = Arc::clone(&query_lower);
+                    async_runtime::spawn_blocking(move || {
+                        if fs::metadata(&path)
+                            .map(|meta| meta.len() > 5 * 1024 * 1024)
+                            .unwrap_or(true)
+                        {
+                            return vec![];
+                        }
+                        match fs::read_to_string(&path) {
+                            Ok(content) => search_content_lines(&path, &content, &q),
+                            Err(_) => vec![],
+                        }
+                    })
+                })
+                .collect();
+            for handle in handles {
+                if let Ok(file_results) = handle.await {
+                    for r in file_results {
+                        if results.len() >= limit {
+                            break;
+                        }
+                        results.push(r);
                     }
-                    results.push(r);
                 }
             }
         }
+        CANCELLED_SEARCHES.lock().unwrap().remove(&task_id);
         Ok(results)
     } else {
         // 仅文件名搜索仍放在线程池执行，
@@ -885,6 +1218,11 @@ async fn search_files(
     }
 }
 
+#[tauri::command]
+async fn cancel_search(task_id: String) -> bool {
+    CANCELLED_SEARCHES.lock().unwrap().insert(task_id)
+}
+
 /// 在宿主平台的文件管理器中显示指定文件或目录。
 #[tauri::command]
 async fn show_in_explorer(path: String) -> Result<String, String> {
@@ -896,56 +1234,60 @@ async fn show_in_explorer(path: String) -> Result<String, String> {
 
     #[cfg(not(target_os = "android"))]
     {
-    let target_path = Path::new(&path);
-    if !target_path.exists() {
-        return Err("Path does not exist".to_string());
-    }
-
-    #[cfg(target_os = "windows")]
-    {
-        let args = if target_path.is_file() {
-            vec!["/select,".to_string(), path]
-        } else {
-            vec![path]
-        };
-        match Command::new("explorer").args(&args).spawn() {
-            Ok(_) => Ok("Opened in Explorer".to_string()),
-            Err(e) => Err(format!("Failed to open Explorer: {}", e)),
+        let target_path = Path::new(&path);
+        if !target_path.exists() {
+            return Err("Path does not exist".to_string());
         }
-    }
 
-    #[cfg(target_os = "macos")]
-    {
-        let args = if target_path.is_file() {
-            vec!["-R".to_string(), path]
-        } else {
-            vec![path]
-        };
-        match Command::new("open").args(&args).spawn() {
-            Ok(_) => Ok("Opened in Finder".to_string()),
-            Err(e) => Err(format!("Failed to open Finder: {}", e)),
-        }
-    }
-
-    #[cfg(target_os = "linux")]
-    {
-        match Command::new("xdg-open")
-            .arg(if target_path.is_file() {
-                target_path.parent().unwrap_or(target_path).to_str().unwrap_or(".")
-            } else {
-                path.as_str()
-            })
-            .spawn()
+        #[cfg(target_os = "windows")]
         {
-            Ok(_) => Ok("Opened file manager".to_string()),
-            Err(e) => Err(format!("Failed to open file manager: {}", e)),
+            let args = if target_path.is_file() {
+                vec!["/select,".to_string(), path]
+            } else {
+                vec![path]
+            };
+            match Command::new("explorer").args(&args).spawn() {
+                Ok(_) => Ok("Opened in Explorer".to_string()),
+                Err(e) => Err(format!("Failed to open Explorer: {}", e)),
+            }
         }
-    }
 
-    #[cfg(not(any(target_os = "windows", target_os = "macos", target_os = "linux")))]
-    {
-        Err("Operation not supported on this platform".to_string())
-    }
+        #[cfg(target_os = "macos")]
+        {
+            let args = if target_path.is_file() {
+                vec!["-R".to_string(), path]
+            } else {
+                vec![path]
+            };
+            match Command::new("open").args(&args).spawn() {
+                Ok(_) => Ok("Opened in Finder".to_string()),
+                Err(e) => Err(format!("Failed to open Finder: {}", e)),
+            }
+        }
+
+        #[cfg(target_os = "linux")]
+        {
+            match Command::new("xdg-open")
+                .arg(if target_path.is_file() {
+                    target_path
+                        .parent()
+                        .unwrap_or(target_path)
+                        .to_str()
+                        .unwrap_or(".")
+                } else {
+                    path.as_str()
+                })
+                .spawn()
+            {
+                Ok(_) => Ok("Opened file manager".to_string()),
+                Err(e) => Err(format!("Failed to open file manager: {}", e)),
+            }
+        }
+
+        #[cfg(not(any(target_os = "windows", target_os = "macos", target_os = "linux")))]
+        {
+            Err("Operation not supported on this platform".to_string())
+        }
     }
 }
 
@@ -966,8 +1308,7 @@ async fn get_app_documents_dir(app: AppHandle) -> Result<String, String> {
         .map_err(|e| format!("Failed to resolve app data dir: {}", e))?;
     let docs = app_data_dir.join("Documents");
     if !docs.exists() {
-        fs::create_dir_all(&docs)
-            .map_err(|e| format!("Failed to create documents dir: {}", e))?;
+        fs::create_dir_all(&docs).map_err(|e| format!("Failed to create documents dir: {}", e))?;
     }
     Ok(docs.to_string_lossy().to_string())
 }
@@ -1039,9 +1380,8 @@ async fn show_main_window(app: AppHandle) -> Result<(), String> {
 /// 仅允许 http(s) 与 mailto 协议，避免被用于触发本地命令或打开任意文件。
 #[tauri::command]
 async fn open_external(url: String) -> Result<(), String> {
-    let allowed = url.starts_with("http://")
-        || url.starts_with("https://")
-        || url.starts_with("mailto:");
+    let allowed =
+        url.starts_with("http://") || url.starts_with("https://") || url.starts_with("mailto:");
     if !allowed {
         return Err("Only http(s) and mailto URLs are allowed".to_string());
     }
@@ -1058,7 +1398,9 @@ pub fn run() {
     let mut builder = tauri::Builder::default()
         .plugin(tauri_plugin_fs::init())
         .plugin(tauri_plugin_dialog::init())
-        .plugin(tauri_plugin_store::Builder::default().build());
+        .plugin(tauri_plugin_store::Builder::default().build())
+        .plugin(tauri_plugin_updater::Builder::new().build())
+        .plugin(tauri_plugin_process::init());
 
     // 避免把额外初始化逻辑带入生产启动路径；
     // 只有调试构建才会自动打开 devtools，便于本地排查桥接行为。
@@ -1079,6 +1421,14 @@ pub fn run() {
             read_binary_file,
             write_file_content,
             save_file,
+            write_recovery_snapshot,
+            read_recovery_snapshot,
+            clear_recovery_snapshot,
+            set_refresh_credential,
+            get_refresh_credential,
+            delete_refresh_credential,
+            record_diagnostic,
+            export_diagnostics,
             check_file_exists,
             get_file_info,
             get_directory_contents,
@@ -1086,9 +1436,8 @@ pub fn run() {
             delete_file,
             start_file_watching,
             stop_file_watching,
-            execute_file,
-            run_code_snippet,
             search_files,
+            cancel_search,
             show_in_explorer,
             show_main_window,
             get_app_documents_dir,
@@ -1099,3 +1448,31 @@ pub fn run() {
         .expect("error while running tauri application");
 }
 
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn atomic_write_replaces_complete_file() {
+        let root = std::env::temp_dir().join(format!(
+            "mde-atomic-write-{}-{}",
+            std::process::id(),
+            SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        fs::create_dir_all(&root).unwrap();
+        let target = root.join("document.md");
+        fs::write(&target, b"original").unwrap();
+        atomic_write(&target, b"replacement").unwrap();
+        assert_eq!(fs::read(&target).unwrap(), b"replacement");
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn line_ending_detection_is_stable() {
+        assert_eq!(detect_line_ending("a\r\nb\r\n"), "CRLF");
+        assert_eq!(detect_line_ending("a\nb\n"), "LF");
+    }
+}

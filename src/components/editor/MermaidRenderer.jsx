@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { memo, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Alert } from 'antd';
 import mermaid from 'mermaid';
@@ -25,9 +25,26 @@ function MermaidRenderer({ code, isDark }) {
   const ref = useRef(null);
   const [svg, setSvg] = useState('');
   const [error, setError] = useState(null);
+  const [visible, setVisible] = useState(false);
 
   useEffect(() => {
-    if (!code) return;
+    const node = ref.current;
+    if (!node || typeof IntersectionObserver === 'undefined') {
+      setVisible(true);
+      return undefined;
+    }
+    const observer = new IntersectionObserver(([entry]) => {
+      if (entry.isIntersecting) {
+        setVisible(true);
+        observer.disconnect();
+      }
+    }, { rootMargin: '300px' });
+    observer.observe(node);
+    return () => observer.disconnect();
+  }, [code]);
+
+  useEffect(() => {
+    if (!code || !visible) return;
     let cancelled = false;
 
     (async () => {
@@ -50,7 +67,7 @@ function MermaidRenderer({ code, isDark }) {
 
     // 异步渲染未完成时组件可能已卸载，用标记避免后续状态回写。
     return () => { cancelled = true; };
-  }, [code, isDark]);
+  }, [code, isDark, t, visible]);
 
   if (error) {
     return (
@@ -75,4 +92,4 @@ function MermaidRenderer({ code, isDark }) {
   );
 }
 
-export default MermaidRenderer;
+export default memo(MermaidRenderer);

@@ -19,10 +19,17 @@ import { UsersModule } from '../users/users.module';
       imports: [ConfigModule],
       inject: [ConfigService],
       // 通过环境变量驱动签名配置，避免在测试和部署环境中重复维护同类设置。
-      useFactory: (config: ConfigService) => ({
-        secret: config.get<string>('JWT_SECRET', 'mde-dev-secret'),
-        signOptions: { expiresIn: config.get<string>('JWT_EXPIRES_IN', '7d') },
-      }),
+      useFactory: (config: ConfigService) => {
+        const configuredSecret = config.get<string>('JWT_SECRET');
+        const isProduction = config.get<string>('NODE_ENV') === 'production';
+        if (isProduction && !configuredSecret) {
+          throw new Error('JWT_SECRET is required in production');
+        }
+        return {
+          secret: configuredSecret || 'mde-development-only-secret',
+          signOptions: { expiresIn: config.get<string>('JWT_EXPIRES_IN', '15m') },
+        };
+      },
     }),
   ],
   providers: [AuthService, JwtStrategy, LocalStrategy],

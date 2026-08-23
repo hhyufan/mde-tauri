@@ -13,11 +13,8 @@ import {
   statUri as safStatUri,
   readFileText as safReadFileText,
   writeFileText as safWriteFileText,
-  createFileUnder as safCreateFileUnder,
   deleteUri as safDeleteUri,
   renameUriTo as safRenameUriTo,
-  resolveChild as safResolveChild,
-  childExists as safChildExists,
   openInFileManager as safOpenInFileManager,
   safDisplayName,
 } from '@utils/androidSaf';
@@ -162,6 +159,51 @@ export async function saveFile(filePath, content, encoding) {
   return invoke('save_file', { filePath, content, encoding });
 }
 
+/** Persist an application-managed crash-recovery snapshot. */
+export async function writeRecoverySnapshot(snapshot) {
+  return invoke('write_recovery_snapshot', { snapshot });
+}
+
+/** Read the last crash-recovery snapshot, including verified draft contents. */
+export async function readRecoverySnapshot() {
+  return invoke('read_recovery_snapshot');
+}
+
+/** Remove the recovery manifest and all associated draft files. */
+export async function clearRecoverySnapshot() {
+  return invoke('clear_recovery_snapshot');
+}
+
+export async function setRefreshCredential(token) {
+  if (!window.__TAURI_INTERNALS__) {
+    localStorage.setItem('mde-dev-refresh-token', token);
+    return;
+  }
+  return invoke('set_refresh_credential', { token });
+}
+
+export async function getRefreshCredential() {
+  if (!window.__TAURI_INTERNALS__) return localStorage.getItem('mde-dev-refresh-token');
+  return invoke('get_refresh_credential');
+}
+
+export async function deleteRefreshCredential() {
+  if (!window.__TAURI_INTERNALS__) {
+    localStorage.removeItem('mde-dev-refresh-token');
+    return;
+  }
+  return invoke('delete_refresh_credential');
+}
+
+export async function recordDiagnostic(category, durationMs) {
+  if (!window.__TAURI_INTERNALS__) return;
+  return invoke('record_diagnostic', { category, durationMs });
+}
+
+export async function exportDiagnostics(destination) {
+  return invoke('export_diagnostics', { destination });
+}
+
 /**
  * 判断指定路径是否存在。
  */
@@ -264,32 +306,11 @@ export async function stopFileWatching(filePath) {
 }
 
 /**
- * 调用原生侧执行指定文件。
- *
- * @param {string} filePath 目标文件路径
- * @returns {Promise<unknown>} 原生命令返回结果
- */
-export async function executeFile(filePath) {
-  return invoke('execute_file', { filePath });
-}
-
-/**
- * 调用原生侧运行一段临时代码片段。
- *
- * @param {string} code 待执行的代码内容
- * @param {string} language 代码所属语言
- * @returns {Promise<unknown>} 原生命令返回结果
- */
-export async function runCodeSnippet(code, language) {
-  return invoke('run_code_snippet', { code, language });
-}
-
-/**
  * 在目录内搜索文件。
  *
  * SAF 场景下降级为当前层级的名称匹配，以避免深层遍历带来的性能问题。
  */
-export async function searchFiles(dirPath, query, searchContent = false, maxResults = 100) {
+export async function searchFiles(dirPath, query, searchContent = false, maxResults = 100, taskId) {
   if (isSafUri(dirPath)) {
     // SAF 树遍历远慢于 `std::fs`，每深入一层都意味着新的 ContentResolver 查询；
     // 因此这里只保留“当前目录单层名称搜索”，保证搜索面板仍可用于快速定位文件。
@@ -315,7 +336,12 @@ export async function searchFiles(dirPath, query, searchContent = false, maxResu
       return [];
     }
   }
-  return invoke('search_files', { dirPath, query, searchContent, maxResults });
+  return invoke('search_files', { dirPath, query, searchContent, maxResults, taskId });
+}
+
+export async function cancelSearch(taskId) {
+  if (!taskId || !window.__TAURI_INTERNALS__) return false;
+  return invoke('cancel_search', { taskId });
 }
 
 /**

@@ -50,5 +50,7 @@
     "store:allow-length",
     "store:allow-load",
     "store:allow-save"
+    ,"updater:default"
+    ,"process:allow-restart"
   ]
 }

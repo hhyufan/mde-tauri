@@ -3,6 +3,10 @@ import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcrypt';
 import { UsersService } from '../users/users.service';
 import { RegisterDto } from './dto/register.dto';
+import { createHash, randomBytes } from 'crypto';
+
+const ACCESS_TOKEN_TTL_SECONDS = 15 * 60;
+const REFRESH_TOKEN_TTL_MS = 30 * 24 * 60 * 60 * 1000;
 
 /**
  * 认证核心服务。
@@ -47,17 +51,47 @@ export class AuthService {
   }
 
   /** 刷新现有用户的访问令牌。 */
-  async refreshToken(userId: string) {
-    const user = await this.usersService.findById(userId);
-    if (!user) throw new UnauthorizedException();
-    return this.buildTokenResponse(user);
+  async refreshToken(refreshToken: string) {
+    const oldHash = this.hashRefreshToken(refreshToken);
+    const user = await this.usersService.findByRefreshTokenHash(oldHash);
+    const record = user?.refreshTokens?.find((item) => item.tokenHash === oldHash);
+    if (!user || !record || new Date(record.expiresAt).getTime() <= Date.now()) {
+      throw new UnauthorizedException('Invalid refresh token');
+    }
+    const nextToken = this.createRefreshToken();
+    const expiresAt = new Date(Date.now() + REFRESH_TOKEN_TTL_MS);
+    const rotated = await this.usersService.rotateRefreshToken(
+      user._id.toString(),
+      oldHash,
+      this.hashRefreshToken(nextToken),
+      expiresAt,
+    );
+    if (!rotated) throw new UnauthorizedException('Refresh token was already used');
+    return this.buildAccessResponse(user, nextToken);
+  }
+
+  async logout(refreshToken: string) {
+    if (refreshToken) await this.usersService.revokeRefreshToken(this.hashRefreshToken(refreshToken));
+    return { revoked: true };
   }
 
   /** 统一组装鉴权接口返回结构。 */
-  private buildTokenResponse(user: any) {
+  private async buildTokenResponse(user: any) {
+    const refreshToken = this.createRefreshToken();
+    await this.usersService.addRefreshToken(
+      user._id.toString(),
+      this.hashRefreshToken(refreshToken),
+      new Date(Date.now() + REFRESH_TOKEN_TTL_MS),
+    );
+    return this.buildAccessResponse(user, refreshToken);
+  }
+
+  private buildAccessResponse(user: any, refreshToken: string) {
     const payload = { sub: user._id.toString(), email: user.email };
     return {
-      access_token: this.jwtService.sign(payload),
+      access_token: this.jwtService.sign(payload, { expiresIn: ACCESS_TOKEN_TTL_SECONDS }),
+      expiresIn: ACCESS_TOKEN_TTL_SECONDS,
+      refreshToken,
       user: {
         id: user._id.toString(),
         email: user.email,
@@ -65,5 +99,13 @@ export class AuthService {
         avatar: user.avatar,
       },
     };
+  }
+
+  private createRefreshToken(): string {
+    return randomBytes(48).toString('base64url');
+  }
+
+  private hashRefreshToken(token: string): string {
+    return createHash('sha256').update(String(token || '')).digest('hex');
   }
 }

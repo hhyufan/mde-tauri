@@ -97,8 +97,21 @@ function OutlineView() {
   }, [activeTabId]);
   const content = useEditorBufferContent(activeTabId, fallback, 320);
   const [collapsed, setCollapsed] = useState({});
+  const [workerItems, setWorkerItems] = useState([]);
 
-  const items = useMemo(() => extractItems(content), [content]);
+  const items = useMemo(() => (content.length > 200_000 ? workerItems : extractItems(content)), [content, workerItems]);
+
+  useEffect(() => {
+    if (content.length <= 200_000) return undefined;
+    const worker = new Worker(new URL('../../../../workers/markdownAnalysis.worker.js', import.meta.url), { type: 'module' });
+    const id = `${activeTabId}-${Date.now()}`;
+    worker.onmessage = (event) => {
+      if (event.data?.id === id) setWorkerItems(event.data.result || []);
+      worker.terminate();
+    };
+    worker.postMessage({ id, type: 'outline', content });
+    return () => worker.terminate();
+  }, [activeTabId, content]);
 
   const headings = useMemo(() => items.filter((it) => it.type === 'heading'), [items]);
   const minLevel = useMemo(

@@ -59,7 +59,7 @@
         // mounting with no error boundary) gets surfaced into a visible
         // overlay. This is critical on Android where opening devtools
         // requires USB + chrome://inspect.
-        function showStartupError(msg) {
+        function showStartupError(msg, kind) {
           try {
             var box = document.getElementById('__startup_error__');
             if (!box) {
@@ -73,6 +73,10 @@
               box.appendChild(body);
               (document.body || document.documentElement).appendChild(box);
             }
+            // A timeout is only a diagnostic hint: the development server may
+            // still be transforming the initial module graph. Real runtime
+            // errors must remain visible until the app is restarted.
+            box.dataset.kind = kind || 'error';
             var body = document.getElementById('__startup_error_body__');
             var line = document.createElement('div');
             line.textContent = String(msg);
@@ -112,19 +116,41 @@
           var msg = reason && (reason.stack || reason.message) ? (reason.stack || reason.message) : String(reason);
           showStartupError('Unhandled promise rejection: ' + msg);
         });
-        // Fail-safe: if after 8 s the React root is still empty, show a
-        // hint so the user knows something is wrong rather than staring
-        // at a blank screen.
-        setTimeout(function () {
+        // Fail-safe: a cold Vite development start can spend more than a few
+        // seconds transforming the initial dependency graph. Wait long enough
+        // to avoid flagging normal startup as a crash, and automatically clear
+        // this diagnostic if React subsequently mounts successfully.
+        var startupTimeoutMs = 30000;
+        var startupTimer = setTimeout(function () {
           var root = document.getElementById('root');
           if (root && root.childElementCount === 0 && !document.getElementById('__startup_error__')) {
             showStartupError(
-              'App did not render within 8 s.\n' +
+              'App did not render within ' + (startupTimeoutMs / 1000) + ' s.\n' +
               'UA: ' + (navigator && navigator.userAgent) + '\n' +
-              'Tauri internals present: ' + !!window.__TAURI_INTERNALS__
+              'Tauri internals present: ' + !!window.__TAURI_INTERNALS__,
+              'timeout'
             );
           }
-        }, 8000);
+        }, startupTimeoutMs);
+
+        window.addEventListener('DOMContentLoaded', function () {
+          var root = document.getElementById('root');
+          if (!root) return;
+
+          function handleReactMount() {
+            if (root.childElementCount === 0) return false;
+            clearTimeout(startupTimer);
+            var box = document.getElementById('__startup_error__');
+            if (box && box.dataset.kind === 'timeout') box.remove();
+            return true;
+          }
+
+          if (handleReactMount()) return;
+          var observer = new MutationObserver(function () {
+            if (handleReactMount()) observer.disconnect();
+          });
+          observer.observe(root, { childList: true });
+        });
 
         // 1. Apply persisted theme to <html> so the inline CSS picks it up.
         try {

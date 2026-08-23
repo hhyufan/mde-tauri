@@ -1,5 +1,6 @@
 import * as dns from 'dns';
 import { INestApplication, ValidationPipe } from '@nestjs/common';
+import helmet from 'helmet';
 
 /**
  * 强制 Node 的 DNS 解析器使用可靠支持 SRV 记录查询的公共 DNS，
@@ -33,6 +34,7 @@ ensureDnsServers();
  * 共用的 Nest 应用配置。
  */
 export function setupApp(app: INestApplication): void {
+  app.use(helmet({ crossOriginResourcePolicy: { policy: 'cross-origin' } }));
   app.use((req, res, next) => {
     if (req.path.startsWith('/sync')) {
       res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
@@ -43,14 +45,30 @@ export function setupApp(app: INestApplication): void {
     next();
   });
 
+  const configuredOrigins = (process.env.CORS_ORIGINS || '')
+    .split(',')
+    .map((origin) => origin.trim())
+    .filter(Boolean);
+  const allowedOrigins = new Set([
+    'http://tauri.localhost',
+    'https://tauri.localhost',
+    'tauri://localhost',
+    'http://localhost:1420',
+    'http://localhost:1421',
+    ...configuredOrigins,
+  ]);
   app.enableCors({
-    origin: true,
+    origin(origin, callback) {
+      if (!origin || allowedOrigins.has(origin)) return callback(null, true);
+      return callback(new Error('Origin is not allowed by CORS'), false);
+    },
     credentials: true,
   });
 
   app.useGlobalPipes(
     new ValidationPipe({
       whitelist: true,
+      forbidNonWhitelisted: true,
       transform: true,
     }),
   );

@@ -43,7 +43,9 @@ src-tauri/gen/android/app/src/main/java/com/mde/app/*
 .env.development
 .env.production
 .env.test
-
+.cursor
+.trae
+.idea
 # ===========================
 # Logs
 # ===========================

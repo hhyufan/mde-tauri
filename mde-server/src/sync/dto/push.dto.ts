@@ -1,10 +1,12 @@
 import {
+  ArrayMaxSize,
   IsArray,
   IsBoolean,
   IsInt,
   IsObject,
   IsOptional,
   IsString,
+  MaxLength,
   Min,
   ValidateNested,
 } from 'class-validator';
@@ -18,25 +20,30 @@ export class PushFileDto {
   /** 文件的稳定 ID；单文件接口通常由路由参数提供。 */
   @IsOptional()
   @IsString()
+  @MaxLength(128)
   fileId?: string;
 
   /** 展示用文件名。 */
   @IsOptional()
   @IsString()
+  @MaxLength(255)
   fileName?: string;
 
   /** 文件最初来源路径，仅作为元数据保存。 */
   @IsOptional()
   @IsString()
+  @MaxLength(4096)
   originalPath?: string;
 
   /** 文件来源类型，如手动创建、最近打开等。 */
   @IsOptional()
   @IsString()
+  @MaxLength(64)
   source?: string;
 
   /** 文件正文；若 `compressed=true` 则为压缩后的字符串。 */
   @IsString()
+  @MaxLength(5 * 1024 * 1024)
   content: string;
 
   /** 标记 `content` 是否经过压缩。 */
@@ -53,15 +60,18 @@ export class PushFileDto {
   /** 文件编码。 */
   @IsOptional()
   @IsString()
+  @MaxLength(64)
   encoding?: string;
 
   /** 行尾风格，如 `LF` 或 `CRLF`。 */
   @IsOptional()
   @IsString()
+  @MaxLength(16)
   lineEnding?: string;
 
   /** 内容校验值，用于检测变更。 */
   @IsString()
+  @MaxLength(128)
   checksum: string;
 
   /** 客户端认为当前文件基于的服务端版本号。 */
@@ -71,6 +81,7 @@ export class PushFileDto {
 
   /** 客户端生成的变更 ID，用于实现幂等重试。 */
   @IsString()
+  @MaxLength(128)
   mutationId: string;
 
   /**
@@ -79,6 +90,7 @@ export class PushFileDto {
    */
   @IsOptional()
   @IsString()
+  @MaxLength(128)
   deviceId?: string;
 
   /**
@@ -87,6 +99,7 @@ export class PushFileDto {
    */
   @IsOptional()
   @IsString()
+  @MaxLength(4096)
   devicePath?: string;
 }
 
@@ -94,15 +107,18 @@ export class PushFileDto {
 export class BindPathDto {
   /** 设备稳定标识。 */
   @IsString()
+  @MaxLength(128)
   deviceId: string;
 
   /** 该设备上的本地绝对路径。 */
   @IsString()
+  @MaxLength(4096)
   devicePath: string;
 
   /** 可选的幂等变更 ID。 */
   @IsOptional()
   @IsString()
+  @MaxLength(128)
   mutationId?: string;
 }
 
@@ -115,6 +131,7 @@ export class DeleteFileDto {
 
   /** 删除操作的唯一变更 ID。 */
   @IsString()
+  @MaxLength(128)
   mutationId: string;
 }
 
@@ -195,6 +212,7 @@ export class UpdateConfigDto {
 export class PushDto {
   /** 待批量推送的文件列表。 */
   @IsArray()
+  @ArrayMaxSize(100)
   @ValidateNested({ each: true })
   @Type(() => PushFileDto)
   documents: PushFileDto[];

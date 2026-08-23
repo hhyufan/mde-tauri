@@ -142,6 +142,33 @@ const useEditorStore = create(
         });
       },
 
+      /** Restore a draft as a dirty tab without writing over its original disk file. */
+      restoreRecoveredTab: (draft) => {
+        const { tabs, tabRenderList } = get();
+        const baseId = draft.tabId || draft.path || `recovered-${Date.now()}`;
+        const id = tabs.some((tab) => tab.id === baseId)
+          ? `recovered-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`
+          : baseId;
+        const recovered = {
+          id,
+          name: draft.name || 'Recovered.md',
+          path: draft.path || '',
+          ext: (draft.name || '').split('.').pop() || 'md',
+          content: draft.content || '',
+          encoding: draft.encoding || 'UTF-8',
+          lineEnding: draft.lineEnding || 'LF',
+          modified: true,
+        };
+        setBuffer(id, recovered.content);
+        set({
+          tabs: [...tabs, recovered],
+          tabRenderList: [...tabRenderList, toTabMeta(recovered)],
+          activeTabId: id,
+          tabsRevision: get().tabsRevision + 1,
+        });
+        return id;
+      },
+
       /** ????????????????????? */
       renameTab: (tabId, newName) => {
         set((state) => ({

@@ -1,6 +1,12 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
 import { Document } from 'mongoose';
 
+export type RefreshTokenRecord = {
+  tokenHash: string;
+  expiresAt: Date;
+  createdAt: Date;
+};
+
 /**
  * 本地登录与 OAuth 登录共用的用户持久化模型。
  */
@@ -29,6 +35,14 @@ export class User extends Document {
   // OAuth 提供方返回的稳定用户唯一标识。
   @Prop({ default: null })
   oauthId: string;
+
+  // Refresh tokens are opaque client secrets; only SHA-256 hashes are stored.
+  @Prop({
+    type: [{ tokenHash: String, expiresAt: Date, createdAt: Date }],
+    default: [],
+    select: false,
+  })
+  refreshTokens: RefreshTokenRecord[];
 }
 
 export const UserSchema = SchemaFactory.createForClass(User);

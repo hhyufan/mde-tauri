@@ -1,4 +1,18 @@
-import { FileIcon as VsCodeFileIcon } from 'react-material-vscode-icons';
+import { useEffect, useState } from 'react';
+
+// 完整图标目录保持在首屏依赖图之外，并且只在浏览器空闲时加载一次。
+let fullIconComponent = null;
+let fullIconPromise = null;
+
+function loadFullIconComponent() {
+  if (!fullIconPromise) {
+    fullIconPromise = import('react-material-vscode-icons').then((module) => {
+      fullIconComponent = module.FileIcon;
+      return fullIconComponent;
+    });
+  }
+  return fullIconPromise;
+}
 
 const EXTENSION_ALIASES = {
   markdown: 'md',
@@ -24,22 +38,18 @@ function normalizeExtension(extension = '', fileName = '') {
   return EXTENSION_ALIASES[normalized] || normalized;
 }
 
-/**
- * 为 VS Code 风格图标组件补全可识别的文件名。
- */
-function buildFileName(extension = '', fileName = '') {
-  const normalizedExtension = normalizeExtension(extension, fileName);
-  const normalizedFileName = String(fileName || '').trim();
-  if (normalizedFileName) return normalizedFileName;
-  return normalizedExtension ? `file.${normalizedExtension}` : 'file.txt';
-}
+const COLORS = {
+  md: '#519aba', mdx: '#519aba', js: '#f1e05a', jsx: '#61dafb', ts: '#3178c6',
+  tsx: '#61dafb', json: '#cbcb41', html: '#e34c26', css: '#563d7c', scss: '#c6538c',
+  yaml: '#cb171e', toml: '#9c4221', rs: '#dea584', py: '#3572a5', java: '#b07219', txt: '#8b949e',
+};
 
 /**
  * 文件类型图标封装。
  *
- * 对第三方 VS Code 图标组件做一层适配，统一处理扩展名别名、文件夹态与默认名。
+ * 使用少量本地 SVG 和常用扩展名颜色映射作为无闪烁占位。
  */
-function FileTypeIcon({
+function LightweightFallback({
   extension = '',
   fileName = '',
   size = 16,
@@ -47,10 +57,56 @@ function FileTypeIcon({
   isFolder = false,
   isExpanded = false,
 }) {
-  const resolvedFileName = buildFileName(extension, fileName);
+  const ext = normalizeExtension(extension, fileName);
+  if (isFolder) {
+    return (
+      <svg className={className} width={size} height={size} viewBox="0 0 24 24" aria-hidden="true">
+        <path fill={isExpanded ? '#dcb67a' : '#c69c5d'} d="M3 5.5A1.5 1.5 0 0 1 4.5 4H9l2 2h8.5A1.5 1.5 0 0 1 21 7.5v10a1.5 1.5 0 0 1-1.5 1.5h-15A1.5 1.5 0 0 1 3 17.5z" />
+      </svg>
+    );
+  }
+  return (
+    <svg className={className} width={size} height={size} viewBox="0 0 24 24" aria-hidden="true">
+      <path fill={COLORS[ext] || '#8b949e'} d="M6 2h8l4 4v16H6z" opacity=".9" />
+      <path fill="rgba(255,255,255,.75)" d="M14 2v5h5z" />
+      {size >= 16 && <text x="12" y="17" textAnchor="middle" fontSize="5.2" fontWeight="700" fill="#fff">{ext.slice(0, 3).toUpperCase()}</text>}
+    </svg>
+  );
+}
+
+function FileTypeIcon(props) {
+  const { extension = '', fileName = '', size = 16, className = '', isFolder = false, isExpanded = false } = props;
+  const [FullIcon, setFullIcon] = useState(() => fullIconComponent);
+  const normalizedFileName = String(fileName || '').trim();
+  const ext = normalizeExtension(extension, fileName);
+  const resolvedFileName = normalizedFileName || (ext ? `file.${ext}` : 'file.txt');
+
+  useEffect(() => {
+    if (fullIconComponent) {
+      setFullIcon(() => fullIconComponent);
+      return undefined;
+    }
+
+    let active = true;
+    const load = () => {
+      loadFullIconComponent().then((Component) => {
+        if (active) setFullIcon(() => Component);
+      });
+    };
+    const idleId = window.requestIdleCallback?.(load, { timeout: 1500 });
+    const timeoutId = idleId == null ? window.setTimeout(load, 250) : null;
+
+    return () => {
+      active = false;
+      if (idleId != null) window.cancelIdleCallback?.(idleId);
+      if (timeoutId != null) window.clearTimeout(timeoutId);
+    };
+  }, []);
+
+  if (!FullIcon) return <LightweightFallback {...props} />;
 
   return (
-    <VsCodeFileIcon
+    <FullIcon
       fileName={resolvedFileName}
       size={size}
       className={className}

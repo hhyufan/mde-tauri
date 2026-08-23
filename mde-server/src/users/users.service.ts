@@ -20,6 +20,43 @@ export class UsersService {
     return this.userModel.findById(id);
   }
 
+  async findByRefreshTokenHash(tokenHash: string): Promise<User | null> {
+    return this.userModel.findOne({ 'refreshTokens.tokenHash': tokenHash }).select('+refreshTokens');
+  }
+
+  async addRefreshToken(userId: string, tokenHash: string, expiresAt: Date): Promise<void> {
+    await this.userModel.updateOne(
+      { _id: userId },
+      {
+        $pull: { refreshTokens: { expiresAt: { $lte: new Date() } } },
+        $push: { refreshTokens: { tokenHash, expiresAt, createdAt: new Date() } },
+      },
+    );
+  }
+
+  async rotateRefreshToken(
+    userId: string,
+    oldHash: string,
+    newHash: string,
+    expiresAt: Date,
+  ): Promise<boolean> {
+    const result = await this.userModel.updateOne(
+      { _id: userId, 'refreshTokens.tokenHash': oldHash },
+      {
+        $pull: { refreshTokens: { tokenHash: oldHash } },
+        $push: { refreshTokens: { tokenHash: newHash, expiresAt, createdAt: new Date() } },
+      },
+    );
+    return result.modifiedCount === 1;
+  }
+
+  async revokeRefreshToken(tokenHash: string): Promise<void> {
+    await this.userModel.updateOne(
+      { 'refreshTokens.tokenHash': tokenHash },
+      { $pull: { refreshTokens: { tokenHash } } },
+    );
+  }
+
   // 创建本地账号用户，密码散列值由上游预先计算后传入。
   async create(data: { email: string; username: string; passwordHash: string }): Promise<User> {
     return this.userModel.create(data);

@@ -90,7 +90,7 @@ apiClient.interceptors.request.use((config) => {
 apiClient.interceptors.response.use(
   (res) => res,
   async (error) => {
-    if (error.response?.status === 401) {
+    if (error.response?.status === 401 && error.config?.url !== '/auth/refresh') {
       const { token, refreshToken, logout } = useAuthStore.getState();
       if (token && !error.config._retried) {
         error.config._retried = true;

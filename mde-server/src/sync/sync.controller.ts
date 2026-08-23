@@ -20,12 +20,14 @@ import {
   PushFileDto,
   UpdateConfigDto,
 } from './dto';
+import { Throttle } from '@nestjs/throttler';
 
 /**
  * 云端同步接口。
  * 所有路由都要求用户先通过 JWT 鉴权。
  */
 @UseGuards(JwtAuthGuard)
+@Throttle({ default: { limit: 60, ttl: 60_000 } })
 @Controller('sync')
 export class SyncController {
   constructor(private syncService: SyncService) {}
@@ -38,8 +40,13 @@ export class SyncController {
 
   /** 按游标时间增量拉取发生变化的文档元数据。 */
   @Get('changes')
-  getChanges(@Request() req, @Query('since') since?: string) {
-    return this.syncService.getChanges(req.user.userId, since);
+  getChanges(
+    @Request() req,
+    @Query('since') since?: string,
+    @Query('cursor') cursor?: string,
+    @Query('limit') limit?: string,
+  ) {
+    return this.syncService.getChanges(req.user.userId, { since, cursor, limit });
   }
 
   /** 单文件写入接口，供新版按版本号同步的客户端优先使用。 */

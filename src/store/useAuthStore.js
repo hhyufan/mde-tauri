@@ -5,6 +5,11 @@
  */
 import { create } from 'zustand';
 import apiClient from '@/services/apiClient';
+import {
+  deleteRefreshCredential,
+  getRefreshCredential,
+  setRefreshCredential,
+} from '@utils/tauriApi';
 
 let tauriStore = null;
 
@@ -38,10 +43,12 @@ const useAuthStore = create((set, get) => ({
   loadToken: async () => {
     try {
       const store = await getTauriStore();
-      const token = await store.get('token');
       const user = await store.get('user');
-      if (token && user) {
-        set({ token, user, isLoggedIn: true });
+      const refreshCredential = await getRefreshCredential();
+      if (refreshCredential && user) {
+        const { data } = await apiClient.post('/auth/refresh', { refreshToken: refreshCredential });
+        set({ token: data.access_token, user: data.user, isLoggedIn: true });
+        await setRefreshCredential(data.refreshToken);
       }
     } catch {
       // 开发中的浏览器环境可能没有 Tauri store，这里静默降级。
@@ -57,9 +64,9 @@ const useAuthStore = create((set, get) => ({
       const { data } = await apiClient.post('/auth/login', { email, password });
       set({ user: data.user, token: data.access_token, isLoggedIn: true, loading: false });
       const store = await getTauriStore();
-      await store.set('token', data.access_token);
       await store.set('user', data.user);
       await store.save();
+      await setRefreshCredential(data.refreshToken);
       return data;
     } catch (err) {
       set({ loading: false });
@@ -76,9 +83,9 @@ const useAuthStore = create((set, get) => ({
       const { data } = await apiClient.post('/auth/register', { email, username, password });
       set({ user: data.user, token: data.access_token, isLoggedIn: true, loading: false });
       const store = await getTauriStore();
-      await store.set('token', data.access_token);
       await store.set('user', data.user);
       await store.save();
+      await setRefreshCredential(data.refreshToken);
       return data;
     } catch (err) {
       set({ loading: false });
@@ -91,12 +98,14 @@ const useAuthStore = create((set, get) => ({
    */
   refreshToken: async () => {
     try {
-      const { data } = await apiClient.post('/auth/refresh');
+      const refreshCredential = await getRefreshCredential();
+      if (!refreshCredential) throw new Error('Missing refresh credential');
+      const { data } = await apiClient.post('/auth/refresh', { refreshToken: refreshCredential });
       set({ token: data.access_token, user: data.user });
       const store = await getTauriStore();
-      await store.set('token', data.access_token);
       await store.set('user', data.user);
       await store.save();
+      await setRefreshCredential(data.refreshToken);
     } catch {
       get().logout();
     }
@@ -106,12 +115,19 @@ const useAuthStore = create((set, get) => ({
    * 清空内存态与本地存储中的认证信息。
    */
   logout: async () => {
+    try {
+      const refreshCredential = await getRefreshCredential();
+      if (refreshCredential) await apiClient.post('/auth/logout', { refreshToken: refreshCredential });
+    } catch {
+      // Local logout still proceeds if revocation cannot reach the server.
+    }
     set({ user: null, token: null, isLoggedIn: false });
     try {
       const store = await getTauriStore();
       await store.delete('token');
       await store.delete('user');
       await store.save();
+      await deleteRefreshCredential();
     } catch {
       // 持久层清理失败不影响前端立即退出登录态。
     }

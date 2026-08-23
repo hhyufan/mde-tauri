@@ -6,9 +6,10 @@
  */
 import { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Tooltip } from 'antd';
+import { Button, Popover, Space, Typography } from 'antd';
 import { syncEngine } from '@/services/syncEngine';
 import useAuthStore from '@store/useAuthStore';
+import useSyncStore from '@store/useSyncStore';
 import './sync-status.scss';
 
 const SyncIcon = () => (
@@ -60,6 +61,9 @@ function SyncStatusIndicator() {
   const { t } = useTranslation();
   const isLoggedIn = useAuthStore((s) => s.isLoggedIn);
   const [status, setStatus] = useState(syncEngine.status);
+  const queue = useSyncStore((s) => s.queue);
+  const lastSuccessfulSyncAt = useSyncStore((s) => s.lastSuccessfulSyncAt);
+  const lastSyncError = useSyncStore((s) => s.lastSyncError);
 
   useEffect(() => {
     return syncEngine.onStatusChange(setStatus);
@@ -71,7 +75,19 @@ function SyncStatusIndicator() {
   const label = t(`sync.status.${status}`);
 
   return (
-    <Tooltip title={label} placement="top" mouseEnterDelay={0.25}>
+    <Popover
+      placement="bottomRight"
+      title={label}
+      content={(
+        <Space direction="vertical" size={6}>
+          <Typography.Text>待处理：{queue.length}</Typography.Text>
+          <Typography.Text>上次成功：{lastSuccessfulSyncAt ? new Date(lastSuccessfulSyncAt).toLocaleString() : '尚未完成'}</Typography.Text>
+          {lastSyncError && <Typography.Text type="danger">失败分类：{lastSyncError.kind}</Typography.Text>}
+          <Button size="small" onClick={() => syncEngine.fullSync()}>立即重试</Button>
+        </Space>
+      )}
+      trigger="click"
+    >
       <span
         className={`sync-status sync-status--${status}`}
         onClick={() => syncEngine.fullSync()}
@@ -79,7 +95,7 @@ function SyncStatusIndicator() {
         <span className="sync-status__icon"><IconComponent /></span>
         <span className="sync-status__label">{label}</span>
       </span>
-    </Tooltip>
+    </Popover>
   );
 }
 

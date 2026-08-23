@@ -21,8 +21,8 @@ expressApp.set('etag', false);
 // 触发 Express 默认的 100kb 上限。Vercel 仍有自己的单请求体积限制
 // （Hobby 约 4.5MB，Pro 约 5MB），这里无法覆盖，因此客户端会按单文件
 // 逐次上传，并在发送前先压缩载荷。
-expressApp.use(json({ limit: '50mb' }));
-expressApp.use(urlencoded({ limit: '50mb', extended: true }));
+expressApp.use(json({ limit: '5mb' }));
+expressApp.use(urlencoded({ limit: '5mb', extended: true }));
 
 // 在多次 serverless 调用间复用，避免每个请求都重新初始化 Nest。
 let bootstrapPromise: Promise<Express> | null = null;

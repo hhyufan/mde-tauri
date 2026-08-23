@@ -5,10 +5,43 @@
  * ??????????????????????????
  */
 import { create } from 'zustand';
-import { persist } from 'zustand/middleware';
+import { createJSONStorage, persist } from 'zustand/middleware';
 import { getCurrentUserScopeId, isOwnedByUser } from './userScope';
 
-export const SYNC_PROTOCOL_VERSION = 2;
+export const SYNC_PROTOCOL_VERSION = 3;
+
+let nativeSyncStorePromise = null;
+const syncStateStorage = {
+  async getItem(name) {
+    if (typeof window === 'undefined' || !window.__TAURI_INTERNALS__) return localStorage.getItem(name);
+    nativeSyncStorePromise ||= import('@tauri-apps/plugin-store').then(({ load }) => load('sync-state.json'));
+    const store = await nativeSyncStorePromise;
+    const nativeValue = await store.get(name);
+    if (nativeValue) return nativeValue;
+    const legacy = localStorage.getItem(name);
+    if (legacy) {
+      await store.set(name, legacy);
+      await store.set('migratedLocalStorageV2', true);
+      await store.save();
+      localStorage.removeItem(name);
+    }
+    return legacy;
+  },
+  async setItem(name, value) {
+    if (typeof window === 'undefined' || !window.__TAURI_INTERNALS__) return localStorage.setItem(name, value);
+    nativeSyncStorePromise ||= import('@tauri-apps/plugin-store').then(({ load }) => load('sync-state.json'));
+    const store = await nativeSyncStorePromise;
+    await store.set(name, value);
+    await store.save();
+  },
+  async removeItem(name) {
+    if (typeof window === 'undefined' || !window.__TAURI_INTERNALS__) return localStorage.removeItem(name);
+    nativeSyncStorePromise ||= import('@tauri-apps/plugin-store').then(({ load }) => load('sync-state.json'));
+    const store = await nativeSyncStorePromise;
+    await store.delete(name);
+    await store.save();
+  },
+};
 
 /**
  * 同步状态 store。
@@ -80,6 +113,7 @@ const useSyncStore = create(
       cursor: '',
       cursors: {},
       lastSyncError: null,
+      lastSuccessfulSyncAt: 0,
 
       /** ?????????????????? */
       markLocalResetDone: () =>
@@ -137,6 +171,7 @@ const useSyncStore = create(
         return get().cursors?.[ownerUserId] || (ownerUserId === 'guest' ? get().cursor || '' : '');
       },
       setLastSyncError: (error) => set({ lastSyncError: error || null }),
+      markSyncSuccessful: () => set({ lastSuccessfulSyncAt: Date.now(), lastSyncError: null }),
 
       /** ???? `fileId` ?????????? */
       getDoc: (fileId) => get().docs[scopedDocKey(fileId)] || null,
@@ -243,16 +278,14 @@ const useSyncStore = create(
       // 返回该文件仍在队列中、尚未推送成功的 upsert 原始内容。自动保存会在推送
       // 成功后立刻清掉标签的 modified 标记，所以冲突判断不能只看 modified，需要
       // 以队列里待推送的内容作为本地权威内容来比对远端，避免静默覆盖本地改动。
-      getPendingUpsertContent: (fileId) => {
+      getPendingUpsertPayload: (fileId) => {
         const pending = listOwnedQueue(get().queue).find(
           (item) =>
             item.fileId === fileId
             && item.type === 'upsert'
             && ['pending', 'processing'].includes(item.status),
         );
-        return typeof pending?.payload?.rawContent === 'string'
-          ? pending.payload.rawContent
-          : undefined;
+        return pending?.payload;
       },
 
       /** ???????????????????? */
@@ -388,6 +421,16 @@ const useSyncStore = create(
     {
       name: 'mde-sync-state',
       version: SYNC_PROTOCOL_VERSION,
+      storage: createJSONStorage(() => syncStateStorage),
+      migrate: (persisted) => ({
+        ...persisted,
+        protocolVersion: SYNC_PROTOCOL_VERSION,
+        queue: (persisted?.queue || []).map((item) => {
+          if (!item?.payload || !Object.hasOwn(item.payload, 'rawContent')) return item;
+          const { rawContent: _rawContent, ...payload } = item.payload;
+          return { ...item, payload };
+        }),
+      }),
       partialize: (state) => ({
         protocolVersion: state.protocolVersion,
         localResetDone: state.localResetDone,
@@ -397,6 +440,7 @@ const useSyncStore = create(
         conflicts: state.conflicts,
         cursor: state.cursor,
         cursors: state.cursors,
+        lastSuccessfulSyncAt: state.lastSuccessfulSyncAt,
       }),
     },
   ),

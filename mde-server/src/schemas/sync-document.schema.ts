@@ -90,3 +90,5 @@ export class SyncDocument extends Document {
 export const SyncDocumentSchema = SchemaFactory.createForClass(SyncDocument);
 /** 保证每个用户下的 `fileId` 全局唯一。 */
 SyncDocumentSchema.index({ userId: 1, fileId: 1 }, { unique: true });
+/** Stable seek-pagination order for protocol v3. */
+SyncDocumentSchema.index({ userId: 1, updatedAt: 1, _id: 1 });

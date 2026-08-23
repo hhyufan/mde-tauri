@@ -192,25 +192,65 @@ export class SyncService implements OnModuleInit {
     return docs.map((doc) => this.serializeDoc(doc));
   }
 
-  /** 根据时间游标返回用户文档的增量变化列表。 */
-  async getChanges(userId: string, since?: string) {
+  private encodeCursor(updatedAt: Date, id: Types.ObjectId): string {
+    return Buffer.from(JSON.stringify({ updatedAt: updatedAt.toISOString(), id: id.toString() }))
+      .toString('base64url');
+  }
+
+  private decodeCursor(cursor?: string): { updatedAt: Date; id: Types.ObjectId } | null {
+    if (!cursor) return null;
+    try {
+      const value = JSON.parse(Buffer.from(cursor, 'base64url').toString('utf8'));
+      const updatedAt = new Date(value.updatedAt);
+      if (Number.isNaN(updatedAt.getTime()) || !Types.ObjectId.isValid(value.id)) return null;
+      return { updatedAt, id: new Types.ObjectId(value.id) };
+    } catch {
+      return null;
+    }
+  }
+
+  /** Protocol v3 uses stable `(updatedAt, _id)` seek pagination. */
+  async getChanges(
+    userId: string,
+    options: { since?: string; cursor?: string; limit?: string } = {},
+  ) {
+    const { since, cursor, limit } = options;
+    const isV3 = cursor !== undefined || limit !== undefined;
+    const decoded = this.decodeCursor(cursor);
     const sinceDate = since ? new Date(since) : null;
     const filter: Record<string, any> = {
       userId: this.userObjectId(userId),
       fileId: { $exists: true, $nin: [null, ''] },
     };
-    if (sinceDate && !Number.isNaN(sinceDate.getTime())) {
+    if (decoded) {
+      filter.$or = [
+        { updatedAt: { $gt: decoded.updatedAt } },
+        { updatedAt: decoded.updatedAt, _id: { $gt: decoded.id } },
+      ];
+    } else if (sinceDate && !Number.isNaN(sinceDate.getTime())) {
       filter.updatedAt = { $gt: sinceDate };
     }
-    const docs = await this.docModel
+    const pageSize = Math.min(500, Math.max(1, Number.parseInt(limit || '100', 10) || 100));
+    let query = this.docModel
       .find(filter)
-      .sort({ updatedAt: 1 })
-      .lean<any[]>();
+      .sort({ updatedAt: 1, _id: 1 });
+    if (isV3) query = query.limit(pageSize + 1);
+    const docs = await query.lean<any[]>();
+    const page = isV3 ? docs.slice(0, pageSize) : docs;
+    const hasMore = isV3 && docs.length > pageSize;
+    const tail = page[page.length - 1];
+    if (isV3) {
+      return {
+        changes: page.map((doc) => this.serializeDoc(doc)),
+        nextCursor: tail ? this.encodeCursor(new Date(tail.updatedAt), tail._id) : cursor || '',
+        hasMore,
+      };
+    }
     return {
-      changes: docs.map((doc) => this.serializeDoc(doc)),
+      changes: page.map((doc) => this.serializeDoc(doc)),
       cursor:
-        docs.length > 0
-          ? new Date(docs[docs.length - 1].updatedAt).toISOString()
+        page.length > 0
+          ? new Date(page[page.length - 1].updatedAt).toISOString()
           : since || '',
     };
   }

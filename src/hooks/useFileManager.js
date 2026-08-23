@@ -18,7 +18,6 @@ import {
   renameFile,
   startFileWatching,
   stopFileWatching,
-  onFileChanged,
   showInExplorer,
   getAppDocumentsDir,
   isSafUri,
@@ -35,7 +34,6 @@ import useEditorStore from '@store/useEditorStore';
 import useFileStore from '@store/useFileStore';
 import useConfigStore from '@store/useConfigStore';
 import useNotificationStore from '@store/useNotificationStore';
-import useExternalDocsStore from '@store/useExternalDocsStore';
 import { syncEngine, isCloudPath, fileIdFromCloudPath } from '@/services/syncEngine';
 import { getBuffer } from '@utils/editorBuffer';
 import { debounce } from '@utils/debounce';
@@ -155,7 +153,6 @@ export function useFileManager() {
     openFile: openTab,
     openExternalFile,
     markTabSaved,
-    getActiveTab,
     createUntitledTab,
     updateTabPath,
   } = useEditorStore.getState();

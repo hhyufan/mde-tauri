@@ -27,7 +27,6 @@ function flush() {
     try {
       fn(ids);
     } catch (err) {
-      // eslint-disable-next-line no-console
       console.warn('[editorBuffer] listener threw', err);
     }
   });

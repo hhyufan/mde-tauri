@@ -156,7 +156,7 @@ const rehypePlugins = [
  * @param {object} props React Markdown 注入的代码节点属性。
  * @returns {JSX.Element} 代码节点对应的渲染结果。
  */
-function CodeBlock({ children, className, ...props }) {
+const CodeBlock = memo(function CodeBlock({ children, className, ...props }) {
   const match = /language-(\w+)/.exec(className || '');
   const lang = match ? match[1] : '';
   const code = String(children).replace(/\n$/, '');
@@ -171,7 +171,7 @@ function CodeBlock({ children, className, ...props }) {
   }
 
   return <code className={`language-${lang}`} {...props}>{children}</code>;
-}
+});
 
 /**
  * 为指定标题标签生成自动附带锚点 `id` 的渲染器。
@@ -278,10 +278,23 @@ const MarkdownPreview = forwardRef(function MarkdownPreview({ className }, ref) 
   const rawContent = useEditorBufferContent(activeTabId, fallback, 240);
   const containerRef = useRef(null);
 
+  const [workerProcessedContent, setWorkerProcessedContent] = useState('');
   const processedContent = useMemo(() => {
-    const { content: processed } = parseFootnotes(rawContent);
-    return processed;
-  }, [rawContent]);
+    if (rawContent.length > 200_000) return workerProcessedContent || rawContent;
+    return parseFootnotes(rawContent).content;
+  }, [rawContent, workerProcessedContent]);
+
+  useEffect(() => {
+    if (rawContent.length <= 200_000) return undefined;
+    const worker = new Worker(new URL('../../workers/markdownAnalysis.worker.js', import.meta.url), { type: 'module' });
+    const id = `${activeTabId}-${Date.now()}`;
+    worker.onmessage = (event) => {
+      if (event.data?.id === id) setWorkerProcessedContent(event.data.result || '');
+      worker.terminate();
+    };
+    worker.postMessage({ id, type: 'footnotes', content: rawContent });
+    return () => worker.terminate();
+  }, [activeTabId, rawContent]);
 
   // `useDeferredValue` 会把较重的 Markdown 树渲染降到较低优先级处理。新的
   // 预览树尚在构建时，旧树仍然保持可交互，从而降低长文档下编辑器、滚动条

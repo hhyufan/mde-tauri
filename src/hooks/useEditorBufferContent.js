@@ -16,7 +16,7 @@ import { getBuffer, subscribe } from '@utils/editorBuffer';
  * 否则解析和渲染开销可能挤占编辑器自身的按键处理，造成输入发黏或掉帧。
  */
 function pickDelay(baseDelay, contentLength) {
-  if (contentLength > 200_000) return Math.max(baseDelay, 700);
+  if (contentLength > 200_000) return Math.max(baseDelay, 1000);
   if (contentLength > 80_000) return Math.max(baseDelay, 480);
   if (contentLength > 30_000) return Math.max(baseDelay, 340);
   return baseDelay;

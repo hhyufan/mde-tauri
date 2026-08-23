@@ -6,7 +6,7 @@
  */
 import pako from 'pako';
 import apiClient, { classifyApiError } from './apiClient';
-import { saveFile } from '@utils/tauriApi';
+import { recordDiagnostic, saveFile } from '@utils/tauriApi';
 import useEditorStore from '@store/useEditorStore';
 import useFileStore from '@store/useFileStore';
 import useFileIdStore from '@store/useFileIdStore';
@@ -155,13 +155,6 @@ function decodeBody(doc) {
 /**
  * 生成一次变更提交使用的唯一 mutationId。
  */
-function mutationId() {
-  if (typeof crypto !== 'undefined' && crypto.randomUUID) {
-    return crypto.randomUUID();
-  }
-  return `mutation_${Date.now()}_${Math.random().toString(36).slice(2)}`;
-}
-
 /**
  * 构造当前本地设置快照，供配置同步上推。
  */
@@ -443,7 +436,6 @@ class SyncEngine {
         originalPath: filePath,
         source: options.source || 'local',
         content: body.content,
-        rawContent: content,
         compressed: body.compressed,
         size: body.size,
         encoding,
@@ -525,7 +517,6 @@ class SyncEngine {
         originalPath,
         source: options.source || 'external',
         content: body.content,
-        rawContent: content,
         compressed: body.compressed,
         size: body.size,
         encoding,
@@ -650,7 +641,13 @@ class SyncEngine {
     // 本地“权威内容”优先取同步队列里待推送的内容；否则取编辑器里打开的实时内容
     // （getOpenLocalState 已合并 editorBuffer）。自动保存会在推送后立刻清掉 modified
     // 标记，所以不能只看 modified，必须以真实内容做比对。
-    const pendingContent = useSyncStore.getState().getPendingUpsertContent?.(fileId);
+    const pendingPayload = useSyncStore.getState().getPendingUpsertPayload?.(fileId);
+    let pendingContent;
+    try {
+      pendingContent = pendingPayload ? decodeBody(pendingPayload) : undefined;
+    } catch {
+      pendingContent = undefined;
+    }
     let localContent = null;
     if (typeof pendingContent === 'string') {
       localContent = pendingContent;
@@ -944,7 +941,7 @@ class SyncEngine {
             encoding: item.payload.encoding || doc?.encoding || 'UTF-8',
             lineEnding: item.payload.lineEnding || doc?.lineEnding || 'LF',
             originalPath: item.payload.originalPath || '',
-            content: item.payload.rawContent || '',
+            content: decodeBody(item.payload),
             checksum: data.contentHash || data.checksum || item.payload.checksum,
             rev: data.rev || (doc?.rev || 0),
           });
@@ -1003,9 +1000,13 @@ class SyncEngine {
         // “本次尝试推送的内容”作为本地权威内容来判断是否真的分叉，不依赖标签的
         // modified 标记（自动保存会在排队后立刻清除它，导致漏判冲突）。
         const localState = this.getOpenLocalState(item.fileId, localPath);
-        const localContent = typeof item.payload?.rawContent === 'string'
-          ? item.payload.rawContent
-          : localState.content;
+        let queuedContent;
+        try {
+          queuedContent = decodeBody(item.payload || {});
+        } catch {
+          queuedContent = undefined;
+        }
+        const localContent = typeof queuedContent === 'string' ? queuedContent : localState.content;
         const diverged = localContent !== (remoteContent || '');
         useSyncStore.getState().completeMutation(item.mutationId);
         if (!diverged) {
@@ -1033,6 +1034,7 @@ class SyncEngine {
       }
 
       const kind = classifyApiError(err);
+      recordDiagnostic(`sync_${kind}`).catch(() => {});
       useSyncStore.getState().failMutation(
         item.mutationId,
         err?.response?.data?.message || err?.message || 'sync failed',
@@ -1068,28 +1070,41 @@ class SyncEngine {
    */
   async pullRemoteChanges() {
     const syncStore = useSyncStore.getState();
-    const cursor = syncStore.getCursor();
-    const { data } = await apiClient.get('/sync/changes', {
-      params: cursor ? { since: cursor } : {},
-    });
-    for (const change of data?.changes || []) {
-      if (!change?.fileId) continue;
-      const localDoc = useSyncStore.getState().getDoc(change.fileId);
-      if (localDoc && (localDoc.lastKnownServerRev || 0) >= (change.rev || 0)) {
-        continue;
+    let cursor = syncStore.getCursor();
+    let hasMore = true;
+    while (hasMore) {
+      const { data } = await apiClient.get('/sync/changes', {
+        params: { cursor: cursor || '', limit: 100 },
+      });
+      const changes = (data?.changes || []).filter((change) => change?.fileId);
+      const pending = changes.filter((change) => {
+        const localDoc = useSyncStore.getState().getDoc(change.fileId);
+        return !localDoc || (localDoc.lastKnownServerRev || 0) < (change.rev || 0);
+      });
+      const fetched = new Map();
+      let nextIndex = 0;
+      const workers = Array.from({ length: Math.min(4, pending.length) }, async () => {
+        while (nextIndex < pending.length) {
+          const change = pending[nextIndex++];
+          if (change.deleted) {
+            fetched.set(change.fileId, change);
+            continue;
+          }
+          const { data: fullDoc } = await apiClient.get(
+            `/sync/file/${encodeURIComponent(change.fileId)}`,
+          );
+          if (fullDoc) fetched.set(change.fileId, fullDoc);
+        }
+      });
+      await Promise.all(workers);
+      for (const change of pending) {
+        const fullDoc = fetched.get(change.fileId);
+        if (fullDoc) await this.applyRemoteDoc(fullDoc);
       }
-      if (change.deleted) {
-        await this.applyRemoteDoc(change);
-        continue;
-      }
-      const { data: fullDoc } = await apiClient.get(
-        `/sync/file/${encodeURIComponent(change.fileId)}`,
-      );
-      if (fullDoc) {
-        await this.applyRemoteDoc(fullDoc);
-      }
+      cursor = data?.nextCursor || cursor || '';
+      useSyncStore.getState().setCursor(cursor);
+      hasMore = Boolean(data?.hasMore);
     }
-    useSyncStore.getState().setCursor(data?.cursor || cursor || '');
     useSyncStore.getState().clearDeletedWithoutPath();
   }
 
@@ -1234,6 +1249,7 @@ class SyncEngine {
         this.scheduleRetry();
         this.setStatus('idle');
       } else {
+        useSyncStore.getState().markSyncSuccessful();
         this.setStatus('synced');
       }
     } catch (err) {

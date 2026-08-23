@@ -135,15 +135,6 @@ function FloatingToolbar({ onInsert }) {
   }, [runAction]);
 
   /**
-   * 直接插入块级模板内容。
-   *
-   * @param {string} text 待插入的模板文本
-   */
-  const insertBlock = useCallback((text) => {
-    runAction({ type: 'insert', text });
-  }, [runAction]);
-
-  /**
    * 开始拖拽工具栏，把当前指针位置与工具栏初始位置记录下来。
    *
    * @param {import('react').PointerEvent<HTMLDivElement>} event 指针事件

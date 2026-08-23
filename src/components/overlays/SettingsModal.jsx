@@ -26,12 +26,13 @@ import {
 import { open, save } from '@tauri-apps/plugin-dialog';
 import { readTextFile, writeTextFile } from '@tauri-apps/plugin-fs';
 import { getVersion } from '@tauri-apps/api/app';
-import { openExternal } from '@utils/tauriApi';
+import { exportDiagnostics, openExternal } from '@utils/tauriApi';
 import { useTranslation } from 'react-i18next';
 import useConfigStore from '@store/useConfigStore';
 import useThemeStore from '@store/useThemeStore';
 import useAuthStore from '@store/useAuthStore';
 import useNotificationStore from '@store/useNotificationStore';
+import useUpdaterStore from '@store/useUpdaterStore';
 import syncEngine from '../../services/syncEngine';
 import {
   applySettingsSnapshot,
@@ -72,6 +73,7 @@ function SettingsModal({ open: openProp, onClose }) {
   const { isLoggedIn, user, logout } = useAuthStore();
   const notify = useNotificationStore((s) => s.notify);
   const { isMobileLayout, isPortrait } = useResponsiveLayout();
+  const updater = useUpdaterStore();
   // 手机竖屏下把设置面板当作全屏抽屉处理，给内部双栏布局留出纵向堆叠空间；
   // 横屏移动端横向空间更充足，因此仍保留左右并排布局。
   const fullScreen = isMobileLayout && isPortrait;
@@ -100,6 +102,16 @@ function SettingsModal({ open: openProp, onClose }) {
     } catch (err) {
       notify('error', t('notification.error'), err?.message || String(err));
     }
+  }
+
+  async function handleExportDiagnostics() {
+    const destination = await save({
+      defaultPath: `mde-diagnostics-${new Date().toISOString().slice(0, 10)}.json`,
+      filters: [{ name: 'JSON', extensions: ['json'] }],
+    });
+    if (!destination) return;
+    await exportDiagnostics(destination);
+    notify('success', t('notification.success', 'Success'), '诊断包已导出');
   }
 
   /**
@@ -603,6 +615,27 @@ function SettingsModal({ open: openProp, onClose }) {
                   <Button icon={<GithubOutlined />} onClick={handleOpenRepo}>
                     {t('settings.about.openRepo')}
                   </Button>
+                </SettingRow>
+                <SettingRow
+                  label="自动更新"
+                  desc={updater.status === 'available'
+                    ? `发现新版本 v${updater.version}`
+                    : updater.status === 'error' ? updater.error : 'stable 通道，更新包会校验签名'}
+                >
+                  {updater.status === 'available' ? (
+                    <Button type="primary" onClick={updater.downloadAndInstall}>下载并安装</Button>
+                  ) : (
+                    <Button
+                      icon={<CloudDownloadOutlined />}
+                      loading={updater.status === 'checking' || updater.status === 'downloading'}
+                      onClick={() => updater.checkForUpdates()}
+                    >
+                      检查更新
+                    </Button>
+                  )}
+                </SettingRow>
+                <SettingRow label="本地诊断" desc="仅导出版本、平台、耗时和错误分类，不含正文、令牌或完整路径">
+                  <Button icon={<ExportOutlined />} onClick={handleExportDiagnostics}>导出诊断包</Button>
                 </SettingRow>
 
                 <div className="settings-about__star">

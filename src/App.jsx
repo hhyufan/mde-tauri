@@ -7,7 +7,8 @@
 import { lazy, Suspense, useEffect, useState, useCallback, useMemo, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { listen } from '@tauri-apps/api/event';
-import { appWindow, getCliArgs } from '@utils/tauriApi';
+import { appWindow, getCliArgs, onFileChanged, readFileContent } from '@utils/tauriApi';
+import { getBuffer } from '@utils/editorBuffer';
 import useThemeStore from '@store/useThemeStore';
 import useEditorStore from '@store/useEditorStore';
 import useAuthStore from '@store/useAuthStore';
@@ -17,6 +18,12 @@ import { useFileManager } from '@hooks/useFileManager';
 import { useResponsiveLayout } from '@hooks/useResponsiveLayout';
 import { useViewportInsets } from '@hooks/useViewportInsets';
 import { syncEngine } from '@/services/syncEngine';
+import {
+  discardRecoverySnapshot,
+  flushRecoverySnapshot,
+  loadRecoveryCandidates,
+  startRecoveryTracking,
+} from '@/services/recoveryService';
 import Sidebar from '@layout/sidebar/Sidebar';
 import TitleBar from '@layout/title-bar/TitleBar';
 import TabBar from '@layout/tab-bar/TabBar';
@@ -42,6 +49,8 @@ const StatsPanel = lazy(() => import('@components/overlays/StatsPanel'));
 const LoginModal = lazy(() => import('@components/overlays/LoginModal'));
 const ConflictDialog = lazy(() => import('@components/overlays/ConflictDialog'));
 const UnsavedChangesModal = lazy(() => import('@components/overlays/UnsavedChangesModal'));
+const RecoveryModal = lazy(() => import('@components/overlays/RecoveryModal'));
+const ExternalFileConflictModal = lazy(() => import('@components/overlays/ExternalFileConflictModal'));
 
 const ASSOCIATED_MARKDOWN_EXTENSIONS = new Set(['md', 'markdown', 'mdown', 'mdwn', 'mkd', 'mkdn']);
 
@@ -85,6 +94,8 @@ function App() {
   const [loginOpen, setLoginOpen] = useState(false);
   const [windowClosePromptOpen, setWindowClosePromptOpen] = useState(false);
   const [windowCloseSaving, setWindowCloseSaving] = useState(false);
+  const [recoveryDrafts, setRecoveryDrafts] = useState([]);
+  const [externalConflict, setExternalConflict] = useState(null);
   const [selectedUnsavedTabIds, setSelectedUnsavedTabIds] = useState([]);
   const [isDragOver, setIsDragOver] = useState(false);
   const [dragTarget, setDragTarget] = useState(null);
@@ -99,6 +110,7 @@ function App() {
   const {
     saveCurrentFile,
     saveTab,
+    saveAsDialog,
     openFileDialog,
     openFileFromPath,
     loadDirectory,
@@ -136,6 +148,75 @@ function App() {
       const savedDir = useFileStore.getState().currentDir;
       if (savedDir) loadDirectory(savedDir);
     });
+  }, []);
+
+  useEffect(() => {
+    if (!window.__TAURI_INTERNALS__) return undefined;
+    const timer = setTimeout(() => {
+      import('@store/useUpdaterStore')
+        .then(({ default: store }) => store.getState().checkForUpdates({ silent: true }))
+        .catch(() => {});
+    }, 10_000);
+    return () => clearTimeout(timer);
+  }, []);
+
+  useEffect(() => {
+    if (isAndroid) return undefined;
+    let disposed = false;
+    const unlisten = onFileChanged(async (event) => {
+      if (disposed || !event?.path) return;
+      const state = useEditorStore.getState();
+      const tab = state.getTabByPath(event.path);
+      if (!tab) return;
+
+      if (event.kind === 'removed' || event.kind === 'renamed') {
+        setExternalConflict({ path: event.path, kind: event.kind, tabId: tab.id });
+        return;
+      }
+      const disk = await readFileContent(event.path).catch(() => null);
+      if (!disk?.success || disposed) return;
+      const localContent = getBuffer(tab.id, tab.content || '');
+      if (localContent === disk.content) return;
+      if (!tab.modified) {
+        state.replaceTabContentByPath(event.path, {
+          content: disk.content || '',
+          encoding: disk.encoding || tab.encoding,
+          lineEnding: disk.line_ending || tab.lineEnding,
+        });
+        return;
+      }
+      setExternalConflict({
+        path: event.path,
+        kind: 'modified',
+        tabId: tab.id,
+        diskContent: disk.content || '',
+        encoding: disk.encoding || tab.encoding,
+        lineEnding: disk.line_ending || tab.lineEnding,
+      });
+    });
+    return () => {
+      disposed = true;
+      unlisten.then((fn) => fn()).catch(console.error);
+    };
+  }, [isAndroid]);
+
+  useEffect(() => {
+    let cancelled = false;
+    let stopTracking = () => {};
+    (async () => {
+      try {
+        const drafts = await loadRecoveryCandidates();
+        if (!cancelled) setRecoveryDrafts(drafts);
+      } catch (error) {
+        console.warn('[App] Failed to load recovery snapshot:', error);
+      } finally {
+        if (!cancelled) stopTracking = startRecoveryTracking();
+      }
+    })();
+    return () => {
+      cancelled = true;
+      stopTracking();
+    };
   }, []);
 
   useEffect(() => {
@@ -233,12 +314,13 @@ function App() {
    *
    * @returns {void}
    */
-  const requestWindowClose = useCallback(() => {
+  const requestWindowClose = useCallback(async () => {
     if (unsavedTabs.length > 0) {
       openUnsavedClosePrompt(unsavedTabs);
       return;
     }
     if (!isDesktopWindow) return;
+    await flushRecoverySnapshot().catch(console.error);
     allowWindowCloseRef.current = true;
     appWindow.close();
   }, [isDesktopWindow, openUnsavedClosePrompt, unsavedTabs]);
@@ -246,19 +328,61 @@ function App() {
   useEffect(() => {
     if (!isDesktopWindow || typeof appWindow.onCloseRequested !== 'function') return undefined;
 
-    const unlisten = appWindow.onCloseRequested((event) => {
+    const unlisten = appWindow.onCloseRequested(async (event) => {
       if (allowWindowCloseRef.current) return;
+      event.preventDefault();
+      await flushRecoverySnapshot().catch((error) => {
+        console.warn('[App] Failed to flush recovery snapshot before close:', error);
+      });
       const shouldPrompt = !useConfigStore.getState().autoSave
         && useEditorStore.getState().tabRenderList.some((tab) => tab.modified);
-      if (!shouldPrompt) return;
-      event.preventDefault();
-      openUnsavedClosePrompt(useEditorStore.getState().tabRenderList.filter((tab) => tab.modified));
+      if (shouldPrompt) {
+        openUnsavedClosePrompt(useEditorStore.getState().tabRenderList.filter((tab) => tab.modified));
+        return;
+      }
+      allowWindowCloseRef.current = true;
+      appWindow.close();
     });
 
     return () => {
       unlisten.then((fn) => fn()).catch(console.error);
     };
   }, [isDesktopWindow, openUnsavedClosePrompt]);
+
+  const handleRestoreRecovery = useCallback(async (drafts) => {
+    for (const draft of drafts) {
+      useEditorStore.getState().restoreRecoveredTab(draft);
+    }
+    setRecoveryDrafts([]);
+    await discardRecoverySnapshot().catch(console.error);
+    await flushRecoverySnapshot().catch(console.error);
+  }, []);
+
+  const handleDiscardRecovery = useCallback(async () => {
+    setRecoveryDrafts([]);
+    await discardRecoverySnapshot().catch(console.error);
+  }, []);
+
+  const handleKeepExternalEdit = useCallback(() => {
+    setExternalConflict(null);
+  }, []);
+
+  const handleUseExternalDisk = useCallback(() => {
+    if (!externalConflict || typeof externalConflict.diskContent !== 'string') return;
+    useEditorStore.getState().replaceTabContent(externalConflict.tabId, {
+      content: externalConflict.diskContent,
+      encoding: externalConflict.encoding,
+      lineEnding: externalConflict.lineEnding,
+    });
+    setExternalConflict(null);
+  }, [externalConflict]);
+
+  const handleSaveExternalAs = useCallback(async () => {
+    if (!externalConflict) return;
+    useEditorStore.getState().setActiveTab(externalConflict.tabId);
+    await saveAsDialog();
+    setExternalConflict(null);
+  }, [externalConflict, saveAsDialog]);
 
   /**
    * 保存已勾选的未保存标签，并在成功后继续关闭窗口。
@@ -277,6 +401,7 @@ function App() {
       }
     }
     setWindowCloseSaving(false);
+    await flushRecoverySnapshot().catch(console.error);
     if (!isDesktopWindow) {
       setWindowClosePromptOpen(false);
       return;
@@ -290,7 +415,8 @@ function App() {
    *
    * @returns {void}
    */
-  const handleDiscardAndCloseWindow = useCallback(() => {
+  const handleDiscardAndCloseWindow = useCallback(async () => {
+    await discardRecoverySnapshot().catch(console.error);
     if (!isDesktopWindow) {
       setWindowClosePromptOpen(false);
       return;
@@ -578,6 +704,22 @@ function App() {
             onDiscard={handleDiscardAndCloseWindow}
             onCancel={() => setWindowClosePromptOpen(false)}
             loading={windowCloseSaving}
+          />
+        )}
+        {recoveryDrafts.length > 0 && (
+          <RecoveryModal
+            open
+            drafts={recoveryDrafts}
+            onRestore={handleRestoreRecovery}
+            onDiscard={handleDiscardRecovery}
+          />
+        )}
+        {externalConflict && (
+          <ExternalFileConflictModal
+            conflict={externalConflict}
+            onKeep={handleKeepExternalEdit}
+            onUseDisk={handleUseExternalDisk}
+            onSaveAs={handleSaveExternalAs}
           />
         )}
       </Suspense>
