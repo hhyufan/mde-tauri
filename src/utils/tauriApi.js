@@ -419,3 +419,22 @@ export function onFileChanged(callback) {
   }
   return listen('file-changed', (event) => callback(event.payload));
 }
+
+/**
+ * 订阅单实例转发 / macOS odoc 打开事件。
+ *
+ * 应用已运行时双击关联文件、或 macOS 系统投递“打开文件”请求时，
+ * 原生侧会把过滤后的 Markdown 路径列表通过 `open-paths` 事件发到这里。
+ *
+ * @param {(paths: string[]) => void} callback 收到待打开路径列表时的回调。
+ * @returns {Promise<() => void>} 取消订阅函数。
+ */
+export function onOpenPaths(callback) {
+  if (typeof window === 'undefined' || !window.__TAURI_INTERNALS__) {
+    return Promise.resolve(() => {});
+  }
+  return listen('open-paths', (event) => {
+    const payload = Array.isArray(event.payload) ? event.payload : [];
+    callback(payload);
+  });
+}

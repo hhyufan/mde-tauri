@@ -2,7 +2,7 @@
 name = "mde"
 version = "0.1.0"
 description = "A cross-platform Markdown editor based on Tauri"
-authors = ["you"]
+authors = ["hhyufan"]
 edition = "2021"
 
 [lib]
@@ -52,6 +52,10 @@ tar = "0.4"
 
 [target.'cfg(windows)'.dependencies]
 windows-sys = { version = "0.52", features = ["Win32_System_Console", "Win32_Foundation", "Win32_Storage_FileSystem", "Win32_System_JobObjects", "Win32_System_Threading", "Win32_Security"] }
+
+# 桌面端单实例：已运行实例接收第二次启动（文件关联打开）的参数转发。
+[target.'cfg(not(any(target_os = "android", target_os = "ios")))'.dependencies]
+tauri-plugin-single-instance = "2"
 
 # ---------------------------------------------------------------------------
 # Profiles tuned for fastest cold-start.

@@ -7,7 +7,7 @@
 import { lazy, Suspense, useEffect, useState, useCallback, useMemo, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { listen } from '@tauri-apps/api/event';
-import { appWindow, getCliArgs, onFileChanged } from '@utils/tauriApi';
+import { appWindow, getCliArgs, onFileChanged, onOpenPaths } from '@utils/tauriApi';
 import { isImeComposing } from '@utils/keyboard';
 import { rememberDiskBaseline } from '@/services/localFileGuard';
 import { createFileChangeObserver, setLocalFileComposing } from '@/services/localFileOperations';
@@ -274,6 +274,33 @@ function App() {
 
     return () => {
       cancelled = true;
+    };
+  }, [isAndroid, openFileFromPath]);
+
+  /**
+   * 处理运行中的关联打开请求。
+   *
+   * 应用已运行时双击关联文件，第二进程会被单实例插件拦截，原生侧转发参数
+   * 并通过 `open-paths` 事件投递到这里；macOS 的系统“打开文件”事件同样
+   * 汇入该通道。首启文件由上面的 get_cli_args 负责，二者互不重复。
+   */
+  useEffect(() => {
+    if (isAndroid) return;
+    let disposed = false;
+
+    const unlistenPromise = onOpenPaths((paths) => {
+      if (disposed) return;
+      for (const path of paths.filter(isAssociatedMarkdownPath)) {
+        const name = path.split(/[\\/]/).pop() || path;
+        openFileFromPath(path, name).catch((err) =>
+          console.warn('[App] Failed to open forwarded path:', err),
+        );
+      }
+    });
+
+    return () => {
+      disposed = true;
+      unlistenPromise.then((unlisten) => unlisten());
     };
   }, [isAndroid, openFileFromPath]);
 

@@ -1346,32 +1346,59 @@ fn is_markdown_file_path(path: &Path) -> bool {
     )
 }
 
-/// 收集传递给应用进程的 Markdown 文件参数。
-#[tauri::command]
-async fn get_cli_args() -> Result<Vec<String>, String> {
-    let current_dir = std::env::current_dir().ok();
+/// 从一组进程参数中提取可打开的 Markdown 文件路径。
+///
+/// 统一处理相对路径解析、非文件参数过滤与去重，供首启命令行解析、
+/// 单实例转发与 macOS 打开事件三处共用。
+fn collect_markdown_paths<I, S>(args: I, base_dir: Option<&Path>) -> Vec<String>
+where
+    I: IntoIterator<Item = S>,
+    S: AsRef<str>,
+{
+    let mut seen = HashSet::new();
     let mut files = Vec::new();
 
-    for arg in std::env::args().skip(1) {
+    for raw in args {
+        let arg = raw.as_ref();
         if arg.is_empty() || arg == "--" || arg.starts_with('-') {
             continue;
         }
 
-        let path = Path::new(&arg);
+        let path = Path::new(arg);
         let resolved = if path.is_absolute() {
             path.to_path_buf()
-        } else if let Some(dir) = &current_dir {
+        } else if let Some(dir) = base_dir {
             dir.join(path)
         } else {
             path.to_path_buf()
         };
 
         if resolved.is_file() && is_markdown_file_path(&resolved) {
-            files.push(resolved.to_string_lossy().to_string());
+            let normalized = resolved.to_string_lossy().to_string();
+            if seen.insert(normalized.clone()) {
+                files.push(normalized);
+            }
         }
     }
 
-    Ok(files)
+    files
+}
+
+/// 将主窗口带回前台并聚焦，用于关联文件打开与单实例转发场景。
+fn focus_main_window(app: &AppHandle) {
+    if let Some(window) = app.get_webview_window("main") {
+        let _ = window.show();
+        let _ = window.unminimize();
+        let _ = window.set_focus();
+    }
+}
+
+/// 收集传递给应用进程的 Markdown 文件参数。
+#[tauri::command]
+async fn get_cli_args() -> Result<Vec<String>, String> {
+    let args: Vec<String> = std::env::args().skip(1).collect();
+    let current_dir = std::env::current_dir().ok();
+    Ok(collect_markdown_paths(&args, current_dir.as_deref()))
 }
 
 /// 确保在桥接层触发的流程结束后，
@@ -1436,7 +1463,24 @@ pub fn run() {
         });
     }
 
-    builder
+    // 桌面端单实例：应用已运行时再次双击关联文件，第二进程会把参数转发给
+    // 首实例，由首实例在现有窗口打开标签并聚焦，而不是另开一个新窗口。
+    //
+    // 注意：首实例启动时该回调也会以初始参数触发一次，此时前端事件监听尚未
+    // 就绪，emit 会被丢弃；首启文件由前端 get_cli_args 兜底，这里只负责转发
+    // 与聚焦，因此丢一次事件不影响首启行为。
+    #[cfg(desktop)]
+    {
+        builder = builder.plugin(tauri_plugin_single_instance::init(|app, argv, cwd| {
+            let paths = collect_markdown_paths(&argv, Some(Path::new(&cwd)));
+            if !paths.is_empty() {
+                let _ = app.emit("open-paths", &paths);
+            }
+            focus_main_window(app);
+        }));
+    }
+
+    let builder = builder
         .on_window_event(|window, event| {
             if window.label() == "main" && matches!(event, tauri::WindowEvent::Destroyed) {
                 script_runner::stop_all();
@@ -1484,9 +1528,32 @@ pub fn run() {
             language_plugins::cancel_language_plugin_install,
             language_plugins::set_language_plugin_enabled,
             language_plugins::uninstall_language_plugin,
-        ])
-        .run(tauri::generate_context!())
-        .expect("error while running tauri application");
+        ]);
+
+    let app = builder
+        .build(tauri::generate_context!())
+        .expect("error while building tauri application");
+
+    app.run(|_app_handle, _event| {
+        // macOS 的“打开方式”不经过命令行参数，而是由系统通过 odoc 事件
+        // 投递文件 URL；这里统一转成 open-paths 事件交给前端处理。
+        #[cfg(target_os = "macos")]
+        if let tauri::RunEvent::Opened { urls } = _event {
+            let paths: Vec<String> = urls
+                .into_iter()
+                .filter_map(|url| url.to_file_path().ok())
+                .map(|path| path.to_string_lossy().into_owned())
+                .filter(|raw| {
+                    let path = Path::new(raw);
+                    path.is_file() && is_markdown_file_path(path)
+                })
+                .collect();
+            if !paths.is_empty() {
+                let _ = _app_handle.emit("open-paths", &paths);
+                focus_main_window(_app_handle);
+            }
+        }
+    });
 }
 
 #[cfg(test)]
@@ -1515,5 +1582,33 @@ mod tests {
     fn line_ending_detection_is_stable() {
         assert_eq!(detect_line_ending("a\r\nb\r\n"), "CRLF");
         assert_eq!(detect_line_ending("a\nb\n"), "LF");
+    }
+
+    #[test]
+    fn collect_markdown_paths_filters_resolves_and_dedupes() {
+        let root = std::env::temp_dir().join(format!("mde-cli-args-{}", std::process::id()));
+        fs::create_dir_all(&root).unwrap();
+        let md = root.join("note.md");
+        let txt = root.join("plain.txt");
+        fs::write(&md, b"hi").unwrap();
+        fs::write(&txt, b"hi").unwrap();
+
+        let md_raw = md.to_string_lossy().to_string();
+        let args = vec![
+            "--flag".to_string(),
+            md_raw.clone(),
+            md_raw.clone(),
+            txt.to_string_lossy().to_string(),
+            "missing.md".to_string(),
+        ];
+        // 非路径参数、重复项与非 Markdown 文件都被过滤；不存在的文件也被忽略。
+        let paths = collect_markdown_paths(&args, None);
+        assert_eq!(paths, vec![md_raw.clone()]);
+
+        // 相对路径基于 base_dir 解析。
+        let relative = collect_markdown_paths(&["note.md".to_string()], Some(&root));
+        assert_eq!(relative, vec![md_raw]);
+
+        fs::remove_dir_all(root).unwrap();
     }
 }
