@@ -9,29 +9,15 @@ import { initReactI18next } from 'react-i18next';
 import LanguageDetector from 'i18next-browser-languagedetector';
 import enUS from './locales/en_us.json';
 import zhCN from './locales/zh_cn.json';
+import { readInitialLanguage } from './language';
 
 /**
  * 读取应用启动时应采用的初始语言。
  *
- * 优先级依次为：`i18next` 持久化值、应用配置中的语言设置、浏览器语言。
- *
- * @returns {'zh' | 'en'} 归一化后的初始语言标识
+ * 应用配置、旧版 i18next 缓存和系统语言必须通过同一个解析器决定，避免
+ * React 界面与 Monaco 在全新 profile 或缓存不一致时选出不同语言。
  */
-function readInitialLang() {
-  try {
-    const persisted = localStorage.getItem('i18nextLng')
-      || JSON.parse(localStorage.getItem('mde-config') || 'null')?.state?.language;
-    if (persisted) {
-      return /^zh/i.test(persisted) ? 'zh' : 'en';
-    }
-  } catch { /* 忽略读取失败 */ }
-  if (typeof navigator !== 'undefined' && /^zh/i.test(navigator.language || '')) {
-    return 'zh';
-  }
-  return 'en';
-}
-
-const initialLang = readInitialLang();
+const initialLang = readInitialLanguage();
 document.documentElement.lang = initialLang;
 
 i18n

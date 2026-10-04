@@ -7,13 +7,16 @@
 import { lazy, Suspense, useEffect, useState, useCallback, useMemo, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { listen } from '@tauri-apps/api/event';
-import { appWindow, getCliArgs, onFileChanged, readFileContent } from '@utils/tauriApi';
-import { getBuffer } from '@utils/editorBuffer';
+import { appWindow, getCliArgs, onFileChanged } from '@utils/tauriApi';
+import { isImeComposing } from '@utils/keyboard';
+import { rememberDiskBaseline } from '@/services/localFileGuard';
+import { createFileChangeObserver, setLocalFileComposing } from '@/services/localFileOperations';
 import useThemeStore from '@store/useThemeStore';
 import useEditorStore from '@store/useEditorStore';
 import useAuthStore from '@store/useAuthStore';
 import useFileStore from '@store/useFileStore';
 import useConfigStore from '@store/useConfigStore';
+import useLspStore from '@store/useLspStore';
 import { useFileManager } from '@hooks/useFileManager';
 import { useResponsiveLayout } from '@hooks/useResponsiveLayout';
 import { useViewportInsets } from '@hooks/useViewportInsets';
@@ -29,6 +32,9 @@ import TitleBar from '@layout/title-bar/TitleBar';
 import TabBar from '@layout/tab-bar/TabBar';
 import EditorContent from '@layout/content/EditorContent';
 import Footer from '@layout/footer/Footer';
+import OutputConsole from '@components/editor/OutputConsole';
+import { handleScriptShortcut } from '@/services/scriptRunner';
+import ExternalFileConflictNotice from '@components/overlays/ExternalFileConflictNotice';
 import NotificationContainer from '@components/notification/NotificationContainer';
 import useSyncStore from '@store/useSyncStore';
 import { GUEST_USER_SCOPE, isOwnedByUser } from '@store/userScope';
@@ -47,10 +53,16 @@ const SearchModal = lazy(() => import('@components/overlays/SearchModal'));
 const SettingsModal = lazy(() => import('@components/overlays/SettingsModal'));
 const StatsPanel = lazy(() => import('@components/overlays/StatsPanel'));
 const LoginModal = lazy(() => import('@components/overlays/LoginModal'));
-const ConflictDialog = lazy(() => import('@components/overlays/ConflictDialog'));
+// ConflictDialog owns a second Monaco entry point (the diff editor). Gate it
+// behind the same complete runtime bootstrap as the main editor so a restored
+// conflict cannot race localization, token providers or theme registration.
+const ConflictDialog = lazy(() =>
+  import('@/utils/monacoRuntimeBoot')
+    .then(({ prepareMonacoRuntime }) => prepareMonacoRuntime())
+    .then(() => import('@components/overlays/ConflictDialog'))
+);
 const UnsavedChangesModal = lazy(() => import('@components/overlays/UnsavedChangesModal'));
 const RecoveryModal = lazy(() => import('@components/overlays/RecoveryModal'));
-const ExternalFileConflictModal = lazy(() => import('@components/overlays/ExternalFileConflictModal'));
 
 const ASSOCIATED_MARKDOWN_EXTENSIONS = new Set(['md', 'markdown', 'mdown', 'mdwn', 'mkd', 'mkdn']);
 
@@ -78,6 +90,7 @@ function App() {
   const setSidebarVisible = useEditorStore((s) => s.setSidebarVisible);
   const sidebarVisible = useEditorStore((s) => s.sidebarVisible);
   const toggleEditPreview = useEditorStore((s) => s.toggleEditPreview);
+  const closeTab = useEditorStore((s) => s.closeTab);
   const tabs = useEditorStore((s) => s.tabRenderList);
   const loadToken = useAuthStore((s) => s.loadToken);
   const isLoggedIn = useAuthStore((s) => s.isLoggedIn);
@@ -92,10 +105,15 @@ function App() {
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [statsOpen, setStatsOpen] = useState(false);
   const [loginOpen, setLoginOpen] = useState(false);
-  const [windowClosePromptOpen, setWindowClosePromptOpen] = useState(false);
-  const [windowCloseSaving, setWindowCloseSaving] = useState(false);
+  const [syncConflictReviewOpen, setSyncConflictReviewOpen] = useState(false);
+  useEffect(() => {
+    if (!conflicts.length) setSyncConflictReviewOpen(false);
+  }, [conflicts.length]);
+  const [unsavedPromptOpen, setUnsavedPromptOpen] = useState(false);
+  const [unsavedPromptSaving, setUnsavedPromptSaving] = useState(false);
+  const [pendingCloseTabId, setPendingCloseTabId] = useState(null);
   const [recoveryDrafts, setRecoveryDrafts] = useState([]);
-  const [externalConflict, setExternalConflict] = useState(null);
+  const externalConflict = useEditorStore((s) => s.externalFileConflict);
   const [selectedUnsavedTabIds, setSelectedUnsavedTabIds] = useState([]);
   const [isDragOver, setIsDragOver] = useState(false);
   const [dragTarget, setDragTarget] = useState(null);
@@ -121,24 +139,47 @@ function App() {
     () => (autoSave ? [] : tabs.filter((tab) => tab.modified)),
     [autoSave, tabs],
   );
+  const promptedUnsavedTabs = useMemo(
+    () => pendingCloseTabId
+      ? unsavedTabs.filter((tab) => tab.id === pendingCloseTabId)
+      : unsavedTabs,
+    [pendingCloseTabId, unsavedTabs],
+  );
 
   /**
    * 打开未保存变更确认弹窗，并预选当前待处理标签。
    *
    * @param {Array<object>} [pendingTabs=unsavedTabs] 需要参与关闭确认的未保存标签集合。
+   * @param {string|null} [closeTabId=null] 仅关闭单个标签时的目标 id；null 表示关闭窗口。
    */
-  const openUnsavedClosePrompt = useCallback((pendingTabs = unsavedTabs) => {
+  const openUnsavedClosePrompt = useCallback((pendingTabs = unsavedTabs, closeTabId = null) => {
     setSelectedUnsavedTabIds(pendingTabs.map((tab) => tab.id));
-    setWindowClosePromptOpen(true);
+    setPendingCloseTabId(closeTabId);
+    setUnsavedPromptOpen(true);
   }, [unsavedTabs]);
+
+  /**
+   * 请求关闭标签；关闭自动保存时，脏标签必须先由用户确认。
+   *
+   * @param {string} tabId 目标标签 id。
+   */
+  const requestTabClose = useCallback((tabId) => {
+    const tab = useEditorStore.getState().tabRenderList.find((item) => item.id === tabId);
+    if (!tab) return;
+    if (!autoSave && tab.modified) {
+      openUnsavedClosePrompt([tab], tabId);
+      return;
+    }
+    closeTab(tabId);
+  }, [autoSave, closeTab, openUnsavedClosePrompt]);
 
   useEffect(() => {
     // 主题与登录态会影响首屏渲染结果，因此在首次挂载时立即初始化。
     initTheme();
     loadToken();
+    useLspStore.getState().refresh();
 
-    // 原生窗口已由 `index.html` 内联启动脚本提前显示，这里无需再次触发
-    // `show_main_window`，避免重复窗口控制调用。
+    // Windows 主窗口由 Tauri 在创建时显示；这里仅初始化界面状态。
 
     // 不影响首屏可见内容的工作统一延后到浏览器空闲期执行，避免阻塞交互就绪：
     // 例如同步引擎重置、资源管理器目录恢复等。
@@ -162,40 +203,21 @@ function App() {
 
   useEffect(() => {
     if (isAndroid) return undefined;
-    let disposed = false;
-    const unlisten = onFileChanged(async (event) => {
-      if (disposed || !event?.path) return;
-      const state = useEditorStore.getState();
-      const tab = state.getTabByPath(event.path);
-      if (!tab) return;
-
-      if (event.kind === 'removed' || event.kind === 'renamed') {
-        setExternalConflict({ path: event.path, kind: event.kind, tabId: tab.id });
-        return;
-      }
-      const disk = await readFileContent(event.path).catch(() => null);
-      if (!disk?.success || disposed) return;
-      const localContent = getBuffer(tab.id, tab.content || '');
-      if (localContent === disk.content) return;
-      if (!tab.modified) {
-        state.replaceTabContentByPath(event.path, {
-          content: disk.content || '',
-          encoding: disk.encoding || tab.encoding,
-          lineEnding: disk.line_ending || tab.lineEnding,
-        });
-        return;
-      }
-      setExternalConflict({
-        path: event.path,
-        kind: 'modified',
-        tabId: tab.id,
-        diskContent: disk.content || '',
-        encoding: disk.encoding || tab.encoding,
-        lineEnding: disk.line_ending || tab.lineEnding,
-      });
+    let composing = false;
+    const compositionStart = () => { composing = true; setLocalFileComposing(true); };
+    const compositionEnd = () => { composing = false; setLocalFileComposing(false); };
+    document.addEventListener('compositionstart', compositionStart, true);
+    document.addEventListener('compositionend', compositionEnd, true);
+    const observer = createFileChangeObserver({ isComposing: () => composing });
+    const unlisten = onFileChanged(observer).catch((error) => {
+      console.warn('[App] Failed to subscribe to file changes:', error);
+      return () => {};
     });
     return () => {
-      disposed = true;
+      observer.dispose();
+      setLocalFileComposing(false);
+      document.removeEventListener('compositionstart', compositionStart, true);
+      document.removeEventListener('compositionend', compositionEnd, true);
       unlisten.then((fn) => fn()).catch(console.error);
     };
   }, [isAndroid]);
@@ -261,7 +283,12 @@ function App() {
    * @param {KeyboardEvent} e 键盘事件对象。
    */
   const handleKeyDown = useCallback((e) => {
+    // 输入法组合期间不处理任何应用级快捷键：这一阶段 keyCode 会是 229，
+    // 并且回车、方向键都属于输入法自身，抢过来会导致中文输入彻底失效。
+    if (isImeComposing(e)) return;
     const mod = e.ctrlKey || e.metaKey;
+
+    if (handleScriptShortcut(e)) return;
 
     if (e.key === 'F11') {
       if (!isDesktopWindow) return;
@@ -364,8 +391,17 @@ function App() {
   }, []);
 
   const handleKeepExternalEdit = useCallback(() => {
-    setExternalConflict(null);
-  }, []);
+    if (externalConflict?.path && typeof externalConflict.diskContent === 'string') {
+      // Acknowledge the observed disk side. The next explicit save may replace
+      // it without reopening the same conflict for duplicate watcher events.
+      rememberDiskBaseline(
+        externalConflict.path,
+        externalConflict.diskContent,
+        externalConflict,
+      );
+    }
+    useEditorStore.getState().clearExternalFileConflict();
+  }, [externalConflict]);
 
   const handleUseExternalDisk = useCallback(() => {
     if (!externalConflict || typeof externalConflict.diskContent !== 'string') return;
@@ -374,56 +410,85 @@ function App() {
       encoding: externalConflict.encoding,
       lineEnding: externalConflict.lineEnding,
     });
-    setExternalConflict(null);
+    rememberDiskBaseline(
+      externalConflict.path,
+      externalConflict.diskContent,
+      externalConflict,
+    );
+    useEditorStore.getState().clearExternalFileConflict();
   }, [externalConflict]);
 
   const handleSaveExternalAs = useCallback(async () => {
     if (!externalConflict) return;
     useEditorStore.getState().setActiveTab(externalConflict.tabId);
     await saveAsDialog();
-    setExternalConflict(null);
+    useEditorStore.getState().clearExternalFileConflict();
   }, [externalConflict, saveAsDialog]);
 
   /**
-   * 保存已勾选的未保存标签，并在成功后继续关闭窗口。
+   * 保存已勾选的未保存标签，并在成功后关闭目标标签或窗口。
    *
    * @returns {Promise<void>}
    */
-  const handleSaveAndCloseWindow = useCallback(async () => {
+  const handleSaveAndContinueClose = useCallback(async () => {
     const selectedIds = new Set(selectedUnsavedTabIds);
-    const tabsToSave = unsavedTabs.filter((tab) => selectedIds.has(tab.id));
-    setWindowCloseSaving(true);
+    const tabsToSave = promptedUnsavedTabs.filter((tab) => selectedIds.has(tab.id));
+    let savedCloseTabId = pendingCloseTabId;
+    setUnsavedPromptSaving(true);
     for (const tab of tabsToSave) {
       const result = await saveTab(tab.id);
       if (!result?.ok) {
-        setWindowCloseSaving(false);
+        setUnsavedPromptSaving(false);
         return;
       }
+      if (tab.id === pendingCloseTabId) savedCloseTabId = result.tabId || tab.id;
     }
-    setWindowCloseSaving(false);
+    setUnsavedPromptSaving(false);
+
+    if (pendingCloseTabId) {
+      closeTab(savedCloseTabId || pendingCloseTabId);
+      setPendingCloseTabId(null);
+      setUnsavedPromptOpen(false);
+      await flushRecoverySnapshot().catch(console.error);
+      return;
+    }
+
     await flushRecoverySnapshot().catch(console.error);
     if (!isDesktopWindow) {
-      setWindowClosePromptOpen(false);
+      setUnsavedPromptOpen(false);
       return;
     }
     allowWindowCloseRef.current = true;
     appWindow.close();
-  }, [isDesktopWindow, saveTab, selectedUnsavedTabIds, unsavedTabs]);
+  }, [closeTab, isDesktopWindow, pendingCloseTabId, promptedUnsavedTabs, saveTab, selectedUnsavedTabIds]);
 
   /**
-   * 放弃未保存修改并直接关闭窗口。
+   * 放弃未保存修改并关闭目标标签或窗口。
    *
    * @returns {void}
    */
-  const handleDiscardAndCloseWindow = useCallback(async () => {
+  const handleDiscardAndContinueClose = useCallback(async () => {
+    if (pendingCloseTabId) {
+      closeTab(pendingCloseTabId);
+      setPendingCloseTabId(null);
+      setUnsavedPromptOpen(false);
+      await flushRecoverySnapshot().catch(console.error);
+      return;
+    }
+
     await discardRecoverySnapshot().catch(console.error);
     if (!isDesktopWindow) {
-      setWindowClosePromptOpen(false);
+      setUnsavedPromptOpen(false);
       return;
     }
     allowWindowCloseRef.current = true;
     appWindow.close();
-  }, [isDesktopWindow]);
+  }, [closeTab, isDesktopWindow, pendingCloseTabId]);
+
+  const handleCancelUnsavedClose = useCallback(() => {
+    setPendingCloseTabId(null);
+    setUnsavedPromptOpen(false);
+  }, []);
 
   /**
    * 在关闭确认弹窗中切换某个未保存标签是否参与保存。
@@ -525,6 +590,7 @@ function App() {
     function registerListeners() {
     // Tauri 原生窗口拖拽事件负责桌面端文件拖入；浏览器事件分支兜底 H5
     // 与部分 WebView 场景，两条通路最终都汇聚到同一套区域判定逻辑。
+    if (window.__TAURI_INTERNALS__) {
     register(listen('tauri://drag-enter', (event) => {
       updateDragState(event.payload);
     }));
@@ -558,6 +624,7 @@ function App() {
         await openDroppedPathsInEditor(payload.paths);
       }
     }));
+    }
 
     if (typeof window !== 'undefined') {
       const handleDragOver = (event) => {
@@ -655,8 +722,24 @@ function App() {
             onOpenSearch={() => setSearchOpen(true)}
             onRequestClose={requestWindowClose}
           />
-          <TabBar />
+          <TabBar onRequestCloseTab={requestTabClose} />
+          {conflicts.length > 0 && (
+            <div className="external-file-notice" role="status">
+              <span>{t('sync.conflict.title')} · {conflicts.length}</span>
+              <button type="button" onClick={() => setSyncConflictReviewOpen(true)}>查看并处理</button>
+            </div>
+          )}
+          {externalConflict && (
+            <ExternalFileConflictNotice
+              key={externalConflict.path}
+              conflict={externalConflict}
+              onKeep={handleKeepExternalEdit}
+              onUseDisk={handleUseExternalDisk}
+              onSaveAs={handleSaveExternalAs}
+            />
+          )}
           <EditorContent />
+          <OutputConsole />
           <Footer />
         </div>
         {isDragOver && dragTarget && dragOverlayRect && (
@@ -685,25 +768,25 @@ function App() {
         {searchOpen && <SearchModal open={searchOpen} onClose={() => setSearchOpen(false)} />}
         {settingsOpen && <SettingsModal open={settingsOpen} onClose={() => setSettingsOpen(false)} />}
         {statsOpen && <StatsPanel open={statsOpen} onClose={() => setStatsOpen(false)} />}
-        {loginOpen && <LoginModal open={loginOpen} onClose={() => setLoginOpen(false)} onLoggedIn={() => syncEngine.fullSync()} />}
-        {conflicts.length > 0 && (
+        {loginOpen && <LoginModal open={loginOpen} onClose={() => setLoginOpen(false)} />}
+        {conflicts.length > 0 && syncConflictReviewOpen && (
           <ConflictDialog
             open
             conflicts={conflicts}
             onResolve={(fileId, resolution) => syncEngine.resolveConflict(fileId, resolution)}
-            onClose={() => {}}
+            onClose={() => setSyncConflictReviewOpen(false)}
           />
         )}
-        {windowClosePromptOpen && (
+        {unsavedPromptOpen && (
           <UnsavedChangesModal
-            open={windowClosePromptOpen}
-            tabs={unsavedTabs}
+            open={unsavedPromptOpen}
+            tabs={promptedUnsavedTabs}
             selectedTabIds={selectedUnsavedTabIds}
             onToggleTab={handleToggleUnsavedTab}
-            onSaveSelected={handleSaveAndCloseWindow}
-            onDiscard={handleDiscardAndCloseWindow}
-            onCancel={() => setWindowClosePromptOpen(false)}
-            loading={windowCloseSaving}
+            onSaveSelected={handleSaveAndContinueClose}
+            onDiscard={handleDiscardAndContinueClose}
+            onCancel={handleCancelUnsavedClose}
+            loading={unsavedPromptSaving}
           />
         )}
         {recoveryDrafts.length > 0 && (
@@ -714,14 +797,7 @@ function App() {
             onDiscard={handleDiscardRecovery}
           />
         )}
-        {externalConflict && (
-          <ExternalFileConflictModal
-            conflict={externalConflict}
-            onKeep={handleKeepExternalEdit}
-            onUseDisk={handleUseExternalDisk}
-            onSaveAs={handleSaveExternalAs}
-          />
-        )}
+
       </Suspense>
       <NotificationContainer />
     </>

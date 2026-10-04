@@ -15,6 +15,11 @@ use std::process::Command;
 use std::sync::{Arc, Mutex};
 use std::time::{SystemTime, UNIX_EPOCH};
 use tauri::{async_runtime, AppHandle, Emitter, Manager};
+mod language_plugins;
+mod lsp;
+#[cfg(windows)]
+mod msvc;
+mod script_runner;
 
 /// 返回给前端的轻量级文件系统条目元数据，
 /// 用于资源管理器界面展示文件和目录。
@@ -26,6 +31,7 @@ struct FileInfo {
     is_file: bool,
     is_dir: bool,
     modified: u64,
+    modified_ms: u64,
 }
 
 /// 文件读写与变更命令共用的标准化返回结构，
@@ -679,6 +685,14 @@ async fn get_file_info(path: String) -> Result<FileInfo, String> {
                             .as_secs()
                     })
                     .unwrap_or(0),
+                modified_ms: metadata
+                    .modified()
+                    .map(|time| {
+                        time.duration_since(UNIX_EPOCH)
+                            .unwrap_or_default()
+                            .as_millis() as u64
+                    })
+                    .unwrap_or(0),
             })
         }
         Err(e) => Err(format!("Failed to get file info: {}", e)),
@@ -716,6 +730,14 @@ async fn get_directory_contents(dir_path: String) -> Result<Vec<FileInfo>, Strin
                                 time.duration_since(UNIX_EPOCH)
                                     .unwrap_or_default()
                                     .as_secs()
+                            })
+                            .unwrap_or(0),
+                        modified_ms: metadata
+                            .modified()
+                            .map(|time| {
+                                time.duration_since(UNIX_EPOCH)
+                                    .unwrap_or_default()
+                                    .as_millis() as u64
                             })
                             .unwrap_or(0),
                     });
@@ -1415,6 +1437,13 @@ pub fn run() {
     }
 
     builder
+        .on_window_event(|window, event| {
+            if window.label() == "main" && matches!(event, tauri::WindowEvent::Destroyed) {
+                script_runner::stop_all();
+                lsp::stop_all();
+                language_plugins::cancel_all();
+            }
+        })
         // 注册通过 `invoke` 暴露给前端的 Rust <-> WebView 桥接接口。
         .invoke_handler(tauri::generate_handler![
             read_file_content,
@@ -1443,6 +1472,18 @@ pub fn run() {
             get_app_documents_dir,
             get_cli_args,
             open_external,
+            script_runner::start_script,
+            script_runner::stop_script,
+            script_runner::write_script_input,
+            lsp::start_lsp,
+            lsp::send_lsp,
+            lsp::stop_lsp,
+            language_plugins::list_language_plugins,
+            language_plugins::fetch_language_catalog,
+            language_plugins::install_language_plugin,
+            language_plugins::cancel_language_plugin_install,
+            language_plugins::set_language_plugin_enabled,
+            language_plugins::uninstall_language_plugin,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

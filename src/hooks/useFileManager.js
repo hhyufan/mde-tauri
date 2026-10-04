@@ -38,6 +38,8 @@ import { syncEngine, isCloudPath, fileIdFromCloudPath } from '@/services/syncEng
 import { getBuffer } from '@utils/editorBuffer';
 import { debounce } from '@utils/debounce';
 import { isAndroidRuntime } from '@utils/platform';
+import { rememberDiskBaseline } from '@/services/localFileGuard';
+import { saveExistingFile } from '@/services/localFileOperations';
 import i18n from '@/i18n';
 
 /**
@@ -142,12 +144,19 @@ function hasOpenExplorerDirectory() {
   return Boolean(currentDir && sidebarVisible && sidebarView === 'explorer');
 }
 
-/**
- * 返回文件管理动作集合。
- *
- * 该 Hook 本身不暴露 React 状态，而是利用 store + Tauri API 的组合能力，
- * 提供一组跨平台、可在任意组件中安全调用的文件操作函数。
- */
+async function readFileMetadata(path) {
+  try {
+    return await getFileInfo(path);
+  } catch {
+    return null;
+  }
+}
+
+async function rememberSavedDiskVersion(path, content, metadata) {
+  const currentMetadata = metadata || await readFileMetadata(path);
+  return rememberDiskBaseline(path, content, currentMetadata || {});
+}
+
 export function useFileManager() {
   const {
     openFile: openTab,
@@ -240,19 +249,16 @@ export function useFileManager() {
     () => debounce(async (filePath, content, encoding, meta = {}) => {
       if (!filePath) return;
       try {
-        const result = await saveFile(filePath, content, encoding);
+        const tabId = useEditorStore.getState().getTabByPath(filePath)?.id || filePath;
+        const result = await saveExistingFile(filePath, content, encoding, tabId);
         if (result.success) {
-          const tab = useEditorStore.getState().getActiveTab();
-          if (tab && tab.path === filePath) {
-            markTabSaved(tab.id);
-          }
           syncEngine.registerLocalDocument(filePath, {
             name: meta.name || filePath.split(/[\\/]/).pop() || '',
             ext: meta.ext || '',
             encoding,
             lineEnding: meta.lineEnding || 'LF',
           });
-          await syncEngine.queueLocalUpsert(filePath, content, encoding, {
+          await syncEngine.queueLocalUpsert(filePath, result.savedContent, encoding, {
             name: meta.name || filePath.split(/[\\/]/).pop() || '',
             lineEnding: meta.lineEnding || 'LF',
             source: 'auto-save',
@@ -282,7 +288,7 @@ export function useFileManager() {
         if (result?.ok) {
           const currentTab = useEditorStore.getState().tabs.find((item) => item.id === tabId);
           if (currentTab?.externalFileId === fileId) {
-            markTabSaved(tabId);
+            markTabSaved(tabId, content);
           }
         }
       } catch (_) { /* silent */ }
@@ -463,7 +469,7 @@ export function useFileManager() {
     const externalFileId = tab.externalFileId;
 
     updateTabPath(tab.id, path, name);
-    markTabSaved(path);
+    markTabSaved(path, tab.content);
     addRecentFile({ name, path, ext });
     if (!isAndroid) startFileWatching(path).catch(() => {});
     notify('success', t('notification.fileSaved'), name);
@@ -631,6 +637,11 @@ export function useFileManager() {
     try {
       const result = await readFileContent(filePath);
       if (result.success) {
+        await rememberSavedDiskVersion(
+          filePath,
+          result.content || '',
+          await readFileMetadata(filePath),
+        );
         const ext = fileName.split('.').pop() || '';
         syncEngine.registerLocalDocument(filePath, {
           name: fileName,
@@ -786,9 +797,8 @@ export function useFileManager() {
     }
 
     try {
-      const result = await saveFile(tab.path, tab.content, tab.encoding);
+      const result = await saveExistingFile(tab.path, tab.content, tab.encoding, tab.id);
       if (result.success) {
-        markTabSaved(tab.id);
         notify('success', t('notification.fileSaved'), tab.name);
         syncEngine.registerLocalDocument(tab.path, {
           name: tab.name,
@@ -796,15 +806,17 @@ export function useFileManager() {
           encoding: tab.encoding,
           lineEnding: tab.lineEnding,
         });
-        await syncEngine.queueLocalUpsert(tab.path, tab.content, tab.encoding, {
+        await syncEngine.queueLocalUpsert(tab.path, result.savedContent, tab.encoding, {
           name: tab.name,
           lineEnding: tab.lineEnding,
           source: 'manual-save',
         });
         return { ok: true, tabId: tab.id };
-      } else {
+      } else if (!result.conflict && !result.externalReloaded && !result.superseded) {
         notify('error', t('notification.error'), result.message);
         return { ok: false };
+      } else {
+        return { ok: false, conflict: !!result.conflict, externalReloaded: !!result.externalReloaded };
       }
     } catch (err) {
       notify('error', t('notification.error'), String(err));
@@ -859,7 +871,7 @@ export function useFileManager() {
           const ext = name.split('.').pop() || '';
           const externalFileId = tab.externalFileId;
           updateTabPath(tab.id, path, name);
-          markTabSaved(path);
+          markTabSaved(path, tab.content);
           addRecentFile({ name, path, ext });
           notify('success', t('notification.fileSaved'), path);
           if (externalFileId) {

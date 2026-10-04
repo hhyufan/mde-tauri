@@ -55,6 +55,14 @@ const useEditorStore = create(
       uiStateUpdatedAt: 0,
       cursorPosition: { lineNumber: 1, column: 1 },
       characterCount: 0,
+      // Runtime-only external disk conflict. It is deliberately excluded from
+      // persistence because the disk must be inspected again after restart.
+      externalFileConflict: null,
+
+      setExternalFileConflict: (conflict) => set({
+        externalFileConflict: conflict || null,
+      }),
+      clearExternalFileConflict: () => set({ externalFileConflict: null }),
 
       /**
        * 打开本地文件。
@@ -354,25 +362,26 @@ const useEditorStore = create(
       },
 
       /**
-       * 保存成功后把实时缓冲快照回写到持久化标签对象，并清除脏标记。
+       * 保存实际落盘的快照；保存期间的新输入继续保持未保存状态。
        */
-      markTabSaved: (tabId) => {
+      markTabSaved: (tabId, savedContent) => {
         if (!tabId) return;
-        const content = getBuffer(tabId, undefined);
-        set((state) => ({
-          tabs: state.tabs.map((t) =>
-            t.id === tabId
-              ? {
-                  ...t,
-                  content: typeof content === 'string' ? content : t.content,
-                  modified: false,
-                }
-              : t
-          ),
-          tabRenderList: state.tabRenderList.map((t) =>
-            t.id === tabId ? { ...t, modified: false } : t
-          ),
-        }));
+        const liveContent = getBuffer(tabId, undefined);
+        set((state) => {
+          const tab = state.tabs.find((t) => t.id === tabId);
+          const content = savedContent ?? liveContent ?? tab?.content;
+          const modified = (liveContent ?? tab?.content) !== content;
+          return {
+            tabs: state.tabs.map((t) =>
+              t.id === tabId
+                ? { ...t, content: typeof content === 'string' ? content : t.content, modified }
+                : t
+            ),
+            tabRenderList: state.tabRenderList.map((t) =>
+              t.id === tabId ? { ...t, modified } : t
+            ),
+          };
+        });
       },
 
       /** ???????????????????????? */

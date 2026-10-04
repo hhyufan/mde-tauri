@@ -7,6 +7,7 @@
 import { invoke } from '@tauri-apps/api/core';
 import { listen } from '@tauri-apps/api/event';
 import { getCurrentWindow } from '@tauri-apps/api/window';
+import { rememberDiskBaseline, withFileOperation } from '@/services/localFileGuard';
 import {
   isSafUri,
   listFolder as safListFolder,
@@ -37,6 +38,7 @@ let _appWindow = null;
  * @returns {import('@tauri-apps/api/window').Window | null} 当前窗口对象；不可用时返回 `null`
  */
 function resolveAppWindow() {
+  if (typeof window === 'undefined' || !window.__TAURI_INTERNALS__) return null;
   if (_appWindow) return _appWindow;
   try {
     _appWindow = getCurrentWindow();
@@ -62,6 +64,7 @@ export const appWindow = new Proxy(
       const win = resolveAppWindow();
       if (!win) {
         if (prop === 'then') return undefined;
+        if (typeof prop === 'string' && /^on[A-Z]/.test(prop)) return () => Promise.resolve(() => {});
         return () => Promise.resolve();
       }
       const value = win[prop];
@@ -136,7 +139,18 @@ export async function writeFileContent(path, content) {
 /**
  * 保存文件并返回统一格式的保存结果。
  */
-export async function saveFile(filePath, content, encoding) {
+export function saveFile(filePath, content, encoding, { operationHeld = false } = {}) {
+  const write = async () => {
+    const result = await writeEncodedFile(filePath, content, encoding);
+    // Publish the exact written snapshot before releasing the watcher/save queue.
+    // Do not pair it with metadata read later: another writer may already exist.
+    if (result?.success) rememberDiskBaseline(filePath, content);
+    return result;
+  };
+  return operationHeld ? write() : withFileOperation(filePath, write);
+}
+
+async function writeEncodedFile(filePath, content, encoding) {
   if (isSafUri(filePath)) {
     try {
       const result = await safWriteFileText(filePath, content);
@@ -392,6 +406,7 @@ export async function getAppDocumentsDir() {
  * @returns {Promise<unknown>} 命令行参数列表
  */
 export async function getCliArgs() {
+  if (typeof window === 'undefined' || !window.__TAURI_INTERNALS__) return [];
   return invoke('get_cli_args');
 }
 
@@ -399,5 +414,8 @@ export async function getCliArgs() {
  * 订阅原生侧发出的文件变更事件。
  */
 export function onFileChanged(callback) {
+  if (typeof window === 'undefined' || !window.__TAURI_INTERNALS__) {
+    return Promise.resolve(() => {});
+  }
   return listen('file-changed', (event) => callback(event.payload));
 }
