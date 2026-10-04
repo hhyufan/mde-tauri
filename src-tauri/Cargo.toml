@@ -44,9 +44,14 @@ thiserror = "1.0"
 base64 = "0.22"
 sha2 = "0.10"
 keyring = { version = "3", features = ["windows-native"] }
+tempfile = "3"
+reqwest = { version = "0.13", default-features = false, features = ["blocking", "json", "rustls"] }
+zip = { version = "4", default-features = false, features = ["deflate-flate2"] }
+flate2 = "1"
+tar = "0.4"
 
 [target.'cfg(windows)'.dependencies]
-windows-sys = { version = "0.52", features = ["Win32_System_Console", "Win32_Foundation", "Win32_Storage_FileSystem"] }
+windows-sys = { version = "0.52", features = ["Win32_System_Console", "Win32_Foundation", "Win32_Storage_FileSystem", "Win32_System_JobObjects", "Win32_System_Threading", "Win32_Security"] }
 
 # ---------------------------------------------------------------------------
 # Profiles tuned for fastest cold-start.

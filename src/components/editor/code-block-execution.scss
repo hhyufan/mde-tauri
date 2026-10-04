@@ -1,0 +1,60 @@
+.md-preview .md-runnable-code {
+  position: relative;
+  margin: 1em 0;
+  overflow: hidden;
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius-sm);
+  background: var(--bg);
+  > pre, > pre[class*='language-'] {
+    margin: 0;
+    padding: 38px 16px 16px;
+    border: 0;
+    border-radius: 0;
+    background: transparent;
+  }
+  > pre > .lang-tag {
+    top: 8px;
+    left: 12px;
+    right: auto;
+    padding: 3px 6px;
+    border: 1px solid transparent;
+    border-radius: 5px;
+    background: transparent;
+    color: var(--text-sec);
+    box-shadow: none;
+    font: 11px/1.4 var(--font-app);
+    &:hover { color: var(--accent); background: var(--accent-bg); border-color: var(--border); }
+  }
+}
+.md-code-execution {
+  color: var(--text);
+  font: 12px/1.6 var(--font-app);
+  cursor: default;
+  button { display: inline-flex; align-items: center; gap: 5px; padding: 3px 7px; border: 1px solid transparent; border-radius: 5px; background: transparent; color: var(--text-sec); font: inherit; cursor: pointer;
+    &:hover { color: var(--accent); border-color: var(--border); background: var(--accent-bg); }
+    &:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+    &:disabled { opacity: 0.5; cursor: default; }
+  }
+  svg { width: 14px; height: 14px; }
+  &__toolbar { position: absolute; top: 6px; right: 8px; z-index: 3; button { color: var(--accent); } }
+  &__result { border-top: 1px solid var(--border-light); background: var(--surface); }
+  &__result > header { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 5px 12px; color: var(--text-sec); font-size: 11px;
+    > span { display: inline-flex; align-items: center; gap: 5px; } i { width: 5px; height: 5px; border-radius: 50%; background: currentColor; }
+  }
+  &__result.is-success > header > span { color: var(--success); }
+  &__result.is-error > header > span { color: var(--error); }
+  &__result.is-running > header > span, &__result.is-preparing > header > span { color: var(--accent); }
+  &__output { max-height: 260px; overflow: auto; padding: 4px 12px 12px; user-select: text; samp { display: block; margin: 0; padding: 0; white-space: pre-wrap; overflow-wrap: anywhere; font: 12px/1.5 var(--font-editor); > span { display: inline; margin: 0; padding: 0; font: inherit; } } }
+  &__stderr { color: var(--error); }
+  &__stdin { color: var(--accent); }
+  &__hint { color: var(--text-dim); font-size: 11px; }
+  &__result > .md-code-execution__hint { padding: 0 12px 5px; }
+  &__prompt { display: inline-flex; align-items: center; flex-shrink: 0; opacity: 0.7; svg { width: 12px; height: 12px; } }
+  form { display: flex; align-items: center; gap: 8px; padding: 5px 12px; border-top: 1px solid var(--border-light); color: var(--accent);
+    input { flex: 1; min-width: 0; padding: 3px 0; border: 0; outline: none; background: transparent; color: var(--text); font: inherit; &:focus-visible { box-shadow: 0 1px var(--accent); } }
+  }
+}
+.md-preview--milkdown .milkdown-code-block:has(> .md-code-execution-mount) {
+  .cm-content { padding-top: 38px; }
+  .milkdown-code-block-placeholder { padding-top: 38px; }
+}

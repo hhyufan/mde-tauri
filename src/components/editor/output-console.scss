@@ -1,0 +1,85 @@
+.output-console {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  flex: 0 0 auto;
+  min-height: 140px;
+  max-height: 65vh;
+  border-top: 1px solid var(--border);
+  background: var(--sidebar);
+  color: var(--text);
+  font: 12px var(--font-app);
+  &__tabs { display: flex; align-self: stretch; gap: 6px; flex-shrink: 0;
+    > button { position: relative; gap: 6px; padding: 0 8px; border-radius: 0; color: var(--text-sec);
+      &[aria-selected="true"] { color: var(--accent); &::after { content: ''; position: absolute; height: 2px; bottom: 0; inset-inline: 4px; background: var(--accent); } }
+    }
+  }
+  &__badge { border-radius: 8px; background: var(--hover); padding: 0 5px; min-width: 15px; font-size: 10px; }
+
+  button {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    padding: 5px 8px;
+    border: 0;
+    border-radius: 5px;
+    background: none;
+    color: var(--text-sec);
+    font: inherit;
+    cursor: pointer;
+    &:hover, &.is-active { background: var(--hover); color: var(--accent); }
+    &:disabled { opacity: 0.35; cursor: default; }
+    &:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+  }
+  svg { width: 15px; height: 15px; flex-shrink: 0; }
+  input { min-width: 0; font: inherit; outline: none; }
+  &__resize { position: absolute; height: 5px; top: -3px; inset-inline: 0; cursor: row-resize; touch-action: none; z-index: 10; &:hover, &:focus-visible { background: var(--accent); } }
+  &__header { display: flex; align-items: center; gap: 14px; min-height: 38px; padding: 0 12px; border-bottom: 1px solid var(--border-light); }
+  &__title { display: flex; align-items: center; gap: 7px; color: var(--accent); strong { font-weight: 600; } }
+  &__shortcut { color: var(--text-dim); font: 10px var(--font-editor); }
+  &__status { display: flex; align-items: center; gap: 5px; flex-shrink: 0; color: var(--text-sec); font-size: 11px; i { width: 5px; height: 5px; border-radius: 50%; background: currentColor; } &--running, &--preparing { color: var(--accent); } &--success { color: var(--success); } &--error { color: var(--error); } }
+  &__file { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; color: var(--text-sec); font-size: 11px; flex: 1; min-width: 0; }
+  &__actions { display: flex; align-items: center; gap: 2px; margin-left: auto; }
+  &__body { flex: 1; min-height: 0; padding: 10px 14px; overflow: auto; background: var(--surface); font: 12px/1.5 var(--font-editor); user-select: text; }
+  // 程序输出使用独立文本容器，避免 Markdown 的 pre 样式给每段输出添加间距。
+  &__text { display: block; margin: 0; padding: 0; white-space: pre-wrap; overflow-wrap: anywhere; tab-size: 4; font: inherit;
+    > span { display: inline; margin: 0; padding: 0; font: inherit; }
+  }
+  &__stderr { color: var(--error); }
+  &__stdin { color: var(--accent); }
+  &__muted, &__empty { color: var(--text-sec); }
+  &__footer { display: flex; flex-wrap: wrap; align-items: center; gap: 2px 12px; min-height: 32px; padding: 3px 12px; border-top: 1px solid var(--border-light); color: var(--text-sec); font-size: 11px; > span { flex-shrink: 0; white-space: nowrap; } form { flex: 1 1 220px; display: flex; align-items: center; gap: 8px; min-width: 0; max-width: 100%; } input { flex: 1; border: 0; background: none; color: var(--accent); padding: 5px 0; &::placeholder { color: var(--text-dim); } } }
+  &__prompt { display: inline-flex; align-items: center; flex-shrink: 0; color: var(--accent); opacity: 0.7; svg { width: 12px; height: 12px; } }
+  // 运行环境面板是控制台里唯一可伸缩的区域：控制台高度不足时面板自身滚动，
+  // 不会把底部输入栏挤出控制台外、压到编辑器状态栏上。
+  &__settings { flex: 1 1 auto; min-height: 0; overflow-y: auto; align-content: start; display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 2px 18px; padding: 8px 14px; border-bottom: 1px solid var(--border-light); label { display: flex; align-items: center; gap: 10px; margin: 4px 0; > span { width: 68px; } } input { flex: 1; background: var(--surface); color: var(--text); padding: 5px 8px; border: 1px solid var(--border); border-radius: 5px; &:focus { border-color: var(--accent); } } }
+}
+
+.problems {
+  display: flex; flex-direction: column; flex: 1; min-height: 0; background: var(--surface);
+  &__toolbar { display: flex; gap: 12px; align-items: center; flex-shrink: 0; padding: 6px 12px; border-bottom: 1px solid var(--border-light);
+    select, input { background: var(--surface); color: var(--text); border: 1px solid var(--border); border-radius: 5px; font: inherit; padding: 4px 7px; min-width: 0; }
+    select { max-width: 150px; } input { margin-left: auto; width: 200px; &:focus { border-color: var(--accent); } }
+  }
+  &__levels { display: flex; gap: 2px; > button { gap: 4px; padding: 3px 6px; &[aria-pressed="false"] { opacity: .4; } } }
+  &__severity { width: 15px; height: 15px; flex-shrink: 0; &--1 { color: var(--error); } &--2 { color: var(--warning, #ce9844); } &--3 { color: var(--accent); } &--4 { color: var(--text-sec); } }
+  &__list { flex: 1; min-height: 0; overflow: auto; user-select: text; }
+  &__row { display: flex; align-items: flex-start; gap: 8px; padding: 5px 14px; cursor: default; border-left: 2px solid transparent;
+    &:hover { background: var(--hover); } &.is-selected { background: var(--hover); border-left-color: var(--accent); }
+    &:focus-visible { outline: 1px solid var(--accent); outline-offset: -1px; }
+  }
+  &__message { flex: 1; min-width: 0; white-space: pre-wrap; overflow-wrap: anywhere; line-height: 1.5; }
+  &__source { color: var(--text-dim); font-size: 11px; overflow: hidden; text-overflow: ellipsis; max-width: 200px; white-space: nowrap; }
+  &__location { color: var(--text-sec); white-space: nowrap; font: 11px/1.6 var(--font-editor); }
+  &__empty { color: var(--text-sec); padding: 22px 14px; } &__error { color: var(--error); padding: 8px 14px; }
+  // 问题行悬停提示使用 Tooltip 组件而非原生 title，支持多行排版。
+  &__tip { display: flex; flex-direction: column; gap: 3px; max-width: 340px; overflow-wrap: anywhere; text-align: left; }
+  &__tip-sub { opacity: 0.72; font-size: 12px; }
+  &__footer { display: flex; justify-content: space-between; gap: 10px; padding: 5px 12px; border-top: 1px solid var(--border-light); color: var(--text-dim); font-size: 11px; }
+}
+
+@media (max-width: 768px) {
+  .output-console { &__header { gap: 8px; padding-inline: 8px; } &__shortcut, &__file, &__status { display: none; } &__actions { margin-left: auto; button { padding-inline: 5px; } } &__footer > span { max-width: 42%; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; } }
+  .problems { &__toolbar { gap: 6px; padding-inline: 8px; input { width: 110px; } } &__source, &__footer > span:last-child { display: none; } &__row { padding-inline: 14px 8px; } }
+}
