@@ -26,12 +26,52 @@ jobs:
       - run: npm test
       - run: npm run build
       - run: npm run check:bundle
+      - name: Configure Windows code signing
+        shell: pwsh
+        env:
+          WINDOWS_CERTIFICATE: ${{ secrets.WINDOWS_CERTIFICATE }}
+          WINDOWS_CERTIFICATE_PASSWORD: ${{ secrets.WINDOWS_CERTIFICATE_PASSWORD }}
+          TAURI_UPDATER_PUBLIC_KEY: ${{ secrets.TAURI_UPDATER_PUBLIC_KEY }}
+        run: |
+          if ([string]::IsNullOrWhiteSpace($env:WINDOWS_CERTIFICATE) -or
+              [string]::IsNullOrWhiteSpace($env:WINDOWS_CERTIFICATE_PASSWORD)) {
+            throw 'Windows release requires WINDOWS_CERTIFICATE (base64 PFX) and WINDOWS_CERTIFICATE_PASSWORD secrets.'
+          }
+          if ([string]::IsNullOrWhiteSpace($env:TAURI_UPDATER_PUBLIC_KEY)) {
+            throw 'Windows release requires TAURI_UPDATER_PUBLIC_KEY.'
+          }
+          $pfxPath = Join-Path $env:RUNNER_TEMP 'mde-code-signing.pfx'
+          try {
+            [IO.File]::WriteAllBytes($pfxPath, [Convert]::FromBase64String($env:WINDOWS_CERTIFICATE))
+            $password = ConvertTo-SecureString $env:WINDOWS_CERTIFICATE_PASSWORD -AsPlainText -Force
+            $certificate = Import-PfxCertificate -FilePath $pfxPath -CertStoreLocation Cert:\CurrentUser\My -Password $password
+          } finally {
+            Remove-Item -LiteralPath $pfxPath -ErrorAction SilentlyContinue
+          }
+          if (!$certificate -or !$certificate.HasPrivateKey -or $certificate.NotAfter -le (Get-Date)) {
+            throw 'The imported code-signing certificate is missing its private key or has expired.'
+          }
+          $codeSigningOid = '1.3.6.1.5.5.7.3.3'
+          if (!($certificate.EnhancedKeyUsageList | Where-Object { $_.Value -eq $codeSigningOid })) {
+            throw 'The imported certificate is not valid for code signing.'
+          }
+          $overlay = @{
+            bundle = @{
+              createUpdaterArtifacts = $true
+              windows = @{
+                certificateThumbprint = $certificate.Thumbprint
+                digestAlgorithm = 'sha256'
+                timestampUrl = 'http://timestamp.digicert.com'
+              }
+            }
+            plugins = @{ updater = @{ pubkey = $env:TAURI_UPDATER_PUBLIC_KEY } }
+          } | ConvertTo-Json -Compress -Depth 6
+          "TAURI_CONFIG=$overlay" >> $env:GITHUB_ENV
       - uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
-          TAURI_CONFIG: '{"plugins":{"updater":{"pubkey":"${{ secrets.TAURI_UPDATER_PUBLIC_KEY }}"}}}'
         with:
           tagName: v__VERSION__
           releaseName: MDE v__VERSION__
@@ -39,3 +79,20 @@ jobs:
           prerelease: false
           includeUpdaterJson: true
           args: --bundles nsis,msi
+      - name: Verify Windows signatures
+        shell: pwsh
+        run: |
+          $paths = @('src-tauri/target/release/mde.exe')
+          foreach ($bundle in @(
+            @{ Directory = 'src-tauri/target/release/bundle/nsis'; Filter = 'mde_*_x64-setup.exe' },
+            @{ Directory = 'src-tauri/target/release/bundle/msi'; Filter = 'mde_*_x64_en-US.msi' }
+          )) {
+            $artifacts = @(Get-ChildItem -LiteralPath $bundle.Directory -Filter $bundle.Filter -File)
+            if ($artifacts.Count -ne 1) { throw "Expected exactly one artifact in $($bundle.Directory), found $($artifacts.Count)." }
+            $paths += $artifacts[0].FullName
+          }
+          foreach ($path in $paths) {
+            if (!(Test-Path -LiteralPath $path)) { throw "Release artifact missing: $path" }
+            $signature = Get-AuthenticodeSignature -LiteralPath $path
+            if ($signature.Status -ne 'Valid') { throw "Invalid Windows signature on $path`: $($signature.Status)" }
+          }

@@ -44,14 +44,7 @@
       }
     </style>
 
-    <!--
-      Earliest-possible window show.
-      `visible: false` on the Tauri window means the OS keeps it hidden until
-      we explicitly call `show_main_window`. Doing it here — *before* the React
-      bundle is parsed — shaves the React mount + first effect cycle (~50–200ms
-      on cold starts) off the perceived startup time. The user sees the themed
-      window the instant the WebView can render anything.
-    -->
+    <!-- The native window is visible from creation, so startup errors are visible too. -->
     <script>
       (function () {
         // ---- Startup error capture --------------------------------------
@@ -61,6 +54,12 @@
         // requires USB + chrome://inspect.
         function showStartupError(msg, kind) {
           try {
+            // React 挂载完成后，后续运行时错误应交给组件级错误边界处理，
+            // 不再用全屏启动遮罩覆盖仍可工作的应用。
+            if (appMounted) {
+              console.error(msg);
+              return;
+            }
             var box = document.getElementById('__startup_error__');
             if (!box) {
               box = document.createElement('pre');
@@ -84,6 +83,7 @@
             box.style.display = 'block';
           } catch (_) { /* swallow — overlay is best effort */ }
         }
+        var appMounted = false;
         // Errors that should never reach the visible overlay. Monaco
         // (and a couple of other Microsoft libs) throw `CancellationError`
         // — name === 'Canceled' — as the standard mechanism for aborting
@@ -138,7 +138,10 @@
           if (!root) return;
 
           function handleReactMount() {
-            if (root.childElementCount === 0) return false;
+            // Suspense 的启动占位节点并不代表应用已经可用；只有 App 根容器
+            // 出现后才结束启动错误捕获。
+            if (!root.querySelector('.app')) return false;
+            appMounted = true;
             clearTimeout(startupTimer);
             var box = document.getElementById('__startup_error__');
             if (box && box.dataset.kind === 'timeout') box.remove();
@@ -162,20 +165,6 @@
           document.documentElement.dataset.theme = theme;
         } catch (_) { /* noop — fall back to light */ }
 
-        // 2. Show the OS window the moment Tauri's IPC bridge is ready.
-        // In Tauri 2.5+ initialization scripts always run first; on older
-        // versions __TAURI_INTERNALS__ may appear a few microseconds later,
-        // so we retry on rAF until it's available (or give up after a tick).
-        var attempts = 0;
-        function tryShow() {
-          var t = window.__TAURI_INTERNALS__;
-          if (t && typeof t.invoke === 'function') {
-            t.invoke('show_main_window').catch(function () {});
-            return;
-          }
-          if (attempts++ < 60) requestAnimationFrame(tryShow);
-        }
-        tryShow();
       })();
     </script>
   </head>
