@@ -1,0 +1,60 @@
+[
+  {
+    "id": "mde.typescript", "name": "JavaScript & TypeScript", "publisher": "TypeScript Language Server", "version": "latest",
+    "description": "Intelligent completion, navigation and diagnostics for JavaScript and TypeScript.",
+    "descriptionZh": "为 JavaScript 和 TypeScript 提供智能补全、定义跳转和代码诊断。",
+    "languages": ["javascript", "typescript"], "extensions": { "js": "javascript", "mjs": "javascript", "cjs": "javascript", "jsx": "javascript", "ts": "typescript", "tsx": "typescript" },
+    "icon": "JS", "color": "#c79b21", "homepage": "https://github.com/typescript-language-server/typescript-language-server",
+    "requirements": "Node.js and npm", "requirementsZh": "需要 Node.js 和 npm", "args": ["--stdio"],
+    "install": { "kind": "npm", "packages": ["typescript-language-server", "typescript@6", "@types/node"], "executable": "typescript-language-server" }
+  },
+  {
+    "id": "mde.html", "name": "HTML", "publisher": "VS Code Language Services", "version": "latest",
+    "description": "HTML completion, validation and document formatting.", "descriptionZh": "提供 HTML 标签补全、文档校验和格式化。",
+    "languages": ["html"], "extensions": { "html": "html", "htm": "html" }, "icon": "</>", "color": "#d46f42",
+    "homepage": "https://github.com/hrsh7th/vscode-langservers-extracted", "requirements": "Node.js and npm", "requirementsZh": "需要 Node.js 和 npm", "args": ["--stdio"],
+    "install": { "kind": "npm", "packages": ["vscode-langservers-extracted"], "executable": "vscode-html-language-server" }
+  },
+  {
+    "id": "mde.css", "name": "CSS", "publisher": "VS Code Language Services", "version": "latest",
+    "description": "Stylesheet intelligence for CSS, SCSS and Less.", "descriptionZh": "支持 CSS、SCSS 和 Less 的属性补全、诊断和格式化。",
+    "languages": ["css", "scss", "less"], "extensions": { "css": "css", "scss": "scss", "less": "less" }, "icon": "#", "color": "#568bd2",
+    "homepage": "https://github.com/hrsh7th/vscode-langservers-extracted", "requirements": "Node.js and npm", "requirementsZh": "需要 Node.js 和 npm", "args": ["--stdio"],
+    "install": { "kind": "npm", "packages": ["vscode-langservers-extracted"], "executable": "vscode-css-language-server" }
+  },
+  {
+    "id": "mde.pyright", "name": "Python · Pyright", "publisher": "Microsoft", "version": "latest",
+    "description": "Fast Python type checking, completion and navigation.", "descriptionZh": "为 Python 提供类型检查、代码补全和定义跳转。",
+    "languages": ["python"], "extensions": { "py": "python", "pyi": "python" }, "icon": "Py", "color": "#548bb6",
+    "homepage": "https://github.com/microsoft/pyright", "requirements": "Node.js and npm; Python for your environment", "requirementsZh": "需要 Node.js 和 npm；分析环境需 Python", "args": ["--stdio"],
+    "install": { "kind": "npm", "packages": ["pyright"], "executable": "pyright-langserver" }
+  },
+  {
+    "id": "mde.csharp", "name": "C# · Roslyn", "publisher": "csharp-ls", "version": "latest",
+    "description": "Roslyn-powered C# completion, diagnostics and formatting.", "descriptionZh": "基于 Roslyn，为 C# 提供补全、诊断和格式化。",
+    "languages": ["csharp"], "extensions": { "cs": "csharp" }, "icon": "C#", "color": "#9773bf",
+    "homepage": "https://github.com/razzmatazz/csharp-language-server", "requirements": ".NET 10 SDK or later", "requirementsZh": "需要 .NET 10 或更高版本 SDK", "args": [],
+    "install": { "kind": "dotnet", "packages": ["csharp-ls"], "executable": "csharp-ls" }
+  },
+  {
+    "id": "mde.kotlin", "name": "Kotlin", "publisher": "Kotlin Language Server", "version": "latest",
+    "description": "Kotlin completion and diagnostics for JVM projects and scripts.", "descriptionZh": "为 Kotlin JVM 项目和脚本提供代码补全与诊断。",
+    "languages": ["kotlin"], "extensions": { "kt": "kotlin", "kts": "kotlin" }, "icon": "Kt", "color": "#9c75ca",
+    "homepage": "https://github.com/fwcd/kotlin-language-server", "requirements": "JDK 17–21 (automatically selected)", "requirementsZh": "需要 JDK 17–21，自动选择兼容版本", "args": [],
+    "install": { "kind": "github", "repository": "fwcd/kotlin-language-server", "asset": "server.zip", "format": "zip", "executable": "bin/kotlin-language-server" }
+  },
+  {
+    "id": "mde.java", "name": "Java · Eclipse JDT", "publisher": "Eclipse Foundation", "version": "latest",
+    "description": "Java project intelligence powered by Eclipse JDT Language Server.", "descriptionZh": "基于 Eclipse JDT，为 Java 项目提供补全、导航和代码诊断。",
+    "languages": ["java"], "extensions": { "java": "java" }, "icon": "Ja", "color": "#c47747",
+    "homepage": "https://github.com/eclipse-jdtls/eclipse.jdt.ls", "requirements": "JDK 21 or later", "requirementsZh": "需要 JDK 21 或更高版本", "args": [],
+    "install": { "kind": "jdtls" }
+  },
+  {
+    "id": "mde.rust", "name": "Rust · rust-analyzer", "publisher": "rust-analyzer", "version": "latest",
+    "description": "Rust completion, diagnostics and navigation for Cargo projects and single files.", "descriptionZh": "为 Rust Cargo 项目和独立文件提供智能补全、诊断和导航。",
+    "languages": ["rust"], "extensions": { "rs": "rust" }, "icon": "Rs", "color": "#bd7b5b",
+    "homepage": "https://github.com/rust-lang/rust-analyzer", "requirements": "Rust toolchain; rust-src for standard-library navigation", "requirementsZh": "需要 Rust 工具链；标准库导航需 rust-src", "args": [],
+    "install": { "kind": "github", "repository": "rust-lang/rust-analyzer", "asset": "rust-analyzer-{target}.{archive}", "format": "native", "executable": "rust-analyzer" }
+  }
+]
