@@ -2,17 +2,17 @@ import { Alert, Button, Modal, Space, Typography } from 'antd';
 
 const { Paragraph, Text } = Typography;
 
-function ExternalFileConflictModal({ conflict, onKeep, onUseDisk, onSaveAs }) {
+function ExternalFileConflictModal({ conflict, onKeep, onUseDisk, onSaveAs, onClose }) {
   if (!conflict) return null;
   const unavailable = typeof conflict.diskContent !== 'string';
   return (
     <Modal
       open
-      closable={false}
-      maskClosable={false}
+      onCancel={onClose}
       title="文件已在外部发生变化"
       footer={(
         <Space wrap>
+          <Button onClick={onClose}>稍后处理</Button>
           <Button onClick={onKeep}>保留编辑内容</Button>
           <Button disabled={unavailable} onClick={onUseDisk}>采用磁盘内容</Button>
           <Button type="primary" onClick={onSaveAs}>另存为</Button>

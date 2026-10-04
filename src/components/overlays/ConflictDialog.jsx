@@ -267,8 +267,6 @@ function ConflictDialog({ open, conflicts, onResolve, onClose }) {
       footer={null}
       width="min(1180px, 94vw)"
       centered
-      closable={false}
-      maskClosable={false}
       destroyOnHidden
       rootClassName="mde-conflict-modal-root"
       styles={{ body: { padding: 0 }, content: { padding: 0 } }}
@@ -302,6 +300,7 @@ function ConflictDialog({ open, conflicts, onResolve, onClose }) {
 
         <div className="conflict-dialog__actions">
           <Space>
+            <Button onClick={onClose}>稍后处理</Button>
             <Button onClick={() => onResolve(current.fileId, 'local')}>
               {t('sync.conflict.keepLocal')}
             </Button>
