@@ -4,27 +4,38 @@
  * 本文件统一封装本地文件、external 文档缓存、配置镜像以及远端同步协议之间的
  * 协作流程，对外提供入队、拉取、冲突处理、路径绑定与配置同步等核心能力。
  */
-import pako from 'pako';
-import apiClient, { classifyApiError } from './apiClient';
-import { recordDiagnostic, saveFile } from '@utils/tauriApi';
+import { classifyApiError } from './apiClient';
+import { readFileContent, recordDiagnostic, saveFile } from '@utils/tauriApi';
 import useEditorStore from '@store/useEditorStore';
-import useFileStore from '@store/useFileStore';
+import useFileStore, { getScopedBookmarkedPaths } from '@store/useFileStore';
 import useFileIdStore from '@store/useFileIdStore';
 import useConfigStore from '@store/useConfigStore';
 import useThemeStore from '@store/useThemeStore';
 import useNotificationStore from '@store/useNotificationStore';
 import useAuthStore from '@store/useAuthStore';
 import useDeviceStore from '@store/useDeviceStore';
-import useExternalDocsStore from '@store/useExternalDocsStore';
-import useSyncStore, { SYNC_PROTOCOL_VERSION } from '@store/useSyncStore';
+import useExternalDocsStore, { getScopedExternalDocsMap } from '@store/useExternalDocsStore';
+import useSyncStore, {
+  waitForSyncStatePersistence,
+  waitForSyncStoreHydration,
+} from '@store/useSyncStore';
+import { getCurrentUserScopeId } from '@store/userScope';
 import { getLocalSettingsSnapshot, applySettingsSnapshot } from '@utils/settingsSync';
+import {
+  decodeAndVerifySyncBody,
+  decodeSyncBody,
+  encodeSyncBody,
+  isSyncBodyTooLarge,
+  sha256Text,
+  SyncIntegrityError,
+} from './sync/contentCodec';
+import { getMutationRetryAt, isRetryableSyncError } from './sync/retryPolicy';
+import { syncTransport } from './sync/syncTransport';
+import { SyncProtocolError } from './sync/changeProtocol';
 import i18n from '@/i18n';
 
-// 小体积内容直接明文上传，避免不必要的 gzip 开销。
-const COMPRESS_THRESHOLD_BYTES = 16 * 1024;
-// 预留服务端请求体上限安全余量（避免触发平台硬限制）。
-const MAX_REQUEST_BYTES = 3.5 * 1024 * 1024;
 const CONFIG_SYNC_DEBOUNCE_MS = 900;
+const PULL_WORKER_COUNT = 3;
 export const CLOUD_PATH_PREFIX = 'cloud://';
 
 /**
@@ -57,44 +68,6 @@ export function fileIdFromCloudPath(p) {
   return isCloudPath(p) ? p.slice(CLOUD_PATH_PREFIX.length) : null;
 }
 
-const textEncoder = new TextEncoder();
-const textDecoder = new TextDecoder();
-
-/**
- * 计算文本 SHA-256，用于内容去重与远端校验。
- */
-async function sha256(str) {
-  const buf = await crypto.subtle.digest('SHA-256', textEncoder.encode(str));
-  return Array.from(new Uint8Array(buf))
-    .map((b) => b.toString(16).padStart(2, '0'))
-    .join('');
-}
-
-/**
- * 把二进制内容编码成 base64，便于放入 JSON 请求体。
- */
-function bytesToBase64(bytes) {
-  let binary = '';
-  const chunk = 0x8000;
-  for (let i = 0; i < bytes.length; i += chunk) {
-    binary += String.fromCharCode.apply(
-      null,
-      bytes.subarray(i, i + chunk),
-    );
-  }
-  return btoa(binary);
-}
-
-/**
- * 将 base64 恢复为二进制数组。
- */
-function base64ToBytes(b64) {
-  const binary = atob(b64);
-  const out = new Uint8Array(binary.length);
-  for (let i = 0; i < binary.length; i++) out[i] = binary.charCodeAt(i);
-  return out;
-}
-
 /**
  * 提取路径末尾的文件名。
  */
@@ -113,48 +86,6 @@ function extOf(name) {
   return idx > 0 ? name.slice(idx + 1).toLowerCase() : '';
 }
 
-/**
- * 把原始文本编码为可上传的同步载荷。
- *
- * 小文件直接明文传输，大文件则 gzip 后转为 base64，以在网络体积和 CPU 成本
- * 之间取得平衡。
- */
-async function encodeBody(rawText) {
-  const rawBytes = textEncoder.encode(rawText);
-  const checksum = await sha256(rawText);
-  if (rawBytes.byteLength < COMPRESS_THRESHOLD_BYTES) {
-    return {
-      content: rawText,
-      compressed: false,
-      size: rawBytes.byteLength,
-      checksum,
-      compressedBytes: rawBytes.byteLength,
-    };
-  }
-  const gz = pako.gzip(rawBytes);
-  const b64 = bytesToBase64(gz);
-  return {
-    content: b64,
-    compressed: true,
-    size: rawBytes.byteLength,
-    checksum,
-    compressedBytes: b64.length,
-  };
-}
-
-/**
- * 还原服务端返回的文档正文。
- */
-function decodeBody(doc) {
-  if (!doc.compressed) return doc.content || '';
-  const bytes = base64ToBytes(doc.content || '');
-  const inflated = pako.ungzip(bytes);
-  return textDecoder.decode(inflated);
-}
-
-/**
- * 生成一次变更提交使用的唯一 mutationId。
- */
 /**
  * 构造当前本地设置快照，供配置同步上推。
  */
@@ -179,16 +110,19 @@ function getLocalConflictContent(path, fileId) {
  * 负责本地文件与外部云文档的统一建模、变更入队、推送/拉取、路径绑定、
  * 冲突判定、配置同步以及失败重试，是整个同步能力的单一调度入口。
  */
-class SyncEngine {
-  constructor() {
+export class SyncEngine {
+  constructor({ transport = syncTransport, autoSubscribe = true } = {}) {
+    this.transport = transport;
     this.status = 'idle';
     this.listeners = new Set();
     this.retryTimer = null;
     this.syncing = false;
-    this.syncPending = false;
+    this.syncRequested = false;
+    this.syncPromise = null;
     this.configSyncTimer = null;
     this.suppressConfigAutoSync = false;
-    this.setupConfigSubscriptions();
+    this.lastErrorNotification = '';
+    if (autoSubscribe) this.setupConfigSubscriptions();
   }
 
   /**
@@ -199,7 +133,11 @@ class SyncEngine {
    */
   setupConfigSubscriptions() {
     useConfigStore.subscribe((state, prev) => {
-      if ((state.configUpdatedAt || 0) !== (prev.configUpdatedAt || 0)) {
+      if (!prev.syncEnabled && state.syncEnabled) {
+        if (useAuthStore.getState().isLoggedIn) this.fullSync();
+        return;
+      }
+      if ((state.syncableConfigUpdatedAt || 0) !== (prev.syncableConfigUpdatedAt || 0)) {
         this.scheduleConfigSync();
       }
     });
@@ -213,14 +151,25 @@ class SyncEngine {
         this.scheduleConfigSync();
       }
     });
+    if (typeof window !== 'undefined') {
+      window.addEventListener('online', () => {
+        if (useAuthStore.getState().isLoggedIn && useConfigStore.getState().syncEnabled) {
+          this.fullSync();
+        }
+      });
+    }
   }
 
   /**
    * 节流触发配置同步，避免短时间内多个 store 连续变更造成重复请求。
    */
   scheduleConfigSync() {
-    if (this.suppressConfigAutoSync || this.syncing) return;
+    if (this.suppressConfigAutoSync) return;
     if (!useAuthStore.getState().isLoggedIn || !useConfigStore.getState().syncEnabled) return;
+    if (this.syncing) {
+      this.syncRequested = true;
+      return;
+    }
     if (this.configSyncTimer) clearTimeout(this.configSyncTimer);
     this.configSyncTimer = setTimeout(() => {
       this.configSyncTimer = null;
@@ -241,7 +190,7 @@ class SyncEngine {
   applyRemoteConfig(remoteConfig = {}) {
     this.suppressConfigAutoSync = true;
     try {
-      applySettingsSnapshot(remoteConfig);
+      applySettingsSnapshot(remoteConfig, { includeDeviceLocal: false });
     } finally {
       this.suppressConfigAutoSync = false;
     }
@@ -271,17 +220,17 @@ class SyncEngine {
   /**
    * 按 store 中记录的下次重试时间安排一次完整同步。
    */
-  scheduleRetry() {
+  scheduleRetry(overrideAt = null) {
     if (this.retryTimer) {
       clearTimeout(this.retryTimer);
       this.retryTimer = null;
     }
-    const nextAt = useSyncStore.getState().getNextRetryAt();
+    const nextAt = overrideAt || useSyncStore.getState().getNextRetryAt();
     if (!nextAt) return;
-    const delay = Math.max(0, nextAt - Date.now());
+    const delay = Math.min(2_147_483_647, Math.max(0, nextAt - Date.now()));
     this.retryTimer = setTimeout(() => {
       this.retryTimer = null;
-      if (useAuthStore.getState().isLoggedIn) {
+      if (useAuthStore.getState().isLoggedIn && useConfigStore.getState().syncEnabled) {
         this.fullSync();
       }
     }, delay);
@@ -294,45 +243,129 @@ class SyncEngine {
    * @returns {boolean} 是否进入重试流程
    */
   shouldRetry(kind) {
-    return ['offline', 'server_unreachable', 'server_error', 'error'].includes(kind);
+    return isRetryableSyncError(kind);
   }
 
   /**
-   * 在账号切换后的首次同步前，清理当前用户作用域下的云端镜像状态。
+   * 等待持久状态恢复，并把崩溃遗留的 processing lease 重新放回 outbox。
+   *
+   * 旧实现会在这里删除映射、正文镜像和待推队列；启动准备现在严格保持
+   * 非破坏性，任何协议/本地 schema 升级都不得以清空用户数据完成。
    */
   async ensureLocalReset() {
+    await waitForSyncStoreHydration();
     const syncStore = useSyncStore.getState();
-    if (syncStore.isLocalResetDone()) return;
-    // 切换账号后只清理当前作用域的云同步镜像，不碰其他本地 UI 状态，
-    // 避免跨账号残留的云文档/队列污染新会话。
-    useExternalDocsStore.getState().resetCurrentUser();
-    useFileStore.getState().removeCloudBookmarks();
-    useFileIdStore.getState().resetCurrentUser();
-    syncStore.resetDocumentsAndQueue();
-    syncStore.markLocalResetDone();
+    syncStore.recoverInterruptedMutations();
+    if (!syncStore.isLocalResetDone()) syncStore.markLocalResetDone();
+    await waitForSyncStatePersistence();
   }
 
   /**
-   * 确保远端同步协议版本可用；必要时触发服务端重置并重建配置镜像。
+   * 只读获取远端配置。服务能力由 `/changes` 响应形状协商，配置里的
+   * protocolVersion 只作为历史元数据，不再触发任何远端 reset。
    */
   async ensureRemoteProtocol() {
-    const { data: remoteConfig = {} } = await apiClient.get('/sync/config');
-    if ((remoteConfig.protocolVersion || 1) >= SYNC_PROTOCOL_VERSION) {
-      return remoteConfig;
+    return this.transport.getConfig();
+  }
+
+  assertActiveScope(expectedScope) {
+    if (
+      expectedScope
+      && (!useAuthStore.getState().isLoggedIn || getCurrentUserScopeId() !== expectedScope)
+    ) {
+      const error = new Error('The sync account changed while a request was in flight');
+      error.code = 'SYNC_SESSION_CHANGED';
+      throw error;
     }
-    try {
-      await apiClient.post('/sync/reset');
-    } catch (err) {
-      if (err?.response?.status === 404) {
-        const upgradeError = new Error('Sync server is outdated. Deploy the new server or update the server URL.');
-        upgradeError.code = 'SYNC_SERVER_OUTDATED';
-        throw upgradeError;
+  }
+
+  /**
+   * Low-frequency reconciliation repairs edits that happened while sync was paused,
+   * before the autosave outbox write, or in a previous crashed process.
+   */
+  async reconcileLocalBookmarks(expectedScope = getCurrentUserScopeId()) {
+    const syncStore = useSyncStore.getState();
+    const linkedPaths = syncStore.listReplicas()
+      .filter((replica) => replica.linkState === 'linked' && replica.localPath)
+      .map((replica) => replica.localPath);
+    // One-way compatibility bridge for pre-v5 state. Once a legacy bookmark is
+    // converted into a replica, all future reconciliation is replica-driven.
+    const legacyPaths = getScopedBookmarkedPaths(
+      useFileStore.getState().bookmarkedPaths,
+      expectedScope,
+    ).filter((path) => !isCloudPath(path) && !syncStore.findReplicaByPath(path));
+    const paths = [...new Set([...linkedPaths, ...legacyPaths])];
+
+    for (const filePath of paths) {
+      this.assertActiveScope(expectedScope);
+      let result;
+      try {
+        result = await readFileContent(filePath);
+      } catch {
+        continue;
       }
-      throw err;
+      if (!result || result.success === false || typeof result.content !== 'string') continue;
+
+      const fileId = this.registerLocalDocument(filePath, {
+        name: result.file_name || basename(filePath),
+        encoding: result.encoding || 'UTF-8',
+        lineEnding: result.line_ending || 'LF',
+        source: 'reconcile',
+      });
+      if (!fileId) continue;
+
+      const checksum = await sha256Text(result.content);
+      const syncStore = useSyncStore.getState();
+      const doc = syncStore.getDoc(fileId);
+      const pendingChecksum = syncStore.getPendingUpsertPayload(fileId)?.checksum || '';
+      if (
+        pendingChecksum === checksum
+        || (
+          !pendingChecksum
+          && doc?.localChecksum === checksum
+          && doc?.serverChecksum === checksum
+        )
+      ) {
+        continue;
+      }
+      await this.queueLocalUpsert(filePath, result.content, result.encoding || 'UTF-8', {
+        name: result.file_name || basename(filePath),
+        lineEnding: result.line_ending || 'LF',
+        source: 'reconcile',
+        forceTracking: legacyPaths.includes(filePath),
+        linkReplica: legacyPaths.includes(filePath),
+        deferSync: true,
+      });
     }
-    useSyncStore.getState().resetDocumentsAndQueue();
-    await apiClient.put('/sync/config', buildConfigPayload());
-    return { protocolVersion: SYNC_PROTOCOL_VERSION };
+
+    const externalDocs = Object.values(getScopedExternalDocsMap(
+      useExternalDocsStore.getState().docs,
+      expectedScope,
+    ));
+    for (const externalDoc of externalDocs) {
+      this.assertActiveScope(expectedScope);
+      if (!externalDoc?.fileId || typeof externalDoc.content !== 'string') continue;
+      const checksum = await sha256Text(externalDoc.content);
+      this.assertActiveScope(expectedScope);
+      const syncStore = useSyncStore.getState();
+      const doc = syncStore.getDoc(externalDoc.fileId);
+      const pendingChecksum = syncStore.getPendingUpsertPayload(externalDoc.fileId)?.checksum || '';
+      if (
+        pendingChecksum === checksum
+        || (!pendingChecksum && doc?.serverChecksum === checksum)
+      ) continue;
+      await this.queueExternalUpsert(
+        externalDoc.fileId,
+        externalDoc.content,
+        externalDoc.encoding || 'UTF-8',
+        {
+          name: externalDoc.name,
+          lineEnding: externalDoc.lineEnding || 'LF',
+          source: 'reconcile',
+          deferSync: true,
+        },
+      );
+    }
   }
 
   /**
@@ -341,28 +374,72 @@ class SyncEngine {
   registerLocalDocument(filePath, meta = {}) {
     if (!filePath || isCloudPath(filePath)) return null;
     const fileIdStore = useFileIdStore.getState();
+    const syncStore = useSyncStore.getState();
     const existingFileId = fileIdStore.idOf(filePath);
-    const isBookmarked = useFileStore.getState().isBookmarked(filePath);
-
-    // 只有“已收藏”或调用方显式提供了 `fileId` 时，才会为本地路径建立云身份。
+    // A local path receives a cloud identity only through an explicit link
+    // action or an existing durable mapping. Merely opening a file is inert.
     let fileId = meta.fileId || existingFileId;
-    if (!fileId && isBookmarked) {
+    if (!fileId && meta.linkReplica) {
       fileId = fileIdStore.getOrCreate(filePath);
     }
 
     if (!fileId) return null;
 
+    const existingDoc = syncStore.getDoc(fileId);
+    const existingReplica = syncStore.getReplica(fileId);
     fileIdStore.bind(filePath, fileId);
-    useSyncStore.getState().bindLocalPath(fileId, filePath, {
+    const syncPatch = {
       name: meta.name || basename(filePath),
       ext: meta.ext || extOf(meta.name || filePath),
       encoding: meta.encoding || 'UTF-8',
       lineEnding: meta.lineEnding || 'LF',
       source: meta.source || 'local',
-      status: meta.status || 'idle',
       deleted: false,
-    });
+      // Opening or saving a server-bound file must not silently stop tracking
+      // it merely because bookmark UI state is temporarily absent.
+      enrolled: meta.enrolled
+        ?? (existingReplica
+          ? existingReplica.linkState === 'linked'
+          : existingDoc?.enrolled ?? false),
+    };
+    if (meta.status) syncPatch.status = meta.status;
+    syncStore.bindLocalPath(fileId, filePath, syncPatch);
     return fileId;
+  }
+
+  /**
+   * Stop following a local path without deleting its cloud copy. The stable
+   * fileId is retained so an explicit re-enrollment can safely reuse history.
+   */
+  async stopTrackingLocal(filePath) {
+    if (!filePath || isCloudPath(filePath)) return { ok: false };
+    const expectedScope = getCurrentUserScopeId();
+    await waitForSyncStoreHydration();
+    this.assertActiveScope(expectedScope);
+    const fileId = useFileIdStore.getState().idOf(filePath);
+    if (!fileId) return { ok: true, skipped: 'not-enrolled' };
+    const syncStore = useSyncStore.getState();
+    if (syncStore.listConflicts().some((item) => item.fileId === fileId)) {
+      return { ok: false, reason: 'resolve-conflict-first' };
+    }
+    syncStore.cancelQueuedMutationsForFile(fileId);
+    const replica = syncStore.getReplica(fileId);
+    syncStore.upsertDocumentAndReplica(
+      fileId,
+      {
+        enrolled: false,
+        status: syncStore.hasPendingMutation(fileId) ? 'pending_push' : 'stopped',
+      },
+      {
+        ...replica,
+        localPath: replica?.localPath || filePath,
+        linkState: 'unlinked',
+        stoppedAt: Date.now(),
+      },
+    );
+    await waitForSyncStatePersistence();
+    this.assertActiveScope(expectedScope);
+    return { ok: true, fileId };
   }
 
   /**
@@ -380,13 +457,26 @@ class SyncEngine {
       });
       return { ok: false, reason: 'missing-content' };
     }
+    if (!useAuthStore.getState().isLoggedIn) {
+      return { ok: true, skipped: 'auth-required' };
+    }
+    const expectedScope = getCurrentUserScopeId();
+    await waitForSyncStoreHydration();
+    this.assertActiveScope(expectedScope);
 
+    const syncStore = useSyncStore.getState();
     const existingFileId = useFileIdStore.getState().idOf(filePath);
-    const isBookmarked = useFileStore.getState().isBookmarked(filePath);
+    const existingReplica = existingFileId ? syncStore.getReplica(existingFileId) : null;
+    const isLinked = existingReplica?.linkState === 'linked';
+    const explicitlyTracked = options.forceTracking
+      || ['bookmark-add', 'claim', 'conflict', 'manual'].includes(options.source);
 
-    // 本地文件只有在“已收藏”或“已经绑定过云端 fileId”时才进入云同步。
-    if (!existingFileId && !isBookmarked) {
-      return { ok: true, skipped: 'not-bookmarked-and-not-cloud' };
+    // fileId 只表示稳定身份；收藏/enrollment 才表示用户仍希望持续同步。
+    if (!isLinked && !explicitlyTracked) {
+      return { ok: true, skipped: 'not-enrolled' };
+    }
+    if (existingFileId && syncStore.hasPendingDelete(existingFileId)) {
+      return { ok: false, reason: 'deletion-pending' };
     }
 
     const fileId = this.registerLocalDocument(filePath, {
@@ -394,61 +484,116 @@ class SyncEngine {
       encoding,
       lineEnding: options.lineEnding || 'LF',
       source: options.source || 'local',
+      linkReplica: options.linkReplica || explicitlyTracked,
+      enrolled: options.linkReplica || explicitlyTracked || isLinked,
     });
 
     if (!fileId) {
       return { ok: true, skipped: 'not-bookmarked' };
     }
 
-    if (!useConfigStore.getState().syncEnabled) {
-      return { ok: true, fileId, skipped: 'sync-disabled' };
-    }
-    const body = await encodeBody(content);
-    if (body.compressedBytes > MAX_REQUEST_BYTES) {
+    const doc = syncStore.getDoc(fileId);
+    const fileName = options.name || basename(filePath);
+    const lineEnding = options.lineEnding || doc?.lineEnding || 'LF';
+    const body = options.preparedBody || await encodeSyncBody(content);
+    this.assertActiveScope(expectedScope);
+    const payload = {
+      fileName,
+      originalPath: filePath,
+      source: options.source || 'local',
+      content: body.content,
+      compressed: body.compressed,
+      size: body.size,
+      encoding,
+      lineEnding,
+      checksum: body.checksum,
+      deviceId: useDeviceStore.getState().getId(),
+      devicePath: filePath,
+    };
+    if (isSyncBodyTooLarge(body, payload)) {
+      useSyncStore.getState().upsertDoc(fileId, {
+        localChecksum: body.checksum,
+        status: 'error',
+        lastError: 'Document exceeds the sync request limit',
+      });
+      useSyncStore.getState().setLastSyncError({
+        kind: 'payload_too_large',
+        message: 'Document exceeds the sync request limit',
+        fileId,
+      });
+      await waitForSyncStatePersistence();
+      this.assertActiveScope(expectedScope);
       return {
         ok: false,
         reason: 'too-large',
         size: body.size,
-        compressed: body.compressedBytes,
+        compressed: body.wireBytes,
       };
     }
-    const doc = useSyncStore.getState().getDoc(fileId);
-    useSyncStore.getState().upsertDoc(fileId, {
-      name: options.name || doc?.name || basename(filePath),
-      ext: doc?.ext || extOf(options.name || basename(filePath)),
+    if (syncStore.hasPendingDelete(fileId)) {
+      return { ok: false, reason: 'deletion-pending' };
+    }
+    const docPatch = {
+      name: fileName || doc?.name || basename(filePath),
+      ext: doc?.ext || extOf(fileName),
       localPath: filePath,
       encoding,
-      lineEnding: options.lineEnding || doc?.lineEnding || 'LF',
-      checksum: body.checksum,
+      lineEnding,
+      localChecksum: body.checksum,
       deleted: false,
       status: 'pending_push',
       lastError: null,
-    });
+      enrolled: true,
+    };
+    if (!options.resolveConflict && syncStore.updateConflictLocal(fileId, content, docPatch)) {
+      await waitForSyncStatePersistence();
+      this.assertActiveScope(expectedScope);
+      return { ok: true, fileId, queued: false, conflict: true };
+    }
     // 同一文件在队列中只保留一条去重后的 upsert，后续编辑会覆盖旧载荷，
     // 从而确保真正出队的始终是最新内容快照。
-    useSyncStore.getState().enqueueMutation({
+    const enqueue = options.resolveConflict
+      ? syncStore.replaceConflictWithMutation
+      : syncStore.enqueueMutation;
+    const mutationId = enqueue({
       fileId,
       type: 'upsert',
       baseRev: doc?.lastKnownServerRev || doc?.rev || 0,
       dedupeKey: 'upsert',
-      payload: {
-        fileName: options.name || basename(filePath),
-        originalPath: filePath,
-        source: options.source || 'local',
-        content: body.content,
-        compressed: body.compressed,
-        size: body.size,
-        encoding,
-        lineEnding: options.lineEnding || doc?.lineEnding || 'LF',
-        checksum: body.checksum,
-        deviceId: useDeviceStore.getState().getId(),
-        devicePath: filePath,
+      payload,
+      docPatch,
+      replicaPatch: {
+        deviceId: payload.deviceId,
+        localPath: filePath,
+        linkState: 'linked',
+        baseRev: Number(doc?.lastKnownServerRev || doc?.rev || 0),
+        baseChecksum: doc?.serverChecksum || '',
+        localChecksum: body.checksum,
       },
     });
-    if (useAuthStore.getState().isLoggedIn && useConfigStore.getState().syncEnabled) {
+    if (!mutationId) {
+      if (syncStore.hasPendingDelete(fileId)) {
+        return { ok: false, reason: 'deletion-pending' };
+      }
+      return options.resolveConflict
+        ? { ok: false, reason: 'conflict-state-changed' }
+        : { ok: true, fileId, queued: false, conflict: true };
+    }
+    // The durable outbox must reach storage before a request can leave the process.
+    await waitForSyncStatePersistence();
+    this.assertActiveScope(expectedScope);
+    if (
+      !options.deferSync
+      && useConfigStore.getState().syncEnabled
+    ) {
       this.fullSync();
     }
-    return { ok: true, fileId };
+    return {
+      ok: true,
+      fileId,
+      queued: true,
+      paused: !useConfigStore.getState().syncEnabled,
+    };
   }
 
   /**
@@ -461,42 +606,88 @@ class SyncEngine {
     if (typeof content !== 'string') {
       return { ok: false, reason: 'missing-content' };
     }
+    if (!useAuthStore.getState().isLoggedIn) {
+      return { ok: false, reason: 'auth-required' };
+    }
+    const expectedScope = getCurrentUserScopeId();
+    await waitForSyncStoreHydration();
+    this.assertActiveScope(expectedScope);
 
     const syncStore = useSyncStore.getState();
     const externalStore = useExternalDocsStore.getState();
     const doc = syncStore.getDoc(fileId);
     const externalDoc = externalStore.get(fileId);
-
-    if (!useConfigStore.getState().syncEnabled) {
-      return { ok: true, fileId, skipped: 'sync-disabled' };
-    }
-
-    const body = await encodeBody(content);
-    if (body.compressedBytes > MAX_REQUEST_BYTES) {
-      return {
-        ok: false,
-        reason: 'too-large',
-        size: body.size,
-        compressed: body.compressedBytes,
-      };
+    if (syncStore.hasPendingDelete(fileId)) {
+      return { ok: false, reason: 'deletion-pending' };
     }
 
     const fileName = options.name || doc?.name || externalDoc?.name || fileId;
     const ext = doc?.ext || externalDoc?.ext || extOf(fileName);
     const lineEnding = options.lineEnding || doc?.lineEnding || externalDoc?.lineEnding || 'LF';
     const originalPath = externalDoc?.originalPath || doc?.localPath || '';
+    const body = options.preparedBody || await encodeSyncBody(content);
+    this.assertActiveScope(expectedScope);
+    const payload = {
+      fileName,
+      originalPath,
+      source: options.source || 'external',
+      content: body.content,
+      compressed: body.compressed,
+      size: body.size,
+      encoding,
+      lineEnding,
+      checksum: body.checksum,
+      deviceId: useDeviceStore.getState().getId(),
+      devicePath: '',
+    };
+    if (isSyncBodyTooLarge(body, payload)) {
+      externalStore.put(fileId, {
+        name: fileName,
+        ext,
+        encoding,
+        lineEnding,
+        originalPath,
+        content,
+        checksum: body.checksum,
+        rev: doc?.rev || externalDoc?.rev || 0,
+      });
+      syncStore.upsertDoc(fileId, {
+        name: fileName,
+        ext,
+        localPath: '',
+        encoding,
+        lineEnding,
+        localChecksum: body.checksum,
+        status: 'error',
+        lastError: 'Document exceeds the sync request limit',
+      });
+      syncStore.setLastSyncError({
+        kind: 'payload_too_large',
+        message: 'Document exceeds the sync request limit',
+        fileId,
+      });
+      await waitForSyncStatePersistence();
+      this.assertActiveScope(expectedScope);
+      return {
+        ok: false,
+        reason: 'too-large',
+        size: body.size,
+        compressed: body.wireBytes,
+      };
+    }
 
-    syncStore.upsertDoc(fileId, {
+    const docPatch = {
       name: fileName,
       ext,
       localPath: '',
       encoding,
       lineEnding,
-      checksum: body.checksum,
+      localChecksum: body.checksum,
       deleted: false,
       status: 'pending_push',
       lastError: null,
-    });
+      enrolled: true,
+    };
     externalStore.put(fileId, {
       name: fileName,
       ext,
@@ -507,29 +698,41 @@ class SyncEngine {
       checksum: body.checksum,
       rev: doc?.rev || externalDoc?.rev || 0,
     });
-    syncStore.enqueueMutation({
+    if (!options.resolveConflict && syncStore.updateConflictLocal(fileId, content, docPatch)) {
+      await waitForSyncStatePersistence();
+      this.assertActiveScope(expectedScope);
+      return { ok: true, fileId, queued: false, conflict: true };
+    }
+    const enqueue = options.resolveConflict
+      ? syncStore.replaceConflictWithMutation
+      : syncStore.enqueueMutation;
+    const mutationId = enqueue({
       fileId,
       type: 'upsert',
       baseRev: doc?.lastKnownServerRev || doc?.rev || externalDoc?.rev || 0,
       dedupeKey: 'upsert',
-      payload: {
-        fileName,
-        originalPath,
-        source: options.source || 'external',
-        content: body.content,
-        compressed: body.compressed,
-        size: body.size,
-        encoding,
-        lineEnding,
-        checksum: body.checksum,
-        deviceId: useDeviceStore.getState().getId(),
-        devicePath: '',
-      },
+      payload,
+      docPatch,
     });
-    if (useAuthStore.getState().isLoggedIn && useConfigStore.getState().syncEnabled) {
+    if (!mutationId) {
+      if (syncStore.hasPendingDelete(fileId)) {
+        return { ok: false, reason: 'deletion-pending' };
+      }
+      return options.resolveConflict
+        ? { ok: false, reason: 'conflict-state-changed' }
+        : { ok: true, fileId, queued: false, conflict: true };
+    }
+    await waitForSyncStatePersistence();
+    this.assertActiveScope(expectedScope);
+    if (!options.deferSync && useConfigStore.getState().syncEnabled) {
       this.fullSync();
     }
-    return { ok: true, fileId };
+    return {
+      ok: true,
+      fileId,
+      queued: true,
+      paused: !useConfigStore.getState().syncEnabled,
+    };
   }
 
   /**
@@ -539,24 +742,44 @@ class SyncEngine {
    */
   async bindLocalPath(fileId, localPath, meta = {}) {
     if (!fileId || !localPath) return;
+    const expectedScope = getCurrentUserScopeId();
+    await waitForSyncStoreHydration();
+    this.assertActiveScope(expectedScope);
     useFileIdStore.getState().bind(localPath, fileId);
-    useSyncStore.getState().bindLocalPath(fileId, localPath, {
+    const syncStore = useSyncStore.getState();
+    const docPatch = {
+      localPath,
       name: meta.name || basename(localPath),
       ext: meta.ext || extOf(meta.name || localPath),
       encoding: meta.encoding || 'UTF-8',
       lineEnding: meta.lineEnding || 'LF',
       deleted: false,
-    });
-    useSyncStore.getState().enqueueMutation({
+      enrolled: true,
+    };
+    const mutationId = syncStore.enqueueMutation({
       fileId,
       type: 'bind_path',
-      baseRev: useSyncStore.getState().getDoc(fileId)?.lastKnownServerRev || 0,
+      baseRev: syncStore.getDoc(fileId)?.lastKnownServerRev || 0,
       dedupeKey: 'bind_path',
       payload: {
         deviceId: useDeviceStore.getState().getId(),
         devicePath: localPath,
       },
+      docPatch,
+      replicaPatch: {
+        deviceId: useDeviceStore.getState().getId(),
+        localPath,
+        linkState: 'linked',
+        baseRev: syncStore.getDoc(fileId)?.lastKnownServerRev || 0,
+        baseChecksum: syncStore.getDoc(fileId)?.serverChecksum || '',
+        localChecksum: syncStore.getDoc(fileId)?.localChecksum || '',
+      },
     });
+    if (!mutationId && !syncStore.hasPendingDelete(fileId)) {
+      syncStore.upsertDoc(fileId, docPatch);
+    }
+    await waitForSyncStatePersistence();
+    this.assertActiveScope(expectedScope);
   }
 
   /**
@@ -572,13 +795,17 @@ class SyncEngine {
     useFileIdStore.getState().movePath(oldPath, newPath);
     useFileStore.getState().replaceBookmarkPath(oldPath, newPath);
     useFileStore.getState().replaceRecentFilePath(oldPath, newPath, name);
-    useSyncStore.getState().moveLocalPath(oldPath, newPath, {
+    const syncStore = useSyncStore.getState();
+    syncStore.moveLocalPath(oldPath, newPath, {
       name: name || basename(newPath),
       ext: extOf(name || basename(newPath)),
     });
-    const doc = useSyncStore.getState().findDocByPath(newPath);
-    if (doc) {
-      await this.bindLocalPath(doc.fileId, newPath, {
+    const replica = syncStore.findReplicaByPath(oldPath) || syncStore.findReplicaByPath(newPath);
+    const doc = syncStore.findDocByPath(newPath);
+    const fileId = replica?.fileId || doc?.fileId;
+    if (fileId && replica?.linkState === 'linked') {
+      syncStore.upsertReplica(fileId, { ...replica, localPath: newPath });
+      await this.bindLocalPath(fileId, newPath, {
         name: name || basename(newPath),
         ext: extOf(name || basename(newPath)),
       });
@@ -591,7 +818,7 @@ class SyncEngine {
   /**
    * 构造统一格式的冲突对象，供冲突面板直接消费。
    */
-  buildConflict(fileId, remoteDoc, remoteContent, localContentOverride) {
+  buildConflict(fileId, remoteDoc, remoteContent, localContentOverride, meta = {}) {
     const doc = useSyncStore.getState().getDoc(fileId);
     return {
       fileId,
@@ -602,6 +829,7 @@ class SyncEngine {
         : getLocalConflictContent(doc?.localPath, fileId),
       remoteContent,
       remoteDoc,
+      ...meta,
     };
   }
 
@@ -636,7 +864,20 @@ class SyncEngine {
     }
 
     const remote = remoteContent || '';
-    const doc = useSyncStore.getState().getDoc(fileId);
+    const syncStore = useSyncStore.getState();
+    const doc = syncStore.getDoc(fileId);
+    const pendingDelete = syncStore.listQueue().some((item) =>
+      item.fileId === fileId
+      && item.type === 'delete'
+      && ['staged', 'pending', 'processing', 'blocked'].includes(item.status)
+    );
+    if (pendingDelete) {
+      return {
+        shouldConflict: remote !== '',
+        localDeleted: true,
+        localState: { ...localState, content: '' },
+      };
+    }
 
     // 本地“权威内容”优先取同步队列里待推送的内容；否则取编辑器里打开的实时内容
     // （getOpenLocalState 已合并 editorBuffer）。自动保存会在推送后立刻清掉 modified
@@ -644,7 +885,7 @@ class SyncEngine {
     const pendingPayload = useSyncStore.getState().getPendingUpsertPayload?.(fileId);
     let pendingContent;
     try {
-      pendingContent = pendingPayload ? decodeBody(pendingPayload) : undefined;
+      pendingContent = pendingPayload ? decodeSyncBody(pendingPayload) : undefined;
     } catch {
       pendingContent = undefined;
     }
@@ -670,17 +911,25 @@ class SyncEngine {
     // 校验和与服务端上次记录一致，说明本地只是落后于远端（别的设备做了合法的后续
     // 修改），直接接受远端即可，不应误报冲突；只有当本地已自行改动、且与远端不同，
     // 才是真正需要用户裁决的冲突。
-    const lastServerChecksum = doc?.checksum || '';
+    const lastServerChecksum = doc?.serverChecksum || doc?.checksum || '';
     if (lastServerChecksum) {
-      const localChecksum = await sha256(localContent);
+      const localChecksum = await sha256Text(localContent);
       if (localChecksum === lastServerChecksum) {
         return { shouldConflict: false, localState: { ...localState, content: localContent } };
       }
       return { shouldConflict: true, localState: { ...localState, content: localContent } };
     }
 
-    // 缺少可比对的服务端基线校验和时，退回到“标签已被修改”作为兜底，避免在
-    // 信息不足时把正常拉取误判为冲突。
+    // 存在 durable outbox 却缺少可信服务端基线时必须保守地保留本地版本。
+    // 旧 v3 状态曾把本地 hash 写进 checksum，迁移后这种情况会刻意清空基线。
+    if (pendingPayload) {
+      return {
+        shouldConflict: true,
+        localState: { ...localState, content: localContent },
+      };
+    }
+
+    // 没有 outbox 时退回到打开标签的 modified 标记。
     return {
       shouldConflict: !!localState.modified,
       localState: { ...localState, content: localContent },
@@ -690,136 +939,234 @@ class SyncEngine {
   /**
    * 将远端文档应用到本地路径或 external 缓存区。
    */
-  async applyRemoteDoc(doc, { force = false } = {}) {
+  async applyRemoteDoc(doc, { force = false, expectedScope } = {}) {
     if (!doc?.fileId) return null;
+    this.assertActiveScope(expectedScope);
     const deviceId = useDeviceStore.getState().getId();
-    const myPath = doc.deviceBindings?.[deviceId] || '';
     const syncStore = useSyncStore.getState();
     const editorStore = useEditorStore.getState();
     const existing = syncStore.getDoc(doc.fileId);
+    const replica = syncStore.getReplica(doc.fileId);
+    const serverPath = doc.deviceBindings?.[deviceId] || doc.devicePaths?.[deviceId] || '';
+    // A locally newer bind/rename is authoritative until its outbox item is
+    // acknowledged. A stopped enrollment deliberately ignores stale server paths.
+    const myPath = replica?.linkState === 'linked'
+      ? replica.localPath || existing?.localPath || serverPath
+      : '';
 
     if (doc.deleted) {
       // 远端删除到达时，要先确认本地是否仍有未保存修改；若有，则升级为冲突，
       // 而不是直接把本地草稿视为“接受删除”。
       const deleteDecision = await this.getRemoteConflictDecision(doc.fileId, '', myPath, { force });
-      if (syncStore.hasPendingMutation(doc.fileId) && deleteDecision.shouldConflict) {
-        syncStore.markDeleted(doc.fileId, {
-          rev: doc.rev || 0,
-          lastKnownServerRev: doc.rev || 0,
-          status: 'conflict',
-        });
-        syncStore.addConflict(
-          this.buildConflict(doc.fileId, doc, '', deleteDecision.localState.content),
+      this.assertActiveScope(expectedScope);
+      if (deleteDecision.shouldConflict) {
+        syncStore.recordConflict(
+          doc.fileId,
+          {
+            rev: doc.rev || 0,
+            lastKnownServerRev: doc.rev || 0,
+            serverChecksum: doc.contentHash || doc.checksum || existing?.serverChecksum || '',
+            deleted: true,
+          },
+          this.buildConflict(
+            doc.fileId,
+            doc,
+            '',
+            deleteDecision.localState.content,
+            { localDeleted: deleteDecision.localDeleted },
+          ),
         );
         return { conflict: true };
       }
-      if (syncStore.hasPendingMutation(doc.fileId) && !force) {
-        syncStore.dropMutationsForFile(doc.fileId);
-      }
-      syncStore.markDeleted(doc.fileId, {
-        rev: doc.rev || 0,
-        lastKnownServerRev: doc.rev || 0,
-        status: 'deleted',
-      });
+      syncStore.cancelQueuedMutationsForFile(doc.fileId);
+      syncStore.upsertDocumentAndReplica(
+        doc.fileId,
+        {
+          rev: doc.rev || 0,
+          lastKnownServerRev: doc.rev || 0,
+          serverChecksum: doc.contentHash || doc.checksum || existing?.serverChecksum || '',
+          localChecksum: '',
+          status: 'deleted',
+          enrolled: false,
+          localPath: existing?.localPath || replica?.localPath || '',
+          deleted: true,
+        },
+        replica ? {
+          ...replica,
+          linkState: 'unlinked',
+          remoteDeleted: true,
+          baseRev: doc.rev || 0,
+          baseChecksum: doc.contentHash || doc.checksum || existing?.serverChecksum || '',
+        } : null,
+      );
+      await waitForSyncStatePersistence();
+      this.assertActiveScope(expectedScope);
       useExternalDocsStore.getState().remove(doc.fileId);
       return { deleted: true };
     }
 
-    let decoded = '';
-    try {
-      decoded = decodeBody(doc);
-    } catch (err) {
-      console.warn('[sync] failed to decode pulled doc', doc.fileId, err);
-      return { writtenPath: null, external: true, decodeFailed: true };
-    }
+    const decoded = await decodeAndVerifySyncBody(doc);
+    this.assertActiveScope(expectedScope);
 
-    if (syncStore.hasPendingMutation(doc.fileId) && !force) {
+    if (syncStore.hasPendingContentMutation(doc.fileId) && !force) {
       // 若远端版本已经追上本地队列，先比对内容是否真的分叉；只有正文不同
       // 才进入冲突流程，否则直接用新的远端状态覆盖旧队列即可。
       const pendingDecision = await this.getRemoteConflictDecision(doc.fileId, decoded, myPath, { force });
+      this.assertActiveScope(expectedScope);
       if (pendingDecision.shouldConflict) {
-        syncStore.upsertDoc(doc.fileId, {
-          name: doc.fileName || basename(doc.originalPath || '') || doc.fileId,
-          rev: doc.rev || existing?.rev || 0,
-          lastKnownServerRev: doc.rev || existing?.lastKnownServerRev || 0,
-          status: 'conflict',
-        });
-        syncStore.addConflict(
-          this.buildConflict(doc.fileId, doc, decoded, pendingDecision.localState.content),
+        syncStore.recordConflict(
+          doc.fileId,
+          {
+            name: doc.fileName || basename(doc.originalPath || '') || doc.fileId,
+            rev: doc.rev || existing?.rev || 0,
+            lastKnownServerRev: doc.rev || existing?.lastKnownServerRev || 0,
+            serverChecksum: doc.contentHash || doc.checksum || existing?.serverChecksum || '',
+          },
+          this.buildConflict(
+            doc.fileId,
+            doc,
+            decoded,
+            pendingDecision.localState.content,
+            { localDeleted: pendingDecision.localDeleted },
+          ),
         );
         return { conflict: true };
       }
-      syncStore.dropMutationsForFile(doc.fileId);
+      syncStore.dropContentMutationsForFile(doc.fileId);
     }
 
     if (myPath) {
       const openTab = editorStore.getTabByPath?.(myPath)
         || editorStore.tabs.find((tab) => tab.path === myPath);
       const localDecision = await this.getRemoteConflictDecision(doc.fileId, decoded, myPath, { force });
+      this.assertActiveScope(expectedScope);
       if (localDecision.shouldConflict) {
-        syncStore.upsertDoc(doc.fileId, {
-          localPath: myPath,
-          name: doc.fileName || basename(myPath),
-          ext: extOf(doc.fileName || basename(myPath)),
-          rev: doc.rev || 0,
-          lastKnownServerRev: doc.rev || 0,
-          checksum: doc.contentHash || doc.checksum || '',
-          status: 'conflict',
-          deleted: false,
-        });
-        syncStore.addConflict(
+        syncStore.recordConflict(
+          doc.fileId,
+          {
+            localPath: myPath,
+            name: doc.fileName || basename(myPath),
+            ext: extOf(doc.fileName || basename(myPath)),
+            rev: doc.rev || 0,
+            lastKnownServerRev: doc.rev || 0,
+            checksum: doc.contentHash || doc.checksum || '',
+            serverChecksum: doc.contentHash || doc.checksum || '',
+            deleted: false,
+          },
           this.buildConflict(
             doc.fileId,
             doc,
             decoded,
             localDecision.localState.content || openTab?.content || '',
+            { localDeleted: localDecision.localDeleted },
           ),
         );
         return { conflict: true };
       }
 
+      let savedToBoundPath = false;
       try {
         const result = await saveFile(myPath, decoded, doc.encoding || 'UTF-8');
-        if (result?.success !== false) {
-          useFileIdStore.getState().bind(myPath, doc.fileId);
-          syncStore.bindLocalPath(doc.fileId, myPath, {
+        savedToBoundPath = result?.success !== false;
+      } catch {
+        savedToBoundPath = false;
+      }
+      this.assertActiveScope(expectedScope);
+      if (savedToBoundPath) {
+        useFileIdStore.getState().bind(myPath, doc.fileId);
+        const checksum = doc.contentHash || doc.checksum || '';
+        syncStore.upsertDocumentAndReplica(
+          doc.fileId,
+          {
+            localPath: myPath,
             name: doc.fileName || basename(myPath),
             ext: extOf(doc.fileName || basename(myPath)),
             encoding: doc.encoding || 'UTF-8',
             lineEnding: doc.lineEnding || 'LF',
-            checksum: doc.contentHash || doc.checksum || '',
+            checksum,
+            serverChecksum: checksum,
+            localChecksum: checksum,
             rev: doc.rev || 0,
             lastKnownServerRev: doc.rev || 0,
             status: 'synced',
             deleted: false,
-          });
-          editorStore.replaceTabContentByPath(myPath, {
-            name: doc.fileName || basename(myPath),
-            content: decoded,
-            encoding: doc.encoding || 'UTF-8',
-            lineEnding: doc.lineEnding || 'LF',
-          });
-          useExternalDocsStore.getState().remove(doc.fileId);
-          return { writtenPath: myPath, external: false };
-        }
-      } catch {
-        // 本地落盘失败时，继续退回 external 形式承载远端文档。
+            enrolled: true,
+          },
+          {
+            ...replica,
+            deviceId,
+            localPath: myPath,
+            linkState: 'linked',
+            baseRev: doc.rev || 0,
+            baseChecksum: checksum,
+            localChecksum: checksum,
+            remoteDeleted: false,
+          },
+        );
+        editorStore.replaceTabContentByPath(myPath, {
+          name: doc.fileName || basename(myPath),
+          content: decoded,
+          encoding: doc.encoding || 'UTF-8',
+          lineEnding: doc.lineEnding || 'LF',
+        });
+        useExternalDocsStore.getState().remove(doc.fileId);
+        return { writtenPath: myPath, external: false };
       }
+      if (!force) {
+        syncStore.recordConflict(
+          doc.fileId,
+          {
+            localPath: myPath,
+            name: doc.fileName || basename(myPath),
+            ext: extOf(doc.fileName || basename(myPath)),
+            rev: doc.rev || 0,
+            lastKnownServerRev: doc.rev || 0,
+            serverChecksum: doc.contentHash || doc.checksum || '',
+            deleted: false,
+          },
+          this.buildConflict(
+            doc.fileId,
+            doc,
+            decoded,
+            localDecision.localState.content || openTab?.content || '',
+            { applyError: 'local_write_failed' },
+          ),
+        );
+        return { conflict: true, applyError: 'local_write_failed' };
+      }
+      // The user explicitly chose the remote version, but the old binding is
+      // unwritable. Preserve the verified body as a cloud document and stop
+      // tracking that path so reconciliation cannot push stale disk contents.
+      syncStore.upsertDocumentAndReplica(
+        doc.fileId,
+        { enrolled: false },
+        replica ? { ...replica, linkState: 'unlinked' } : null,
+      );
+      await waitForSyncStatePersistence();
+      this.assertActiveScope(expectedScope);
     }
 
     const externalDecision = await this.getRemoteConflictDecision(doc.fileId, decoded, myPath, { force });
+    this.assertActiveScope(expectedScope);
     if (externalDecision.shouldConflict) {
-      syncStore.upsertDoc(doc.fileId, {
-        name: doc.fileName || externalDecision.localState.tab?.name || doc.fileId,
-        ext: extOf(doc.fileName || externalDecision.localState.tab?.name || ''),
-        rev: doc.rev || 0,
-        lastKnownServerRev: doc.rev || 0,
-        checksum: doc.contentHash || doc.checksum || '',
-        status: 'conflict',
-        deleted: false,
-      });
-      syncStore.addConflict(
-        this.buildConflict(doc.fileId, doc, decoded, externalDecision.localState.content || ''),
+      syncStore.recordConflict(
+        doc.fileId,
+        {
+          name: doc.fileName || externalDecision.localState.tab?.name || doc.fileId,
+          ext: extOf(doc.fileName || externalDecision.localState.tab?.name || ''),
+          rev: doc.rev || 0,
+          lastKnownServerRev: doc.rev || 0,
+          checksum: doc.contentHash || doc.checksum || '',
+          serverChecksum: doc.contentHash || doc.checksum || '',
+          deleted: false,
+        },
+        this.buildConflict(
+          doc.fileId,
+          doc,
+          decoded,
+          externalDecision.localState.content || '',
+          { localDeleted: externalDecision.localDeleted },
+        ),
       );
       return { conflict: true };
     }
@@ -831,10 +1178,13 @@ class SyncEngine {
       encoding: doc.encoding || 'UTF-8',
       lineEnding: doc.lineEnding || 'LF',
       checksum: doc.contentHash || doc.checksum || '',
+      serverChecksum: doc.contentHash || doc.checksum || '',
+      localChecksum: doc.contentHash || doc.checksum || '',
       rev: doc.rev || 0,
       lastKnownServerRev: doc.rev || 0,
       status: 'synced',
       deleted: false,
+      enrolled: false,
     });
     useExternalDocsStore.getState().put(doc.fileId, {
       name: doc.fileName || basename(doc.originalPath || '') || doc.fileId,
@@ -861,12 +1211,16 @@ class SyncEngine {
    */
   async ensureExternalDoc(fileId) {
     if (!fileId) return null;
+    const expectedScope = getCurrentUserScopeId();
+    await waitForSyncStoreHydration();
+    this.assertActiveScope(expectedScope);
     const cached = useExternalDocsStore.getState().get(fileId);
     if (cached && typeof cached.content === 'string') return cached;
     try {
-      const { data: doc } = await apiClient.get(`/sync/file/${encodeURIComponent(fileId)}`);
+      const doc = await this.transport.getFile(fileId);
+      this.assertActiveScope(expectedScope);
       if (!doc) return null;
-      await this.applyRemoteDoc(doc);
+      await this.applyRemoteDoc(doc, { expectedScope });
       return useExternalDocsStore.getState().get(fileId);
     } catch (err) {
       console.warn('[sync] ensureExternalDoc failed', fileId, err);
@@ -886,13 +1240,10 @@ class SyncEngine {
     });
     useExternalDocsStore.getState().remove(fileId);
 
-    if (!useFileStore.getState().isBookmarked(localPath)) {
-      useFileStore.getState().toggleBookmark(localPath);
-    }
-
     return this.queueLocalUpsert(localPath, content, encoding, {
       name: basename(localPath),
       source: 'claim',
+      linkReplica: true,
     });
   }
 
@@ -908,204 +1259,294 @@ class SyncEngine {
   /**
    * 处理单条同步变更队列项。
    */
-  async processMutation(item) {
+  async processMutation(item, expectedScope = item.ownerUserId) {
     const syncStore = useSyncStore.getState();
     const doc = syncStore.getDoc(item.fileId);
     try {
+      this.assertActiveScope(expectedScope);
+
       if (item.type === 'upsert') {
-        const { data } = await apiClient.put(
-          `/sync/file/${encodeURIComponent(item.fileId)}`,
-          {
-            ...item.payload,
-            baseRev: Math.max(doc?.lastKnownServerRev || 0, item.baseRev || 0),
-            mutationId: item.mutationId,
-          },
-        );
-        syncStore.upsertDoc(item.fileId, {
+        // baseRev belongs to this immutable operation. It must never be replaced
+        // with a newer remote revision merely to make a stale write succeed.
+        const data = await this.transport.putFile(item.fileId, {
+          ...item.payload,
+          baseRev: Number(item.baseRev || 0),
+          mutationId: item.mutationId,
+        });
+        this.assertActiveScope(expectedScope);
+        if (!syncStore.hasMutation(item.mutationId)) return { outcome: 'cancelled' };
+
+        const serverRev = Number(data.rev ?? doc?.rev ?? 0);
+        const serverChecksum = data.contentHash || data.checksum || item.payload.checksum;
+        if (serverChecksum && serverChecksum !== item.payload.checksum) {
+          throw new SyncIntegrityError('The server acknowledged a different document checksum', {
+            expectedChecksum: item.payload.checksum,
+            acknowledgedChecksum: serverChecksum,
+          });
+        }
+        syncStore.completeMutation(item.mutationId);
+        syncStore.rebasePendingMutations(item.fileId, serverRev);
+        const stillPending = useSyncStore.getState().hasPendingMutation(item.fileId);
+        const latestPendingPayload = useSyncStore.getState()
+          .getPendingUpsertPayload(item.fileId);
+        const currentReplica = useSyncStore.getState().getReplica(item.fileId);
+        const remainsLinked = currentReplica?.linkState === 'linked';
+        useSyncStore.getState().upsertDocumentAndReplica(item.fileId, {
           name: item.payload.fileName || doc?.name || item.fileId,
           ext: doc?.ext || extOf(item.payload.fileName || ''),
-          localPath: item.payload.devicePath || doc?.localPath || '',
+          localPath: currentReplica?.localPath || item.payload.devicePath || doc?.localPath || '',
           encoding: item.payload.encoding || doc?.encoding || 'UTF-8',
           lineEnding: item.payload.lineEnding || doc?.lineEnding || 'LF',
-          checksum: data.contentHash || data.checksum || item.payload.checksum,
-          rev: data.rev || (doc?.rev || 0),
-          lastKnownServerRev: data.rev || (doc?.lastKnownServerRev || 0),
-          status: 'synced',
+          checksum: serverChecksum,
+          serverChecksum,
+          localChecksum: latestPendingPayload?.checksum || item.payload.checksum,
+          rev: serverRev,
+          lastKnownServerRev: serverRev,
+          status: stillPending ? 'pending_push' : 'synced',
           deleted: false,
+          enrolled: remainsLinked,
           lastError: null,
-        });
-        if (!(item.payload.devicePath || doc?.localPath)) {
+        }, currentReplica ? {
+          ...currentReplica,
+          baseRev: serverRev,
+          baseChecksum: serverChecksum,
+          localChecksum: latestPendingPayload?.checksum || item.payload.checksum,
+          remoteDeleted: false,
+        } : null);
+        if (!stillPending && !(item.payload.devicePath || doc?.localPath)) {
           useExternalDocsStore.getState().put(item.fileId, {
             name: item.payload.fileName || doc?.name || item.fileId,
             ext: doc?.ext || extOf(item.payload.fileName || ''),
             encoding: item.payload.encoding || doc?.encoding || 'UTF-8',
             lineEnding: item.payload.lineEnding || doc?.lineEnding || 'LF',
             originalPath: item.payload.originalPath || '',
-            content: decodeBody(item.payload),
-            checksum: data.contentHash || data.checksum || item.payload.checksum,
-            rev: data.rev || (doc?.rev || 0),
+            content: decodeSyncBody(item.payload),
+            checksum: serverChecksum,
+            rev: serverRev,
           });
         }
-        syncStore.completeMutation(item.mutationId);
-        return true;
+        return { outcome: 'success' };
       }
 
       if (item.type === 'bind_path') {
-        const { data } = await apiClient.post(
-          `/sync/bindings/${encodeURIComponent(item.fileId)}`,
-          {
-            ...item.payload,
-            mutationId: item.mutationId,
-          },
-        );
-        syncStore.upsertDoc(item.fileId, {
-          localPath: item.payload.devicePath || doc?.localPath || '',
-          status: syncStore.hasPendingMutation(item.fileId) ? doc?.status || 'idle' : 'synced',
-          lastKnownServerRev: data?.rev || doc?.lastKnownServerRev || 0,
+        const data = await this.transport.bindPath(item.fileId, {
+          ...item.payload,
+          mutationId: item.mutationId,
         });
+        this.assertActiveScope(expectedScope);
+        if (!syncStore.hasMutation(item.mutationId)) return { outcome: 'cancelled' };
         syncStore.completeMutation(item.mutationId);
-        return true;
+        if (data) {
+          const stillPending = useSyncStore.getState().hasPendingMutation(item.fileId);
+          const currentReplica = syncStore.getReplica(item.fileId);
+          const remainsLinked = currentReplica?.linkState === 'linked';
+          syncStore.upsertDocumentAndReplica(item.fileId, {
+            localPath: currentReplica?.localPath || item.payload.devicePath || doc?.localPath || '',
+            enrolled: remainsLinked,
+            status: remainsLinked
+              ? stillPending ? doc?.status || 'idle' : 'synced'
+              : 'stopped',
+            lastKnownServerRev: Number(data.rev ?? doc?.lastKnownServerRev ?? 0),
+          }, currentReplica ? {
+            ...currentReplica,
+            baseRev: Number(data.rev ?? currentReplica.baseRev ?? 0),
+          } : null);
+        }
+        return { outcome: 'success' };
       }
 
       if (item.type === 'delete') {
-        const { data } = await apiClient.delete(
-          `/sync/file/${encodeURIComponent(item.fileId)}`,
-          {
-            data: {
-              baseRev: item.baseRev,
-              mutationId: item.mutationId,
-            },
-          },
-        );
-        syncStore.markDeleted(item.fileId, {
-          rev: data?.rev || doc?.rev || 0,
-          lastKnownServerRev: data?.rev || doc?.lastKnownServerRev || 0,
-          status: 'deleted',
+        const data = await this.transport.deleteFile(item.fileId, {
+          baseRev: Number(item.baseRev || 0),
+          mutationId: item.mutationId,
         });
-        useExternalDocsStore.getState().remove(item.fileId);
+        this.assertActiveScope(expectedScope);
+        if (!syncStore.hasMutation(item.mutationId)) return { outcome: 'cancelled' };
+        const serverRev = Number(data.rev ?? doc?.rev ?? 0);
         syncStore.completeMutation(item.mutationId);
-        return true;
+        syncStore.rebasePendingMutations(item.fileId, serverRev);
+        const stillPending = useSyncStore.getState().hasPendingMutation(item.fileId);
+        const currentReplica = useSyncStore.getState().getReplica(item.fileId);
+        useSyncStore.getState().upsertDocumentAndReplica(
+          item.fileId,
+          {
+            rev: serverRev,
+            lastKnownServerRev: serverRev,
+            localChecksum: '',
+            status: stillPending ? 'pending_push' : 'deleted',
+            enrolled: false,
+            deleted: true,
+          },
+          currentReplica ? {
+            ...currentReplica,
+            linkState: 'unlinked',
+            remoteDeleted: true,
+            baseRev: serverRev,
+          } : null,
+        );
+        useExternalDocsStore.getState().remove(item.fileId);
+        return { outcome: 'success' };
       }
+
+      const unsupported = new Error(`Unsupported sync mutation: ${item.type}`);
+      unsupported.code = 'SYNC_PROTOCOL_ERROR';
+      throw unsupported;
     } catch (err) {
+      if (getCurrentUserScopeId() !== expectedScope || !useAuthStore.getState().isLoggedIn) {
+        return { outcome: 'session_changed' };
+      }
+
       if (err?.response?.status === 409) {
         const current = err.response?.data?.current;
         let remoteDoc = current;
-        if (current?.fileId && !current.content && !current.deleted) {
-          const { data } = await apiClient.get(`/sync/file/${encodeURIComponent(current.fileId)}`);
-          remoteDoc = data || current;
+        if (current?.fileId && !current.deleted && !Object.hasOwn(current, 'content')) {
+          remoteDoc = await this.transport.getFile(current.fileId) || current;
         }
-        const remoteContent = remoteDoc?.deleted ? '' : decodeBody(remoteDoc || {});
+        this.assertActiveScope(expectedScope);
+        const remoteContent = remoteDoc?.deleted || !remoteDoc
+          ? ''
+          : await decodeAndVerifySyncBody(remoteDoc);
+        this.assertActiveScope(expectedScope);
         const localPath = item.payload?.devicePath || doc?.localPath || '';
-        // 推送被拒说明本地基于过期版本改动，而远端已被其它设备抢先更新。直接以
-        // “本次尝试推送的内容”作为本地权威内容来判断是否真的分叉，不依赖标签的
-        // modified 标记（自动保存会在排队后立刻清除它，导致漏判冲突）。
         const localState = this.getOpenLocalState(item.fileId, localPath);
+        const latestPayload = useSyncStore.getState().getPendingUpsertPayload(item.fileId);
         let queuedContent;
         try {
-          queuedContent = decodeBody(item.payload || {});
+          queuedContent = latestPayload ? decodeSyncBody(latestPayload) : undefined;
         } catch {
           queuedContent = undefined;
         }
         const localContent = typeof queuedContent === 'string' ? queuedContent : localState.content;
-        const diverged = localContent !== (remoteContent || '');
-        useSyncStore.getState().completeMutation(item.mutationId);
-        if (!diverged) {
-          if (remoteDoc) {
-            await this.applyRemoteDoc(remoteDoc, { force: true });
-          }
-          return true;
+        const diverged = localContent !== remoteContent;
+
+        if (!diverged && remoteDoc) {
+          useSyncStore.getState().dropMutationsForFile(item.fileId);
+          await this.applyRemoteDoc(remoteDoc, { force: true, expectedScope });
+          return { outcome: 'success' };
         }
-        useSyncStore.getState().upsertDoc(item.fileId, {
-          status: 'conflict',
-          rev: remoteDoc?.rev || doc?.rev || 0,
-          lastKnownServerRev: remoteDoc?.rev || doc?.lastKnownServerRev || 0,
-          deleted: !!remoteDoc?.deleted,
-        });
-        useSyncStore.getState().addConflict(
+
+        const conflictRemote = remoteDoc || {
+          fileId: item.fileId,
+          fileName: doc?.name || item.fileId,
+          deleted: true,
+          rev: 0,
+        };
+        useSyncStore.getState().recordConflict(
+          item.fileId,
+          {
+            rev: Number(conflictRemote.rev ?? doc?.rev ?? 0),
+            lastKnownServerRev: Number(conflictRemote.rev ?? doc?.lastKnownServerRev ?? 0),
+            serverChecksum: conflictRemote.contentHash || conflictRemote.checksum || '',
+            deleted: Boolean(conflictRemote.deleted),
+          },
           this.buildConflict(
             item.fileId,
-            remoteDoc || current || {},
+            conflictRemote,
             remoteContent,
             localContent,
+            { localDeleted: item.type === 'delete' },
           ),
         );
         this.setStatus('conflict');
-        return true;
+        return { outcome: 'conflict' };
       }
 
       const kind = classifyApiError(err);
+      const message = err?.response?.data?.message || err?.message || 'sync failed';
       recordDiagnostic(`sync_${kind}`).catch(() => {});
-      useSyncStore.getState().failMutation(
-        item.mutationId,
-        err?.response?.data?.message || err?.message || 'sync failed',
-      );
-      useSyncStore.getState().setLastSyncError({
+      const retryAt = getMutationRetryAt({
         kind,
-        message: err?.response?.data?.message || err?.message || 'sync failed',
+        retryCount: Number(item.retryCount || 0) + 1,
+        error: err,
       });
+      if (retryAt !== null) {
+        useSyncStore.getState().retryMutation(item.mutationId, {
+          retryAt,
+          lastError: message,
+          kind,
+        });
+      } else {
+        useSyncStore.getState().blockMutation(item.mutationId, {
+          lastError: message,
+          kind,
+        });
+      }
+      useSyncStore.getState().setLastSyncError({ kind, message, fileId: item.fileId });
       this.setStatus(kind === 'server_unreachable' ? 'server_unreachable' : kind);
-      this.scheduleRetry();
-      return false;
+      return { outcome: retryAt !== null ? 'retry' : 'blocked', kind };
     }
-    return true;
   }
 
   /**
    * 顺序消费当前所有可执行的同步队列项。
    */
-  async processQueue() {
-    const syncStore = useSyncStore.getState();
-    let item = syncStore.getReadyMutation();
-    while (item) {
-      syncStore.markMutationProcessing(item.mutationId);
-      const ok = await this.processMutation(item);
-      if (!ok) return false;
-      item = useSyncStore.getState().getReadyMutation();
+  async processQueue(expectedScope = getCurrentUserScopeId()) {
+    let blocked = false;
+    while (true) {
+      this.assertActiveScope(expectedScope);
+      if (!useConfigStore.getState().syncEnabled) return { outcome: 'paused' };
+      const item = useSyncStore.getState().claimReadyMutation();
+      if (!item) break;
+      await waitForSyncStatePersistence();
+      const result = await this.processMutation(item, expectedScope);
+      await waitForSyncStatePersistence();
+      if (result.outcome === 'retry' || result.outcome === 'session_changed') return result;
+      if (result.outcome === 'blocked' || result.outcome === 'conflict') blocked = true;
     }
-    return true;
+    return { outcome: blocked ? 'blocked' : 'success' };
   }
 
   /**
    * 拉取远端增量变更并依次应用到本地。
    */
-  async pullRemoteChanges() {
-    const syncStore = useSyncStore.getState();
-    let cursor = syncStore.getCursor();
+  async pullRemoteChanges(expectedScope = getCurrentUserScopeId()) {
+    let checkpoint = useSyncStore.getState().getCheckpoint();
     let hasMore = true;
     while (hasMore) {
-      const { data } = await apiClient.get('/sync/changes', {
-        params: { cursor: cursor || '', limit: 100 },
-      });
-      const changes = (data?.changes || []).filter((change) => change?.fileId);
+      this.assertActiveScope(expectedScope);
+      const page = await this.transport.getChanges(checkpoint);
+      this.assertActiveScope(expectedScope);
+      const changes = page.changes.filter((change) => change?.fileId);
       const pending = changes.filter((change) => {
         const localDoc = useSyncStore.getState().getDoc(change.fileId);
         return !localDoc || (localDoc.lastKnownServerRev || 0) < (change.rev || 0);
       });
-      const fetched = new Map();
       let nextIndex = 0;
-      const workers = Array.from({ length: Math.min(4, pending.length) }, async () => {
-        while (nextIndex < pending.length) {
+      let firstError = null;
+      const workers = Array.from({ length: Math.min(PULL_WORKER_COUNT, pending.length) }, async () => {
+        while (!firstError && nextIndex < pending.length) {
           const change = pending[nextIndex++];
-          if (change.deleted) {
-            fetched.set(change.fileId, change);
-            continue;
+          try {
+            const fullDoc = change.deleted
+              ? change
+              : await this.transport.getFile(change.fileId);
+            this.assertActiveScope(expectedScope);
+            if (!fullDoc) {
+              throw new SyncProtocolError('A changed document has no retrievable body', {
+                fileId: change.fileId,
+                rev: change.rev,
+              });
+            }
+            await this.applyRemoteDoc(fullDoc, { expectedScope });
+          } catch (error) {
+            firstError ||= error;
           }
-          const { data: fullDoc } = await apiClient.get(
-            `/sync/file/${encodeURIComponent(change.fileId)}`,
-          );
-          if (fullDoc) fetched.set(change.fileId, fullDoc);
         }
       });
       await Promise.all(workers);
-      for (const change of pending) {
-        const fullDoc = fetched.get(change.fileId);
-        if (fullDoc) await this.applyRemoteDoc(fullDoc);
-      }
-      cursor = data?.nextCursor || cursor || '';
-      useSyncStore.getState().setCursor(cursor);
-      hasMore = Boolean(data?.hasMore);
+      // Successful items are persisted even if a sibling fetch failed. A retry
+      // will skip their acknowledged revisions instead of replaying the page forever.
+      await waitForSyncStatePersistence();
+      if (firstError) throw firstError;
+
+      this.assertActiveScope(expectedScope);
+      useSyncStore.getState().setCheckpoint(page.checkpoint);
+      await waitForSyncStatePersistence();
+      checkpoint = page.checkpoint;
+      hasMore = page.hasMore;
     }
-    useSyncStore.getState().clearDeletedWithoutPath();
+    // Keep acknowledged tombstones locally. Their revision is the causal base
+    // required for an explicit later restore of the same stable fileId.
   }
 
   /**
@@ -1118,61 +1559,217 @@ class SyncEngine {
     });
   }
 
+  /** Link a local file to cloud sync on this device and queue its first snapshot. */
+  async linkLocalDocument(filePath, content, encoding = 'UTF-8', options = {}) {
+    return this.queueLocalUpsert(filePath, content, encoding, {
+      ...options,
+      source: options.source || 'bookmark-add',
+      forceTracking: true,
+      linkReplica: true,
+    });
+  }
+
   /**
-   * 把文档标记为待删除，并生成删除 mutation。
+   * Persist a non-runnable cloud tombstone before touching the local file.
+   * The caller must either commit it after a successful filesystem delete or
+   * abort it on failure. This closes the crash window without allowing a cloud
+   * delete to race ahead of the local operation.
    */
-  async deleteDocument(fileId) {
-    if (!fileId) return;
+  async prepareLocalDeletion(fileId) {
+    if (!fileId || !useAuthStore.getState().isLoggedIn) {
+      return { ok: false, reason: 'auth-required' };
+    }
+    const expectedScope = getCurrentUserScopeId();
+    await waitForSyncStoreHydration();
+    this.assertActiveScope(expectedScope);
     const syncStore = useSyncStore.getState();
     const doc = syncStore.getDoc(fileId);
-    syncStore.dropMutationsForFile(fileId);
-    syncStore.markDeleted(fileId, { status: 'pending_push' });
-    syncStore.enqueueMutation({
+    const replica = syncStore.getReplica(fileId);
+    if (syncStore.listConflicts().some((item) => item.fileId === fileId)) {
+      return { ok: true, conflict: true, previousDoc: doc, previousReplica: replica };
+    }
+    const mutationId = syncStore.enqueueMutation({
       fileId,
       type: 'delete',
       baseRev: doc?.lastKnownServerRev || doc?.rev || 0,
       dedupeKey: 'delete',
       payload: {},
+      status: 'staged',
+      errorKind: 'local_delete_pending',
+      docPatch: {
+        status: 'deleting_local',
+        enrolled: false,
+      },
     });
+    if (!mutationId) return { ok: false, reason: 'conflict' };
+    await waitForSyncStatePersistence();
+    this.assertActiveScope(expectedScope);
+    return { ok: true, mutationId, previousDoc: doc, previousReplica: replica };
+  }
+
+  async commitLocalDeletion(prepared) {
+    if (!prepared?.mutationId) return { ok: false, reason: 'not-staged' };
+    const expectedScope = getCurrentUserScopeId();
+    const activated = useSyncStore.getState().activateStagedMutation(
+      prepared.mutationId,
+      {
+        status: 'pending_push',
+        deleted: true,
+        enrolled: false,
+        localPath: '',
+      },
+      prepared.previousReplica ? {
+        ...prepared.previousReplica,
+        linkState: 'unlinked',
+        remoteDeleted: true,
+      } : null,
+    );
+    if (!activated) return { ok: false, reason: 'staged-delete-missing' };
+    const item = useSyncStore.getState().listQueue()
+      .find((candidate) => candidate.mutationId === prepared.mutationId);
+    if (item?.fileId) useExternalDocsStore.getState().remove(item.fileId);
+    await waitForSyncStatePersistence();
+    this.assertActiveScope(expectedScope);
+    if (useConfigStore.getState().syncEnabled) this.fullSync();
+    return { ok: true, mutationId: prepared.mutationId };
+  }
+
+  async abortLocalDeletion(prepared) {
+    if (!prepared?.mutationId) return { ok: true };
+    const expectedScope = getCurrentUserScopeId();
+    const aborted = useSyncStore.getState().abortStagedMutation(
+      prepared.mutationId,
+      prepared.previousDoc,
+      prepared.previousReplica,
+    );
+    await waitForSyncStatePersistence();
+    this.assertActiveScope(expectedScope);
+    return { ok: aborted };
+  }
+
+  /**
+   * 把文档标记为待删除，并生成删除 mutation。
+   */
+  async deleteDocument(fileId, options = {}) {
+    if (!fileId) return { ok: false };
+    if (!useAuthStore.getState().isLoggedIn) {
+      return { ok: false, reason: 'auth-required' };
+    }
+    const expectedScope = getCurrentUserScopeId();
+    await waitForSyncStoreHydration();
+    this.assertActiveScope(expectedScope);
+    const syncStore = useSyncStore.getState();
+    const doc = syncStore.getDoc(fileId);
+    if (syncStore.updateConflictLocal(
+      fileId,
+      '',
+      { deleted: true, enrolled: false, localPath: '' },
+      { localDeleted: true },
+    )) {
+      await waitForSyncStatePersistence();
+      this.assertActiveScope(expectedScope);
+      return { ok: true, conflict: true };
+    }
+    const mutationId = syncStore.enqueueMutation({
+      fileId,
+      type: 'delete',
+      baseRev: doc?.lastKnownServerRev || doc?.rev || 0,
+      dedupeKey: 'delete',
+      payload: {},
+      docPatch: {
+        status: 'pending_push',
+        deleted: true,
+        enrolled: false,
+        localPath: '',
+      },
+      replicaPatch: syncStore.getReplica(fileId) ? {
+        ...syncStore.getReplica(fileId),
+        linkState: 'unlinked',
+        remoteDeleted: true,
+      } : null,
+    });
+    if (!mutationId) return { ok: false, reason: 'conflict' };
     useExternalDocsStore.getState().remove(fileId);
-    if (useAuthStore.getState().isLoggedIn && useConfigStore.getState().syncEnabled) {
+    await waitForSyncStatePersistence();
+    this.assertActiveScope(expectedScope);
+    if (!options.deferSync && useConfigStore.getState().syncEnabled) {
       this.fullSync();
     }
+    return { ok: true, mutationId };
   }
 
   /**
    * 根据用户选择处理冲突。
    */
   async resolveConflict(fileId, resolution) {
-    const conflict = useSyncStore.getState().listConflicts().find((item) => item.fileId === fileId);
+    const expectedScope = getCurrentUserScopeId();
+    await waitForSyncStoreHydration();
+    this.assertActiveScope(expectedScope);
+    const syncStore = useSyncStore.getState();
+    const conflict = syncStore.listConflicts().find((item) => item.fileId === fileId);
     if (!conflict) return;
-    useSyncStore.getState().resolveConflict(fileId);
     if (resolution === 'remote') {
-      await this.applyRemoteDoc(conflict.remoteDoc, { force: true });
+      syncStore.dropMutationsForFile(fileId);
+      await this.applyRemoteDoc(conflict.remoteDoc, { force: true, expectedScope });
     } else if (resolution === 'local') {
-      const doc = useSyncStore.getState().getDoc(fileId);
-      const localPath = doc?.localPath || '';
-      const content = conflict.localContent || '';
-      if (localPath) {
-        await this.queueLocalUpsert(localPath, content, doc?.encoding || 'UTF-8', {
+      const doc = syncStore.getDoc(fileId);
+      const replica = syncStore.getReplica(fileId);
+      const localPath = replica?.linkState === 'linked'
+        ? replica.localPath || doc?.localPath || ''
+        : '';
+      const content = conflict.localContent ?? '';
+      let result;
+      if (conflict.localDeleted) {
+        const mutationId = syncStore.replaceConflictWithMutation({
+          fileId,
+          type: 'delete',
+          baseRev: doc?.lastKnownServerRev || doc?.rev || 0,
+          dedupeKey: 'delete',
+          payload: {},
+          docPatch: {
+            status: 'pending_push',
+            deleted: true,
+            enrolled: false,
+            localPath: '',
+          },
+        });
+        if (!mutationId) return { ok: false, reason: 'conflict-state-changed' };
+        await waitForSyncStatePersistence();
+        this.assertActiveScope(expectedScope);
+        result = { ok: true, queued: true };
+      } else if (localPath) {
+        result = await this.queueLocalUpsert(localPath, content, doc?.encoding || 'UTF-8', {
           name: doc?.name || basename(localPath),
           lineEnding: doc?.lineEnding || 'LF',
           source: 'conflict',
+          deferSync: true,
+          resolveConflict: true,
         });
       } else {
         // 纯云端文档没有本地路径，保留本地版本时需要把内容重新推回远端，
         // 否则用户选择的本地版本会在下一次同步时被远端覆盖。
-        await this.queueExternalUpsert(fileId, content, doc?.encoding || 'UTF-8', {
+        result = await this.queueExternalUpsert(fileId, content, doc?.encoding || 'UTF-8', {
           name: doc?.name || conflict.name || fileId,
           lineEnding: doc?.lineEnding || 'LF',
           source: 'conflict',
+          deferSync: true,
+          resolveConflict: true,
         });
       }
+      if (!result?.ok) return result;
+    } else {
+      return { ok: false, reason: 'invalid-resolution' };
     }
+    useSyncStore.getState().resolveConflict(fileId);
+    await waitForSyncStatePersistence();
+    this.assertActiveScope(expectedScope);
     const remainingConflicts = useSyncStore.getState().listConflicts().length;
     if (remainingConflicts === 0 && !useSyncStore.getState().listQueue().length) {
       this.setStatus('synced');
+    } else if (useConfigStore.getState().syncEnabled) {
+      this.fullSync();
     }
+    return { ok: true };
   }
 
   /**
@@ -1181,8 +1778,10 @@ class SyncEngine {
    * 根据时间戳决定拉远端还是推本地，并复用协议检查与错误分类逻辑。
    */
   async syncConfig(options = {}) {
+    const expectedScope = options.expectedScope || getCurrentUserScopeId();
     try {
-      const remoteConfig = await this.ensureRemoteProtocol();
+      const remoteConfig = options.remoteConfig || await this.transport.getConfig();
+      this.assertActiveScope(expectedScope);
       const remoteUpdatedAt = Number(remoteConfig?.updatedAt || 0);
       const localUpdatedAt = this.getLocalConfigUpdatedAt();
 
@@ -1198,7 +1797,8 @@ class SyncEngine {
 
       if (localUpdatedAt > remoteUpdatedAt || remoteUpdatedAt === 0) {
         const payload = buildConfigPayload();
-        await apiClient.put('/sync/config', payload);
+        await this.transport.putConfig(payload);
+        this.assertActiveScope(expectedScope);
         return payload;
       }
 
@@ -1215,66 +1815,160 @@ class SyncEngine {
   }
 
   /**
-   * 执行完整同步流程。
-   *
-   * 顺序为：本地准备 -> 协议检查 -> 配置对齐 -> 推送队列 -> 拉取远端 -> 再次
-   * 对齐配置。这样能最大程度保留本地最新编辑意图，并减少旧快照回写。
+   * Run one deterministic reconciliation cycle for a fixed account scope.
    */
-  async fullSync() {
-    if (!useAuthStore.getState().isLoggedIn || !useConfigStore.getState().syncEnabled) {
-      return;
+  async runSyncCycle() {
+    if (this.configSyncTimer) {
+      clearTimeout(this.configSyncTimer);
+      this.configSyncTimer = null;
     }
-    // 同步进行中时，记下“还有新变更要推”，等当前轮结束后再补跑一轮，避免在
-    // 一次 fullSync 飞行途中入队的 mutation（例如认领云端文档时的 bind/upsert）
-    // 被这条 guard 静默吞掉，造成“已落盘但没推到云”。
-    if (this.syncing) {
-      this.syncPending = true;
-      return;
-    }
-    this.syncing = true;
+    await this.ensureLocalReset();
+    const expectedScope = getCurrentUserScopeId();
+    this.assertActiveScope(expectedScope);
     this.setStatus('syncing');
+
+    let configError = null;
     try {
-      // 统一采用“先推队列，再拉远端，再对齐配置”的顺序。
-      await this.ensureLocalReset();
-      await this.ensureRemoteProtocol();
-      await this.syncConfig();
-      const queueOk = await this.processQueue();
-      if (queueOk) {
-        await this.pullRemoteChanges();
-        await this.syncConfig();
-      }
-      if (useSyncStore.getState().listConflicts().length > 0) {
-        this.setStatus('conflict');
-      } else if (useSyncStore.getState().listQueue().length > 0) {
-        this.scheduleRetry();
-        this.setStatus('idle');
-      } else {
-        useSyncStore.getState().markSyncSuccessful();
-        this.setStatus('synced');
-      }
-    } catch (err) {
-      const kind = classifyApiError(err);
-      useSyncStore.getState().setLastSyncError({
+      await this.syncConfig({ expectedScope });
+    } catch (error) {
+      if (error?.code === 'SYNC_SESSION_CHANGED') throw error;
+      configError = error;
+    }
+
+    // Rebuild the durable dirty set before accepting remote writes, then pull
+    // first so concurrent remote changes become explicit conflicts rather than
+    // avoidable 409 responses.
+    await this.reconcileLocalBookmarks(expectedScope);
+    if (!useConfigStore.getState().syncEnabled) return { outcome: 'paused' };
+    await this.pullRemoteChanges(expectedScope);
+    if (!useConfigStore.getState().syncEnabled) return { outcome: 'paused' };
+    const queueResult = await this.processQueue(expectedScope);
+    if (queueResult.outcome === 'paused') return queueResult;
+    if (queueResult.outcome !== 'retry' && queueResult.outcome !== 'session_changed') {
+      await this.pullRemoteChanges(expectedScope);
+    }
+    this.assertActiveScope(expectedScope);
+
+    const syncStore = useSyncStore.getState();
+    const conflicts = syncStore.listConflicts();
+    const queue = syncStore.listQueue();
+    const blocked = queue.some((item) => item.status === 'blocked' && item.errorKind !== 'conflict');
+    if (conflicts.length > 0) {
+      this.setStatus('conflict');
+      return { outcome: 'conflict' };
+    }
+    if (blocked || configError) {
+      const error = configError || new Error('One or more changes require manual retry');
+      const kind = configError ? classifyApiError(configError) : 'request_error';
+      syncStore.setLastSyncError({
         kind,
-        message: err?.response?.data?.message || err?.message || 'sync failed',
+        message: error?.response?.data?.message || error?.message || 'sync blocked',
       });
-      this.setStatus(kind === 'server_unreachable' ? 'server_unreachable' : kind);
-      useNotificationStore.getState().notify(
-        'error',
-        i18n.t('notification.syncFailed'),
-        err?.response?.data?.message || String(err?.message || err),
-      );
-      if (this.shouldRetry(kind)) {
-        this.scheduleRetry();
+      this.setStatus(kind);
+      if (configError && this.shouldRetry(kind)) {
+        this.runRetryCount = Number(this.runRetryCount || 0) + 1;
+        const retryAt = getMutationRetryAt({
+          kind,
+          retryCount: this.runRetryCount,
+          error: configError,
+        });
+        if (retryAt !== null) this.scheduleRetry(retryAt);
+      }
+      return { outcome: 'blocked', error, kind };
+    }
+    if (queue.length > 0) {
+      this.scheduleRetry();
+      const lastKind = syncStore.getLastSyncError()?.kind;
+      this.setStatus(lastKind || 'idle');
+      return { outcome: 'retry' };
+    }
+
+    syncStore.markSyncSuccessful();
+    await waitForSyncStatePersistence();
+    if (this.retryTimer) {
+      clearTimeout(this.retryTimer);
+      this.retryTimer = null;
+    }
+    this.setStatus('synced');
+    this.runRetryCount = 0;
+    this.lastErrorNotification = '';
+    return { outcome: 'success' };
+  }
+
+  notifySyncError(kind, error) {
+    const message = error?.response?.data?.message || String(error?.message || error);
+    const signature = `${kind}:${message}`;
+    if (signature === this.lastErrorNotification) return;
+    this.lastErrorNotification = signature;
+    useNotificationStore.getState().notify(
+      'error',
+      i18n.t('notification.syncFailed'),
+      message,
+    );
+  }
+
+  async drainSyncRequests() {
+    this.syncing = true;
+    let result = { outcome: 'skipped' };
+    try {
+      while (
+        this.syncRequested
+        && useAuthStore.getState().isLoggedIn
+        && useConfigStore.getState().syncEnabled
+      ) {
+        this.syncRequested = false;
+        try {
+          result = await this.runSyncCycle();
+          if (result.outcome === 'retry') break;
+        } catch (err) {
+          if (err?.code === 'SYNC_SESSION_CHANGED') {
+            result = { outcome: 'session_changed' };
+            break;
+          }
+          const kind = classifyApiError(err);
+          const message = err?.response?.data?.message || err?.message || 'sync failed';
+          useSyncStore.getState().setLastSyncError({ kind, message });
+          this.setStatus(kind === 'server_unreachable' ? 'server_unreachable' : kind);
+          this.notifySyncError(kind, err);
+          if (this.shouldRetry(kind)) {
+            this.runRetryCount = Number(this.runRetryCount || 0) + 1;
+            const retryAt = getMutationRetryAt({
+              kind,
+              retryCount: this.runRetryCount,
+              error: err,
+            });
+            if (retryAt !== null) this.scheduleRetry(retryAt);
+          }
+          result = { outcome: 'error', kind, error: err };
+          break;
+        }
       }
     } finally {
       this.syncing = false;
-      if (this.syncPending) {
-        this.syncPending = false;
-        // 用微任务补跑，确保上一轮的 finally 完整结束、syncing 已复位。
-        Promise.resolve().then(() => this.fullSync());
-      }
     }
+    return result;
+  }
+
+  /**
+   * Coalesce concurrent callers into one promise while guaranteeing that a
+   * request arriving mid-cycle schedules another complete reconciliation pass.
+   */
+  fullSync() {
+    if (!useAuthStore.getState().isLoggedIn || !useConfigStore.getState().syncEnabled) {
+      return Promise.resolve({ outcome: 'skipped' });
+    }
+    this.syncRequested = true;
+    if (!this.syncPromise) {
+      this.syncPromise = this.drainSyncRequests().finally(() => {
+        this.syncPromise = null;
+      });
+    }
+    return this.syncPromise;
+  }
+
+  retryNow() {
+    useSyncStore.getState().retryBlockedMutations();
+    return this.fullSync();
   }
 }
 

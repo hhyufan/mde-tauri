@@ -18,17 +18,17 @@ function sanitizeMinimap(minimap) {
  * 统一采集配置、主题与编辑器布局状态，并输出带协议版本和更新时间的结构，
  * 供导出与云同步共用。
  */
-export function getLocalSettingsSnapshot() {
+export function getLocalSettingsSnapshot({ includeDeviceLocal = false } = {}) {
   const config = useConfigStore.getState();
   const theme = useThemeStore.getState();
   const editor = useEditorStore.getState();
   const updatedAt = Math.max(
-    Number(config.configUpdatedAt || 0),
+    Number(config.syncableConfigUpdatedAt || 0),
     Number(theme.themeUpdatedAt || 0),
     Number(editor.uiStateUpdatedAt || 0),
   );
 
-  return {
+  const snapshot = {
     theme: theme.theme,
     language: config.language,
     fontSize: config.fontSize,
@@ -42,7 +42,6 @@ export function getLocalSettingsSnapshot() {
     lineNumbers: config.lineNumbers,
     minimap: sanitizeMinimap(config.minimap),
     autoSave: config.autoSave,
-    workspacePath: config.workspacePath,
     editorState: {
       sidebarVisible: editor.sidebarVisible,
       sidebarView: editor.sidebarView,
@@ -52,6 +51,8 @@ export function getLocalSettingsSnapshot() {
     protocolVersion: SYNC_PROTOCOL_VERSION,
     updatedAt,
   };
+  if (includeDeviceLocal) snapshot.workspacePath = config.workspacePath;
+  return snapshot;
 }
 
 /**
@@ -59,7 +60,7 @@ export function getLocalSettingsSnapshot() {
  *
  * 仅回放允许同步的设置字段，不触碰标签页、文件列表等纯本地运行态。
  */
-export function applySettingsSnapshot(snapshot = {}) {
+export function applySettingsSnapshot(snapshot = {}, { includeDeviceLocal = true } = {}) {
   const updatedAt = Number(snapshot.updatedAt || Date.now());
   useThemeStore.getState().setTheme(snapshot.theme || 'light', { updatedAt });
   const language = snapshot.language ?? 'en';
@@ -78,7 +79,9 @@ export function applySettingsSnapshot(snapshot = {}) {
     lineNumbers: snapshot.lineNumbers ?? true,
     minimap: sanitizeMinimap(snapshot.minimap),
     autoSave: snapshot.autoSave ?? true,
-    workspacePath: snapshot.workspacePath ?? '',
+    workspacePath: includeDeviceLocal
+      ? snapshot.workspacePath ?? useConfigStore.getState().workspacePath ?? ''
+      : useConfigStore.getState().workspacePath ?? '',
   }, { updatedAt });
   i18n.changeLanguage(language === 'zh' ? 'zh' : 'en');
   useEditorStore.getState().applySyncedUiState(snapshot.editorState || {}, { updatedAt });
@@ -92,7 +95,7 @@ export function buildSettingsExportPayload() {
     type: 'mde-settings',
     version: 1,
     exportedAt: new Date().toISOString(),
-    settings: getLocalSettingsSnapshot(),
+    settings: getLocalSettingsSnapshot({ includeDeviceLocal: true }),
   };
 }
 

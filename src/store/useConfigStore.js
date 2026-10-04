@@ -5,6 +5,10 @@
  */
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
+import { readInitialLanguage } from '@/i18n/language';
+
+const DEVICE_LOCAL_CONFIG_KEYS = new Set(['workspacePath', 'serverUrl', 'syncEnabled']);
+const initialLanguage = readInitialLanguage();
 
 /**
  * 编辑器与预览配置 store。
@@ -15,7 +19,7 @@ import { persist } from 'zustand/middleware';
 const useConfigStore = create(
   persist(
     (set) => ({
-      language: 'en',
+      language: initialLanguage,
       fontSize: 14,
       previewFontSize: 14,
       fontFamily: 'JetBrains Mono',
@@ -31,6 +35,7 @@ const useConfigStore = create(
       serverUrl: 'https://www.miaogu.xyz',
       syncEnabled: true,
       configUpdatedAt: 0,
+      syncableConfigUpdatedAt: 0,
 
       /**
        * 按单个键更新配置，并同步刷新配置时间戳。
@@ -39,6 +44,9 @@ const useConfigStore = create(
         ...state,
         [key]: value,
         configUpdatedAt: meta.updatedAt ?? Date.now(),
+        syncableConfigUpdatedAt: DEVICE_LOCAL_CONFIG_KEYS.has(key)
+          ? state.syncableConfigUpdatedAt
+          : meta.updatedAt ?? Date.now(),
       })),
       /**
        * 批量加载配置快照，常用于设置导入或云端配置回放。
@@ -47,6 +55,11 @@ const useConfigStore = create(
         ...state,
         ...config,
         configUpdatedAt: meta.updatedAt ?? state.configUpdatedAt ?? Date.now(),
+        syncableConfigUpdatedAt: Object.keys(config || {}).some(
+          (key) => !DEVICE_LOCAL_CONFIG_KEYS.has(key)
+        )
+          ? meta.updatedAt ?? Date.now()
+          : state.syncableConfigUpdatedAt,
       })),
     }),
     {

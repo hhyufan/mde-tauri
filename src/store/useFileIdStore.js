@@ -56,10 +56,21 @@ const useFileIdStore = create(
        */
       bind: (path, fileId) => {
         if (!path || !fileId) return;
-        set((state) => ({
-          pathToId: { ...state.pathToId, [scopePathKey(path)]: fileId },
-          idToPath: { ...state.idToPath, [scopeFileIdKey(fileId)]: path },
-        }));
+        set((state) => {
+          const pathKey = scopePathKey(path);
+          const fileKey = scopeFileIdKey(fileId);
+          const previousFileId = state.pathToId[pathKey];
+          const previousPath = state.idToPath[fileKey];
+          const pathToId = { ...state.pathToId };
+          const idToPath = { ...state.idToPath };
+          if (previousPath && previousPath !== path) delete pathToId[scopePathKey(previousPath)];
+          if (previousFileId && previousFileId !== fileId) {
+            delete idToPath[scopeFileIdKey(previousFileId)];
+          }
+          pathToId[pathKey] = fileId;
+          idToPath[fileKey] = path;
+          return { pathToId, idToPath };
+        });
       },
 
       /**
