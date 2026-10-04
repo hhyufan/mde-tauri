@@ -1,0 +1,107 @@
+.mde-tree {
+  display: flex;
+  flex-direction: column;
+  position: relative;
+  min-height: 0;
+  overflow: hidden;
+  color: var(--text);
+  background: var(--surface);
+  font-family: var(--font-app);
+
+  &__toolbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    min-height: 48px;
+    padding: 8px 18px;
+    border-bottom: 1px solid var(--border-light);
+    background: color-mix(in srgb, var(--sidebar) 65%, var(--surface));
+  }
+  &__tools { display: flex; align-items: center; gap: 4px; flex-wrap: wrap; }
+  &__tools .ant-btn { width: 28px; height: 28px; color: var(--text-sec); border-radius: var(--radius-sm); }
+  &__tools .ant-btn:not(:disabled):hover { background: var(--accent-bg); color: var(--accent); }
+  &__tools .ant-btn:disabled { opacity: 0.35; }
+  &__tools .mde-tree__add { color: var(--accent); background: var(--accent-bg); margin-right: 4px; }
+  &__separator { height: 16px; width: 1px; background: var(--border); margin: 0 6px; }
+  &__zoom { font-size: 11px; color: var(--text-sec); min-width: 36px; font-variant-numeric: tabular-nums; margin-left: 4px; }
+  &__count { display: flex; align-items: center; gap: 7px; white-space: nowrap; color: var(--text-sec); font-size: 11px; }
+  &__scroll { flex: 1; min-height: 0; overflow: auto; overscroll-behavior: contain; }
+  &__canvas { padding: 24px 22px 64px; min-width: fit-content; }
+  &__node { display: flex; align-items: center; gap: 9px; min-height: 34px; padding: 2px 8px 2px 3px; }
+  &__icon { flex-shrink: 0; color: var(--text-sec); font-size: 16px; }
+  &__icon--folder { color: var(--warning); }
+  &__node--linked &__icon { color: var(--accent); }
+  &__title {
+    border: 0;
+    padding: 2px 0;
+    background: transparent;
+    color: var(--text);
+    font: inherit;
+    text-align: left;
+    cursor: text;
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+    line-height: 1.7;
+    code { font: 0.9em var(--font-editor); padding: 2px 5px; border-radius: 4px; color: var(--accent); background: var(--accent-bg); }
+  }
+  &__title:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; border-radius: 3px; }
+  &__node--linked &__title { color: var(--accent); }
+  &__reference { display: inline-flex; align-items: center; gap: 5px; margin-left: 4px; font: 10px var(--font-editor); color: var(--text-sec); white-space: nowrap;
+    span { padding: 1px 5px; border: 1px solid var(--border); border-radius: 4px; }
+  }
+  &__actions { display: flex; gap: 2px; margin-left: auto; opacity: 0; transition: opacity 120ms; }
+  &__node:hover &__actions, &__node:focus-within &__actions { opacity: 1; }
+  &__actions .ant-btn { height: 24px; width: 24px; font-size: 12px; }
+  &__input { min-width: 160px; width: 100%; font: inherit; border-color: var(--accent); background: var(--surface); color: var(--text); }
+  &__empty { min-height: 280px; height: 100%; display: flex; align-items: center; justify-content: center; flex-direction: column; gap: 14px; padding: 32px; text-align: center;
+    > .anticon { color: var(--accent); font-size: 36px; padding: 20px; background: var(--accent-bg); border-radius: 20px; }
+    strong { font-size: 14px; font-weight: 500; }
+    p { font-size: 12px; color: var(--text-sec); margin: 0 0 8px; }
+  }
+  &__hint { padding: 9px 18px; font-size: 10px; color: var(--text-sec); border-top: 1px solid var(--border-light); }
+  &__top { position: absolute; right: 20px; bottom: 48px; border: 1px solid var(--border); border-radius: 50%; width: 32px; height: 32px; color: var(--accent); background: var(--surface); box-shadow: var(--shadow); cursor: pointer; }
+
+  .ant-tree { font: var(--tree-font-size) var(--font-app); color: var(--text); background: transparent; }
+  // Rows meet edge to edge. Spacing belongs inside the title, so ancestor
+  // guides remain continuous through expanded branches and wrapped titles.
+  .ant-tree .ant-tree-treenode { padding-bottom: 0; margin-bottom: 0; }
+  .ant-tree .ant-tree-node-content-wrapper { border-radius: var(--radius-sm); min-width: 0; transition: background 120ms; }
+  .ant-tree .ant-tree-node-content-wrapper:hover { background: var(--hover); }
+  .ant-tree .ant-tree-node-content-wrapper.ant-tree-node-selected { background: var(--accent-bg); }
+  .ant-tree .ant-tree-indent-unit { width: 24px; }
+  .ant-tree .ant-tree-indent-unit::before { inset-inline-end: auto; left: 12px; top: 0; bottom: 0; border-color: var(--border); }
+  .ant-tree .ant-tree-switcher {
+    align-self: stretch;
+    display: flex;
+    justify-content: center;
+    align-items: flex-start;
+    width: 24px;
+    margin-inline-end: 0;
+    padding: 0;
+    color: var(--text-sec);
+    // Use the same connector for leaves and folders, including collapsed
+    // branches. The chevron covers only the centre of the intersection.
+    &::before { left: 12px; top: 0; bottom: 0; width: 0; height: auto; border-left: 1px solid var(--border); border-radius: 0; background: none; }
+    &::after { content: ''; position: absolute; left: 12px; right: 0; top: 17px; border-top: 1px solid var(--border); }
+    &:not(.ant-tree-switcher-noop):hover::before { background: none; }
+  }
+  .ant-tree .mde-tree__last > .ant-tree-switcher::before { bottom: auto; height: 17px; }
+  // Root rows have no indent guides, so the branch line above them leads
+  // nowhere. Keep the chevron and the horizontal connector to the children.
+  .ant-tree .ant-tree-treenode:not(:has(.ant-tree-indent-unit)) > .ant-tree-switcher::before { display: none; }
+  .ant-tree .ant-tree-switcher-leaf-line { display: none; }
+  .mde-tree__chevron { position: relative; z-index: 1; margin-top: 9px; width: 16px; height: 16px; line-height: 16px; background: var(--surface); border-radius: 4px; }
+  .mde-tree__chevron svg { display: block; width: 16px; height: 16px; transition: transform 150ms ease; }
+  .ant-tree .ant-tree-switcher_close .mde-tree__chevron svg { transform: rotate(0deg); }
+  .ant-tree .ant-tree-switcher_open .mde-tree__chevron svg { transform: rotate(90deg); }
+  .ant-tree .ant-tree-switcher:hover .mde-tree__chevron { color: var(--accent); background: var(--accent-light); }
+}
+
+@media (hover: none) { .mde-tree__actions { opacity: 1; } }
+@media (max-width: 640px) {
+  .mde-tree__toolbar { padding: 6px 10px; }
+  .mde-tree__canvas { padding: 16px 10px 48px; }
+  .mde-tree__count { display: none; }
+  .mde-tree__hint { padding: 8px 10px; }
+}
