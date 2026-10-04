@@ -14,7 +14,13 @@ import { useFileManager } from '@hooks/useFileManager';
 import { useHorizontalDragScroll } from '@hooks/useHorizontalDragScroll';
 import { deleteFile as deleteFileApi } from '@utils/tauriApi';
 import useNotificationStore from '@store/useNotificationStore';
+import useFileIdStore from '@store/useFileIdStore';
+import useSyncStore from '@store/useSyncStore';
+import useAuthStore from '@store/useAuthStore';
+import { syncEngine } from '@/services/syncEngine';
+import { getExplorerFileSyncState } from '@/services/sync/syncPresentation';
 import { cn } from '@utils/classNames';
+import { isImeComposing } from '@utils/keyboard';
 import FileTypeIcon from '@components/ui/FileTypeIcon';
 import { isSafUri, safDisplayName } from '@utils/tauriApi';
 import './file-tree.scss';
@@ -76,6 +82,12 @@ function FileTree() {
   const sortBy = useFileStore((s) => s.sortBy);
   const sortOrder = useFileStore((s) => s.sortOrder);
   const activeTabId = useEditorStore((s) => s.activeTabId);
+  const ownerUserId = useAuthStore((s) => s.user?.id);
+  const pathToId = useFileIdStore((s) => s.pathToId);
+  const syncDocs = useSyncStore((s) => s.docs);
+  const syncReplicas = useSyncStore((s) => s.replicas);
+  const syncQueue = useSyncStore((s) => s.queue);
+  const syncConflicts = useSyncStore((s) => s.conflicts);
 
   const {
     loadDirectory,
@@ -93,7 +105,7 @@ function FileTree() {
   const bcThumbRef = useRef(null);
 
   /**
-   * 删除前先确认，避免资源管理器里的误触直接把文件移除。
+   * 删除前先确认；已纳入同步的文件同时写入云端墓碑，避免下一轮拉取把它复活。
    *
    * @param {import('@store/useFileStore').FileInfo} file 待删除的文件条目
    * @param {import('react').MouseEvent<HTMLElement>} [event] 原始点击事件
@@ -106,11 +118,47 @@ function FileTree() {
     );
     if (!confirmed) return;
 
+    let localDeleted = false;
+    let preparedDeletion = null;
     try {
-      await deleteFileApi(file.path);
-      await loadDirectory(currentDir);
+      const fileId = useFileIdStore.getState().idOf(file.path);
+      const linkedReplica = fileId
+        ? useSyncStore.getState().getReplica(fileId)
+        : null;
+      const shouldDeleteCloud = linkedReplica?.linkState === 'linked';
+      if (shouldDeleteCloud) {
+        preparedDeletion = await syncEngine.prepareLocalDeletion(fileId);
+        if (preparedDeletion?.ok === false) {
+          throw new Error(`Failed to prepare cloud deletion: ${preparedDeletion.reason}`);
+        }
+      }
+      const deleteResult = await deleteFileApi(file.path);
+      if (deleteResult?.success === false) {
+        throw new Error(deleteResult.error || `Failed to delete ${file.path}`);
+      }
+      localDeleted = true;
+      if (shouldDeleteCloud) {
+        const syncResult = preparedDeletion?.mutationId
+          ? await syncEngine.commitLocalDeletion(preparedDeletion)
+          : await syncEngine.deleteDocument(fileId);
+        if (syncResult?.ok === false) {
+          throw new Error(`Failed to record cloud deletion: ${syncResult.reason}`);
+        }
+        useFileIdStore.getState().unbindFileId(fileId);
+      } else if (fileId) {
+        useFileIdStore.getState().unbindFileId(fileId);
+      }
+      if (useFileStore.getState().isBookmarked(file.path)) {
+        useFileStore.getState().toggleBookmark(file.path);
+      }
+      useFileStore.getState().removeRecentFile(file.path);
     } catch (err) {
+      if (!localDeleted && preparedDeletion?.mutationId) {
+        await syncEngine.abortLocalDeletion(preparedDeletion).catch(() => {});
+      }
       useNotificationStore.getState().notify('error', t('notification.error'), String(err));
+    } finally {
+      if (localDeleted) await loadDirectory(currentDir).catch(() => {});
     }
   }, [currentDir, loadDirectory, t]);
 
@@ -289,6 +337,24 @@ function FileTree() {
       return cmp * direction;
     });
   }, [files, sortBy, sortOrder]);
+
+  const fileSyncStates = useMemo(() => new Map(
+    sortedFiles
+      .filter((file) => !file.is_dir)
+      .map((file) => [
+        file.path,
+        getExplorerFileSyncState({
+          filePath: file.path,
+          ownerUserId,
+          pathToId,
+          docs: syncDocs,
+          replicas: syncReplicas,
+          queue: syncQueue,
+          conflicts: syncConflicts,
+        }),
+      ])
+      .filter(([, state]) => state),
+  ), [ownerUserId, pathToId, sortedFiles, syncConflicts, syncDocs, syncQueue, syncReplicas]);
 
   // 面包屑展示数据。
   const breadcrumbParts = currentDir
@@ -488,6 +554,7 @@ function FileTree() {
         {sortedFiles.map((file) => {
           const ext = file.name.split('.').pop() || '';
           const isActive = activeTabId === file.path;
+          const fileSyncState = fileSyncStates.get(file.path);
           return (
             <div
               key={file.path}
@@ -500,6 +567,22 @@ function FileTree() {
                   : <FileTypeIcon extension={ext} fileName={file.name} />}
               </span>
               <span className="file-tree__item-name">{file.name}</span>
+              {fileSyncState && (
+                <Tooltip
+                  title={`${t('sidebar.cloud')} · ${t(`sync.status.${fileSyncState.status}`)}`}
+                  placement="top"
+                  mouseEnterDelay={0.3}
+                >
+                  <span
+                    className={`file-tree__item-cloud file-tree__item-cloud--${fileSyncState.status}`}
+                    aria-label={`${t('sidebar.cloud')} · ${t(`sync.status.${fileSyncState.status}`)}`}
+                  >
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                      <path d="M18 10h-1.26A8 8 0 1 0 9 20h9a5 5 0 0 0 0-10z" />
+                    </svg>
+                  </span>
+                </Tooltip>
+              )}
               {!file.is_dir && (
                 <Tooltip title={t('sidebar.explorer.deleteFile')} placement="top" mouseEnterDelay={0.3}>
                 <span
@@ -531,6 +614,9 @@ function FileTree() {
               onBlur={commitCreatingFile}
               onKeyDown={(e) => {
                 e.stopPropagation();
+                // 输入法组合期间回车上屏候选词，不能当成「提交文件名」处理，
+                // 否则用拼音输入中文时会在半途就创建出拼音文件名。
+                if (isImeComposing(e)) return;
                 if (e.key === 'Enter') { e.preventDefault(); commitCreatingFile(); }
                 if (e.key === 'Escape') { e.preventDefault(); cancelCreatingFile(); }
               }}

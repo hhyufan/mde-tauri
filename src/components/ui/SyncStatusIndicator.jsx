@@ -4,12 +4,15 @@
  * 监听同步引擎状态并将其映射为统一的图标、文本与交互入口，
  * 让用户在界面顶部快速判断当前云同步健康度。
  */
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Button, Popover, Space, Typography } from 'antd';
 import { syncEngine } from '@/services/syncEngine';
 import useAuthStore from '@store/useAuthStore';
+import useConfigStore from '@store/useConfigStore';
 import useSyncStore from '@store/useSyncStore';
+import { isOwnedByUser } from '@store/userScope';
+import { resolveGlobalSyncStatus } from '@/services/sync/syncPresentation';
 import './sync-status.scss';
 
 const SyncIcon = () => (
@@ -48,6 +51,14 @@ const STATUS_ICON_MAP = {
   server_unreachable: CloudOffIcon,
   conflict: AlertIcon,
   auth_required: AlertIcon,
+  pending: CloudIcon,
+  disabled: CloudOffIcon,
+  request_error: AlertIcon,
+  server_error: AlertIcon,
+  rate_limited: AlertIcon,
+  integrity_error: AlertIcon,
+  protocol_error: AlertIcon,
+  payload_too_large: AlertIcon,
 };
 
 /**
@@ -55,24 +66,44 @@ const STATUS_ICON_MAP = {
  *
  * 根据同步引擎当前状态切换图标与文案，并提供点击手动触发全量同步的入口。
  *
- * @returns {JSX.Element | null} 登录后显示同步状态入口，否则不渲染。
+ * @returns {JSX.Element} 始终显示同步状态入口；未登录时显示离线状态。
  */
 function SyncStatusIndicator() {
   const { t } = useTranslation();
   const isLoggedIn = useAuthStore((s) => s.isLoggedIn);
+  const userId = useAuthStore((s) => s.user?.id);
+  const syncEnabled = useConfigStore((s) => s.syncEnabled);
   const [status, setStatus] = useState(syncEngine.status);
   const queue = useSyncStore((s) => s.queue);
-  const lastSuccessfulSyncAt = useSyncStore((s) => s.lastSuccessfulSyncAt);
-  const lastSyncError = useSyncStore((s) => s.lastSyncError);
+  const conflicts = useSyncStore((s) => s.conflicts);
+  const lastSuccessfulSyncAts = useSyncStore((s) => s.lastSuccessfulSyncAts);
+  const lastSyncErrors = useSyncStore((s) => s.lastSyncErrors);
 
   useEffect(() => {
     return syncEngine.onStatusChange(setStatus);
   }, []);
 
-  if (!isLoggedIn) return null;
-
-  const IconComponent = STATUS_ICON_MAP[status] || CloudIcon;
-  const label = t(`sync.status.${status}`);
+  const ownedQueue = useMemo(
+    () => queue.filter((item) => isOwnedByUser(item?.ownerUserId, userId)),
+    [queue, userId],
+  );
+  const conflictCount = useMemo(
+    () => conflicts.filter((item) => isOwnedByUser(item?.ownerUserId, userId)).length,
+    [conflicts, userId],
+  );
+  const blockedCount = ownedQueue.filter((item) => item.status === 'blocked').length;
+  const effectiveStatus = resolveGlobalSyncStatus({
+    isLoggedIn,
+    syncEnabled,
+    conflictCount,
+    blockedCount,
+    pendingCount: ownedQueue.length,
+    engineStatus: status,
+  });
+  const lastSuccessfulSyncAt = Number(lastSuccessfulSyncAts?.[userId] || 0);
+  const lastSyncError = lastSyncErrors?.[userId] || null;
+  const IconComponent = STATUS_ICON_MAP[effectiveStatus] || CloudIcon;
+  const label = t(`sync.status.${effectiveStatus}`);
 
   return (
     <Popover
@@ -80,17 +111,32 @@ function SyncStatusIndicator() {
       title={label}
       content={(
         <Space direction="vertical" size={6}>
-          <Typography.Text>待处理：{queue.length}</Typography.Text>
-          <Typography.Text>上次成功：{lastSuccessfulSyncAt ? new Date(lastSuccessfulSyncAt).toLocaleString() : '尚未完成'}</Typography.Text>
-          {lastSyncError && <Typography.Text type="danger">失败分类：{lastSyncError.kind}</Typography.Text>}
-          <Button size="small" onClick={() => syncEngine.fullSync()}>立即重试</Button>
+          <Typography.Text>{t('sync.pendingCount', { count: ownedQueue.length })}</Typography.Text>
+          <Typography.Text>
+            {t('sync.lastSuccess', {
+              time: lastSuccessfulSyncAt
+                ? new Date(lastSuccessfulSyncAt).toLocaleString()
+                : t('sync.neverCompleted'),
+            })}
+          </Typography.Text>
+          {lastSyncError && (
+            <Typography.Text type="danger">
+              {t('sync.failureKind', { kind: lastSyncError.kind })}
+            </Typography.Text>
+          )}
+          <Button
+            size="small"
+            disabled={!isLoggedIn || !syncEnabled}
+            onClick={() => syncEngine.retryNow()}
+          >
+            {t('sync.syncNow')}
+          </Button>
         </Space>
       )}
       trigger="click"
     >
       <span
-        className={`sync-status sync-status--${status}`}
-        onClick={() => syncEngine.fullSync()}
+        className={`sync-status sync-status--${effectiveStatus}`}
       >
         <span className="sync-status__icon"><IconComponent /></span>
         <span className="sync-status__label">{label}</span>

@@ -10,13 +10,11 @@ import { Dropdown, Tooltip, Button, Tag } from 'antd';
 import useEditorStore from '@store/useEditorStore';
 import useAuthStore from '@store/useAuthStore';
 import useThemeStore from '@store/useThemeStore';
-import useFileStore, { getScopedBookmarkedPaths, getScopedRecentFiles } from '@store/useFileStore';
+import useFileStore, { getScopedRecentFiles } from '@store/useFileStore';
 import useNotificationStore from '@store/useNotificationStore';
 import useExternalDocsStore, { getScopedExternalDocsMap } from '@store/useExternalDocsStore';
 import useSyncStore from '@store/useSyncStore';
-import useFileIdStore from '@store/useFileIdStore';
 import { GUEST_USER_SCOPE, isOwnedByUser } from '@store/userScope';
-import { fileIdFromCloudPath, syncEngine } from '@/services/syncEngine';
 import { useFileManager } from '@hooks/useFileManager';
 import FileTree from './explorer/FileTree';
 import OutlineView from './outline/OutlineView';
@@ -205,17 +203,27 @@ function RecentList({ onOpenStats }) {
   const { t } = useTranslation();
   const userId = useAuthStore((s) => s.user?.id || GUEST_USER_SCOPE);
   const recentEntries = useFileStore((s) => s.recentFiles);
-  const bookmarkEntries = useFileStore((s) => s.bookmarkedPaths);
   const externalDocEntries = useExternalDocsStore((s) => s.docs);
   const syncDocsMap = useSyncStore((s) => s.docs);
+  const replicaMap = useSyncStore((s) => s.replicas);
   const { openFileFromPath } = useFileManager();
   const recentFiles = useMemo(
     () => getScopedRecentFiles(recentEntries, userId),
     [recentEntries, userId],
   );
-  const bookmarkedPaths = useMemo(
-    () => getScopedBookmarkedPaths(bookmarkEntries, userId),
-    [bookmarkEntries, userId],
+  const linkedReplicas = useMemo(
+    () => Object.values(replicaMap).filter((replica) =>
+      isOwnedByUser(replica?.ownerUserId, userId) && replica?.linkState === 'linked'
+    ),
+    [replicaMap, userId],
+  );
+  const linkedPaths = useMemo(
+    () => linkedReplicas.map((replica) => replica.localPath).filter(Boolean),
+    [linkedReplicas],
+  );
+  const linkedFileIds = useMemo(
+    () => new Set(linkedReplicas.map((replica) => replica.fileId)),
+    [linkedReplicas],
   );
   const externalDocs = useMemo(
     () => getScopedExternalDocsMap(externalDocEntries, userId),
@@ -226,8 +234,8 @@ function RecentList({ onOpenStats }) {
     [syncDocsMap, userId],
   );
 
-  // Recent 视图里的删除行为需要同时考虑本地最近记录、书签映射以及
-  // 云端外部文档，因此统一收敛到这里处理，避免 UI 分支各自漏清理。
+  // Recent is presentation-only. Removing an entry must never change a device
+  // replica or delete the account-wide cloud document.
   /**
    * 从最近列表中移除一项，并同步处理书签或云端文档关联状态。
    *
@@ -237,26 +245,12 @@ function RecentList({ onOpenStats }) {
    */
   const handleRemove = useCallback(async (e, f) => {
     e.stopPropagation();
-    if (f.cloud) {
-      const fileId = fileIdFromCloudPath(f.path);
-      useExternalDocsStore.getState().remove(fileId);
-      await syncEngine.deleteDocument(fileId);
-    } else {
-      useFileStore.getState().removeRecentFile(f.path);
-      if (bookmarkedPaths.includes(f.path)) {
-        useFileStore.getState().toggleBookmark(f.path);
-        const fileId = useFileIdStore.getState().idOf(f.path);
-        if (fileId) {
-          await syncEngine.deleteDocument(fileId);
-          useFileIdStore.getState().unbindFileId(fileId);
-        }
-      }
-    }
-  }, [bookmarkedPaths]);
+    if (!f.cloud) useFileStore.getState().removeRecentFile(f.path);
+  }, []);
 
   const recentPaths = new Set(recentFiles.map((r) => r.path));
   const cloudOnlyEntries = syncDocs
-    .filter((doc) => !doc.deleted && !doc.localPath)
+    .filter((doc) => !doc.deleted && !linkedFileIds.has(doc.fileId))
     .map((doc) => {
       const fileId = doc.fileId;
       const meta = externalDocs[fileId] || {};
@@ -272,8 +266,8 @@ function RecentList({ onOpenStats }) {
 
   const allFiles = [...cloudOnlyEntries, ...recentFiles];
   const sortedFiles = [...allFiles].sort((a, b) => {
-    const aBookmarked = bookmarkedPaths.includes(a.path);
-    const bBookmarked = bookmarkedPaths.includes(b.path);
+    const aBookmarked = linkedPaths.includes(a.path);
+    const bBookmarked = linkedPaths.includes(b.path);
     if (aBookmarked && !bBookmarked) return -1;
     if (!aBookmarked && bBookmarked) return 1;
     return 0;
@@ -287,15 +281,14 @@ function RecentList({ onOpenStats }) {
       ) : (
         <div className="sidebar__recent-list">
           {sortedFiles.map((f) => {
-            const isBookmarked = bookmarkedPaths.includes(f.path);
+            const isBookmarked = linkedPaths.includes(f.path);
             const isCloud = !!f.cloud;
             const titleText = isCloud
               ? t('sidebar.cloudFileHint', { name: f.name })
               : f.path;
             return (
-              <Tooltip title={titleText} placement="right" mouseEnterDelay={0.5}>
+              <Tooltip key={f.path} title={titleText} placement="right" mouseEnterDelay={0.5}>
                 <div
-                  key={f.path}
                   className={cn('sidebar__recent-item', isBookmarked && 'sidebar__recent-item--bookmarked')}
                   onClick={() => openFileFromPath(f.path, f.name)}
                 >
@@ -319,14 +312,16 @@ function RecentList({ onOpenStats }) {
                       </span>
                     </Tooltip>
                   )}
-                  <Tooltip title={t('sidebar.recent.remove')} placement="top" mouseEnterDelay={0.3}>
-                    <span
-                      className="sidebar__recent-del"
-                      onClick={(e) => handleRemove(e, f)}
-                    >
-                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>
-                    </span>
-                  </Tooltip>
+                  {!isCloud && (
+                    <Tooltip title={t('sidebar.recent.remove')} placement="top" mouseEnterDelay={0.3}>
+                      <span
+                        className="sidebar__recent-del"
+                        onClick={(e) => handleRemove(e, f)}
+                      >
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>
+                      </span>
+                    </Tooltip>
+                  )}
                 </div>
               </Tooltip>
             );

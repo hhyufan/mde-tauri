@@ -1,7 +1,7 @@
 /**
  * 顶部标签栏模块。
  *
- * 组织编辑器多标签切换、标签重命名、书签管理，以及 Markdown 相关工具按钮，
+ * 组织编辑器多标签切换、标签重命名、设备同步开关，以及 Markdown 相关工具按钮，
  * 为主编辑区提供高频文件操作入口。
  */
 import { useRef, useCallback, useMemo, useState } from 'react';
@@ -10,46 +10,49 @@ import { Tooltip } from 'antd';
 import useEditorStore from '@store/useEditorStore';
 import useConfigStore from '@store/useConfigStore';
 import useAuthStore from '@store/useAuthStore';
-import useFileStore, { getScopedBookmarkedPaths } from '@store/useFileStore';
+import useFileStore from '@store/useFileStore';
+import useFileIdStore from '@store/useFileIdStore';
+import useSyncStore from '@store/useSyncStore';
 import useNotificationStore from '@store/useNotificationStore';
+import useScriptStore from '@store/useScriptStore';
 import { GUEST_USER_SCOPE } from '@store/userScope';
 import { renameFile } from '@utils/tauriApi';
 import { useFileManager } from '@hooks/useFileManager';
 import { syncEngine } from '@/services/syncEngine';
-import useFileIdStore from '@store/useFileIdStore';
+import { moveDiskBaseline } from '@/services/localFileGuard';
+import { consoleAvailable } from '@utils/consoleSupport';
 import { cn } from '@utils/classNames';
+import { isImeComposing } from '@utils/keyboard';
 import FileTypeIcon from '@components/ui/FileTypeIcon';
 import './tabbar.scss';
 
 /**
  * 顶部标签栏。
  *
- * 承载文件标签切换、重命名、关闭、新建、书签、工具栏开关与 Markdown
+ * 承载文件标签切换、重命名、关闭、新建、设备同步开关、工具栏开关与 Markdown
  * 分栏视图切换等高频编辑器操作。
  *
  * @returns {JSX.Element} 标签栏界面。
  */
-function TabBar() {
+function TabBar({ onRequestCloseTab }) {
   const { t } = useTranslation();
   const tabs = useEditorStore((s) => s.tabRenderList);
   const activeTabId = useEditorStore((s) => s.activeTabId);
   const setActiveTab = useEditorStore((s) => s.setActiveTab);
-  const closeTab = useEditorStore((s) => s.closeTab);
   const renameTab = useEditorStore((s) => s.renameTab);
   const updateTabPath = useEditorStore((s) => s.updateTabPath);
   const viewMode = useEditorStore((s) => s.viewMode);
   const toggleSplit = useEditorStore((s) => s.toggleSplit);
   const toolbarVisible = useEditorStore((s) => s.toolbarVisible);
   const toggleToolbar = useEditorStore((s) => s.toggleToolbar);
-  const sidebarVisible = useEditorStore((s) => s.sidebarVisible);
-  const setSidebarView = useEditorStore((s) => s.setSidebarView);
-  const toggleSidebar = useEditorStore((s) => s.toggleSidebar);
+  const consoleOpen = useScriptStore((s) => s.open);
+  const toggleConsole = useScriptStore((s) => s.setOpen);
   const notify = useNotificationStore((s) => s.notify);
   const autoSave = useConfigStore((s) => s.autoSave);
   const userId = useAuthStore((s) => s.user?.id || GUEST_USER_SCOPE);
-  const bookmarkEntries = useFileStore((s) => s.bookmarkedPaths);
-  const toggleBookmark = useFileStore((s) => s.toggleBookmark);
-  const addRecentFile = useFileStore((s) => s.addRecentFile);
+  const isLoggedIn = useAuthStore((s) => s.isLoggedIn);
+  const pathToId = useFileIdStore((s) => s.pathToId);
+  const replicas = useSyncStore((s) => s.replicas);
   const currentDir = useFileStore((s) => s.currentDir);
   const { loadDirectory, createFileWithDialog } = useFileManager();
   const scrollRef = useRef(null);
@@ -120,6 +123,7 @@ function TabBar() {
       const result = await renameFile(tab.path, newPath);
       if (result?.success !== false) {
         const actualPath = result?.file_path || newPath;
+        moveDiskBaseline(tab.path, actualPath);
         updateTabPath(tab.id, actualPath, trimmed);
         await syncEngine.rebindLocalPath(tab.path, actualPath, trimmed);
         if (currentDir) loadDirectory(currentDir);
@@ -138,11 +142,16 @@ function TabBar() {
     setRenamingTabId(null);
   }, []);
 
-  const bookmarkedPaths = useMemo(
-    () => getScopedBookmarkedPaths(bookmarkEntries, userId),
-    [bookmarkEntries, userId],
-  );
-  const isBookmarked = activeTab?.path && bookmarkedPaths.includes(activeTab.path);
+  const activeReplica = useMemo(() => {
+    if (!activeTab?.path) return null;
+    const mappedFileId = pathToId[`${userId}::path::${activeTab.path}`];
+    return (mappedFileId && replicas[`${userId}::${mappedFileId}`])
+      || Object.values(replicas).find((item) =>
+        item?.ownerUserId === userId && item?.localPath === activeTab.path
+      )
+      || null;
+  }, [activeTab?.path, pathToId, replicas, userId]);
+  const isLinkedForSync = activeReplica?.linkState === 'linked';
 
   /**
    * 向左平滑滚动标签列表，便于访问被遮挡的标签。
@@ -159,35 +168,34 @@ function TabBar() {
   }, []);
 
   /**
-   * 切换当前活动文件的书签状态，并同步 recent 视图与云端映射。
+   * 切换当前活动文件在此设备上的同步关联。停止同步不会删除云端副本。
    *
-   * @returns {Promise<void>} 书签相关副作用处理完成。
+   * @returns {Promise<void>} 设备同步关联更新完成。
    */
   const handleBookmark = useCallback(async () => {
     if (!activeTab?.path) return;
-    toggleBookmark(activeTab.path);
-    
-    if (!isBookmarked) {
+    if (!isLoggedIn) {
+      notify('error', t('notification.syncFailed'), t('settings.cloud.notLoggedIn'));
+      return;
+    }
+    if (!isLinkedForSync) {
       const liveTab = useEditorStore.getState().getActiveTab();
       const syncTab = liveTab?.id === activeTab.id ? liveTab : activeTab;
-      await syncEngine.queueLocalUpsert(syncTab.path, syncTab.content, syncTab.encoding, {
+      const result = await syncEngine.linkLocalDocument(syncTab.path, syncTab.content, syncTab.encoding, {
         name: syncTab.name,
         lineEnding: syncTab.lineEnding,
-        source: 'bookmark-add',
       });
-      // 顺手补入最近文件列表，保证侧边栏 recent 视图能立刻看见。
-      addRecentFile({ path: syncTab.path, name: syncTab.name, ext: syncTab.ext });
-      // 自动切到侧边栏 recent 视图，直观反馈当前书签已加入列表。
-      if (!sidebarVisible) toggleSidebar();
-      setSidebarView('recent');
+      if (!result?.ok) {
+        notify('error', t('notification.syncFailed'), result?.reason || 'link-failed');
+        return;
+      }
     } else {
-      const fileId = useFileIdStore.getState().idOf(activeTab.path);
-      if (fileId) {
-        syncEngine.deleteDocument(fileId);
-        useFileIdStore.getState().unbindFileId(fileId);
+      const result = await syncEngine.stopTrackingLocal(activeTab.path);
+      if (!result?.ok) {
+        notify('error', t('notification.syncFailed'), result?.reason || 'unlink-failed');
       }
     }
-  }, [activeTab, isBookmarked, toggleBookmark, addRecentFile, sidebarVisible, toggleSidebar, setSidebarView]);
+  }, [activeTab, isLinkedForSync, isLoggedIn, notify, t]);
 
   return (
     <div className="tabbar">
@@ -235,6 +243,9 @@ function TabBar() {
                   onBlur={() => commitRename(tab)}
                   onKeyDown={(e) => {
                     e.stopPropagation();
+                    // 重命名输入框同样要先放行输入法组合，否则回车上屏候选词会
+                    // 直接被当成「确认重命名」，中文文件名输入不下来。
+                    if (isImeComposing(e)) return;
                     if (e.key === 'Enter') { e.preventDefault(); commitRename(tab); }
                     if (e.key === 'Escape') { e.preventDefault(); cancelRename(); }
                   }}
@@ -256,7 +267,7 @@ function TabBar() {
                   className="tabbar__tab-close"
                   onClick={(e) => {
                     e.stopPropagation();
-                    closeTab(tab.id);
+                    onRequestCloseTab?.(tab.id);
                   }}
                 >
                   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -302,21 +313,26 @@ function TabBar() {
             </button>
           </Tooltip>
         )}
-        {/* 当前文件书签开关。 */}
-        <Tooltip title={t('tabbar.bookmark')} placement="bottom" mouseEnterDelay={0.3}>
+        {/* 当前文件在此设备上的云同步关联开关。 */}
+        <Tooltip
+          title={t(isLinkedForSync ? 'tabbar.disableCloudSync' : 'tabbar.enableCloudSync')}
+          placement="bottom"
+          mouseEnterDelay={0.3}
+        >
           <button
-            className={cn('tabbar__action-btn', isBookmarked && 'tabbar__action-btn--active')}
+            className={cn('tabbar__action-btn', isLinkedForSync && 'tabbar__action-btn--active')}
             onClick={handleBookmark}
             disabled={!activeTab?.path}
+            aria-label={t(isLinkedForSync ? 'tabbar.disableCloudSync' : 'tabbar.enableCloudSync')}
             type="button"
           >
-            <svg viewBox="0 0 24 24" fill={isBookmarked ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth="2">
+            <svg viewBox="0 0 24 24" fill={isLinkedForSync ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth="2">
               <path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z" />
             </svg>
           </button>
         </Tooltip>
-        {/* Markdown 文件专属分栏视图开关。 */}
-        {isMarkdown && (
+        {/* Markdown 和树文件的源码 / 渲染分栏。 */}
+        {(isMarkdown || activeTab?.ext?.toLowerCase() === 'mgtree') && (
           <Tooltip title={t('tabbar.splitView')} placement="bottom" mouseEnterDelay={0.3}>
             <button
               className={cn('tabbar__action-btn', viewMode === 'split' && 'tabbar__action-btn--active')}
@@ -326,6 +342,21 @@ function TabBar() {
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                 <rect x="3" y="3" width="18" height="18" rx="2" />
                 <line x1="12" y1="3" x2="12" y2="21" />
+              </svg>
+            </button>
+          </Tooltip>
+        )}
+        {/* 输出与问题控制台：仅在存在代码编辑器且语言受 LSP 支持或可运行时提供入口。 */}
+        {consoleAvailable(viewMode, activeTab) && (
+          <Tooltip title={t('tabbar.console')} placement="bottom" mouseEnterDelay={0.3}>
+            <button
+              className={cn('tabbar__action-btn', consoleOpen && 'tabbar__action-btn--active')}
+              onClick={() => toggleConsole(!consoleOpen)}
+              aria-label={t('tabbar.console')}
+              type="button"
+            >
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <path d="m5 7 5 5-5 5M13 17h6" />
               </svg>
             </button>
           </Tooltip>

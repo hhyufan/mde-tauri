@@ -307,6 +307,36 @@
   white-space: nowrap;
 }
 
+.file-tree__item-cloud {
+  width: 16px;
+  height: 16px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  color: var(--success);
+
+  svg {
+    width: 14px;
+    height: 14px;
+  }
+
+  &--pending {
+    color: var(--accent);
+    animation: file-cloud-pulse 1.4s ease-in-out infinite;
+  }
+
+  &--conflict,
+  &--error {
+    color: var(--error);
+  }
+}
+
+@keyframes file-cloud-pulse {
+  0%, 100% { opacity: 0.45; }
+  50% { opacity: 1; }
+}
+
 .file-tree__item-input {
   flex: 1;
   min-width: 0;

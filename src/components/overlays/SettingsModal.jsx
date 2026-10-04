@@ -22,6 +22,7 @@ import {
   InfoCircleOutlined,
   GithubOutlined,
   StarFilled,
+  AppstoreOutlined,
 } from '@ant-design/icons';
 import { open, save } from '@tauri-apps/plugin-dialog';
 import { readTextFile, writeTextFile } from '@tauri-apps/plugin-fs';
@@ -40,16 +41,18 @@ import {
   parseSettingsImportPayload,
 } from '@utils/settingsSync';
 import './settings-modal.scss';
+import LanguageServices from './LanguageServices';
 
 const NAV_ICONS = {
   general: <SettingOutlined />,
   appearance: <BgColorsOutlined />,
   editor: <EditOutlined />,
+  languages: <AppstoreOutlined />,
   cloud: <CloudOutlined />,
   about: <InfoCircleOutlined />,
 };
 
-const NAV_KEYS = ['general', 'appearance', 'editor', 'cloud', 'about'];
+const NAV_KEYS = ['general', 'appearance', 'editor', 'languages', 'cloud', 'about'];
 
 const REPO_URL = 'https://github.com/hhyufan/mde-tauri';
 
@@ -353,38 +356,11 @@ function SettingsModal({ open: openProp, onClose }) {
                   label={t('settings.appearance.previewFontSize')}
                   desc={t('settings.appearance.previewFontSizeDesc')}
                 >
-                  <InputNumber
-                    min={10}
-                    max={24}
-                    step={1}
+                  <FontSizeControl
+                    label={t('settings.appearance.previewFontSize')}
                     disabled={config.previewZoomSync ?? true}
                     value={config.previewFontSize ?? config.fontSize ?? 14}
                     onChange={(v) => handleChange('previewFontSize', Number(v) || config.fontSize || 14)}
-                    addonBefore={
-                      <Button
-                        type="text"
-                        size="small"
-                        disabled={config.previewZoomSync ?? true}
-                        icon={<MinusOutlined />}
-                        onClick={() => handleChange(
-                          'previewFontSize',
-                          Math.max(10, ((config.previewFontSize ?? config.fontSize) || 14) - 1)
-                        )}
-                      />
-                    }
-                    addonAfter={
-                      <Button
-                        type="text"
-                        size="small"
-                        disabled={config.previewZoomSync ?? true}
-                        icon={<PlusOutlined />}
-                        onClick={() => handleChange(
-                          'previewFontSize',
-                          Math.min(24, ((config.previewFontSize ?? config.fontSize) || 14) + 1)
-                        )}
-                      />
-                    }
-                    style={{ width: 180 }}
                   />
                 </SettingRow>
               </div>
@@ -397,29 +373,10 @@ function SettingsModal({ open: openProp, onClose }) {
                   label={t('settings.editor.fontSize')}
                   desc={t('settings.editor.fontSizeDesc')}
                 >
-                  <InputNumber
-                    min={10}
-                    max={24}
-                    step={1}
+                  <FontSizeControl
+                    label={t('settings.editor.fontSize')}
                     value={config.fontSize}
                     onChange={(v) => handleChange('fontSize', Number(v) || 14)}
-                    addonBefore={
-                      <Button
-                        type="text"
-                        size="small"
-                        icon={<MinusOutlined />}
-                        onClick={() => handleChange('fontSize', Math.max(10, (config.fontSize || 14) - 1))}
-                      />
-                    }
-                    addonAfter={
-                      <Button
-                        type="text"
-                        size="small"
-                        icon={<PlusOutlined />}
-                        onClick={() => handleChange('fontSize', Math.min(24, (config.fontSize || 14) + 1))}
-                      />
-                    }
-                    style={{ width: 180 }}
                   />
                 </SettingRow>
                 <SettingRow
@@ -496,6 +453,8 @@ function SettingsModal({ open: openProp, onClose }) {
               </div>
             )}
 
+            {activeNav === 'languages' && <LanguageServices />}
+
             {activeNav === 'cloud' && (
               <div className="settings-section">
                 <SettingGroup label={t('settings.group.connection')} />
@@ -508,6 +467,7 @@ function SettingsModal({ open: openProp, onClose }) {
                     value={config.serverUrl}
                     onChange={(e) => handleChange('serverUrl', e.target.value)}
                     placeholder="https://www.miaogu.xyz"
+                    disabled={isLoggedIn}
                   />
                 </SettingRow>
                 <SettingRow
@@ -652,11 +612,23 @@ function SettingsModal({ open: openProp, onClose }) {
 }
 
 /**
- * 设置分组标题。
+ * 字号输入与增减按钮，使用 Compact 组合保持控件尺寸一致。
  *
  * @param {object} props 组件属性。
- * @param {React.ReactNode} props.label 分组标题文本。
+ * @param {string} props.label 字号设置名称。
  */
+function FontSizeControl({ label, value, onChange, disabled = false }) {
+  return <Space.Compact className="setting-font-size">
+    <Button disabled={disabled} aria-label={`${label} −`} icon={<MinusOutlined />}
+      onClick={() => onChange(Math.max(10, (value || 14) - 1))} />
+    <InputNumber aria-label={label} min={10} max={24} step={1} disabled={disabled}
+      value={value} onChange={onChange} />
+    <Button disabled={disabled} aria-label={`${label} +`} icon={<PlusOutlined />}
+      onClick={() => onChange(Math.min(24, (value || 14) + 1))} />
+  </Space.Compact>;
+}
+
+/** 设置分组标题。 */
 function SettingGroup({ label }) {
   return (
     <div className="settings-group">

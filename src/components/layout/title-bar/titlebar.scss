@@ -49,6 +49,27 @@
   }
 }
 
+// 置顶钉子：置顶后回正并高亮，未置顶时钉子斜放 45°（与 miaogu-notepad 同款）。
+.titlebar__btn--pin {
+  &.is-pinned {
+    color: var(--accent);
+
+    &:hover {
+      color: var(--accent);
+      background: var(--accent-bg);
+    }
+  }
+}
+
+.titlebar__pin-icon {
+  transition: transform 0.3s ease-in-out;
+  transform-origin: center;
+
+  &--unpinned {
+    transform: rotate(45deg);
+  }
+}
+
 .titlebar__search {
   flex: 0 1 380px;
   height: 36px;

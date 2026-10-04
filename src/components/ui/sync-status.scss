@@ -23,11 +23,21 @@
     color: var(--success);
   }
 
-  &--error {
+  &--error,
+  &--request_error,
+  &--server_error,
+  &--rate_limited,
+  &--integrity_error,
+  &--protocol_error,
+  &--payload_too_large,
+  &--conflict,
+  &--auth_required {
     color: var(--error);
   }
 
-  &--offline {
+  &--offline,
+  &--server_unreachable,
+  &--disabled {
     color: var(--text-dim);
   }
 }

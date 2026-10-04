@@ -1,18 +1,5 @@
 import { useEffect, useState } from 'react';
-
-// 完整图标目录保持在首屏依赖图之外，并且只在浏览器空闲时加载一次。
-let fullIconComponent = null;
-let fullIconPromise = null;
-
-function loadFullIconComponent() {
-  if (!fullIconPromise) {
-    fullIconPromise = import('react-material-vscode-icons').then((module) => {
-      fullIconComponent = module.FileIcon;
-      return fullIconComponent;
-    });
-  }
-  return fullIconPromise;
-}
+import { getMaterialIcons, loadMaterialIcons } from '@utils/materialIcons';
 
 const EXTENSION_ALIASES = {
   markdown: 'md',
@@ -41,7 +28,7 @@ function normalizeExtension(extension = '', fileName = '') {
 const COLORS = {
   md: '#519aba', mdx: '#519aba', js: '#f1e05a', jsx: '#61dafb', ts: '#3178c6',
   tsx: '#61dafb', json: '#cbcb41', html: '#e34c26', css: '#563d7c', scss: '#c6538c',
-  yaml: '#cb171e', toml: '#9c4221', rs: '#dea584', py: '#3572a5', java: '#b07219', txt: '#8b949e',
+  yaml: '#cb171e', toml: '#9c4221', rs: '#dea584', py: '#3572a5', java: '#b07219', kt: '#a97bff', kts: '#a97bff', cs: '#178600', txt: '#8b949e',
 };
 
 /**
@@ -76,21 +63,22 @@ function LightweightFallback({
 
 function FileTypeIcon(props) {
   const { extension = '', fileName = '', size = 16, className = '', isFolder = false, isExpanded = false } = props;
-  const [FullIcon, setFullIcon] = useState(() => fullIconComponent);
+  const [FullIcon, setFullIcon] = useState(() => getMaterialIcons()?.FileIcon);
   const normalizedFileName = String(fileName || '').trim();
   const ext = normalizeExtension(extension, fileName);
   const resolvedFileName = normalizedFileName || (ext ? `file.${ext}` : 'file.txt');
 
   useEffect(() => {
-    if (fullIconComponent) {
-      setFullIcon(() => fullIconComponent);
+    const cached = getMaterialIcons();
+    if (cached) {
+      setFullIcon(() => cached.FileIcon);
       return undefined;
     }
 
     let active = true;
     const load = () => {
-      loadFullIconComponent().then((Component) => {
-        if (active) setFullIcon(() => Component);
+      loadMaterialIcons().then((module) => {
+        if (active) setFullIcon(() => module.FileIcon);
       });
     };
     const idleId = window.requestIdleCallback?.(load, { timeout: 1500 });

@@ -13,6 +13,7 @@ import { useFileManager } from '@hooks/useFileManager';
 import { useResponsiveLayout } from '@hooks/useResponsiveLayout';
 import { cancelSearch, searchFiles } from '@utils/tauriApi';
 import { debounce } from '@utils/debounce';
+import { isImeComposing } from '@utils/keyboard';
 import FileTypeIcon from '@components/ui/FileTypeIcon';
 import './search-modal.scss';
 
@@ -117,6 +118,9 @@ function SearchModal({ open, onClose }) {
    * @param {KeyboardEvent} e 键盘事件对象。
    */
   const handleKeyDown = useCallback((e) => {
+    // 输入法组合期间，Enter 用于候选词上屏、上下方向键用于在候选列表中选词。
+    // 这里必须直接放行，否则用户既选不了词也上不了屏。
+    if (isImeComposing(e)) return;
     if (e.key === 'Escape') {
       onClose();
       return;

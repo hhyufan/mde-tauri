@@ -11,7 +11,7 @@ import FileTypeIcon from '@components/ui/FileTypeIcon';
 import { isAndroidRuntime } from '@utils/platform';
 import './footer.scss';
 
-const MARKDOWN_EXT = /^(md|markdown|mdx)$/i;
+const PREVIEW_EXT = /^(md|markdown|mdx|mgtree)$/i;
 
 function EyeIcon() {
   return (
@@ -67,8 +67,7 @@ function Footer() {
     [tabs, activeTabId],
   );
 
-  const isMarkdown = activeTab ? MARKDOWN_EXT.test(activeTab.ext) : false;
-  const showModeToggle = isMarkdown && viewMode !== 'split';
+  const showModeToggle = activeTab && PREVIEW_EXT.test(activeTab.ext) && viewMode !== 'split';
 
   const [pathSegments, setPathSegments] = useState([]);
   const [directoryContents, setDirectoryContents] = useState({});
@@ -155,7 +154,7 @@ function Footer() {
     } catch (_) {
       setOpenDropdown(null);
     }
-  }, [pathSegments, openDropdown]);
+  }, [pathSegments, openDropdown, activeTab?.path]);
 
   const handleContextMenu = useCallback(async (e, index) => {
     e.preventDefault();
@@ -249,24 +248,27 @@ function Footer() {
                       placement="top"
                       mouseEnterDelay={0.5}
                     >
-                      <Dropdown
-                        open={isOpen}
-                        trigger={['click']}
-                        placement="topLeft"
-                        arrow={false}
-                        popupRender={renderDropdown(index)}
-                        onOpenChange={(open) => {
-                          if (!open) setOpenDropdown(null);
-                        }}
-                      >
-                      <span
-                        className="footer__breadcrumb-segment"
-                        onClick={() => handleSegmentClick(index)}
-                        onContextMenu={(e) => handleContextMenu(e, index)}
-                      >
-                        {/^[A-Z]:\\$/i.test(segment) ? segment.substring(0, 2) : segment}
+                      {/* Tooltip 和 Dropdown 分别绑定原生节点，避免对 Dropdown 调用 findDOMNode。 */}
+                      <span>
+                        <Dropdown
+                          open={isOpen}
+                          trigger={['click']}
+                          placement="topLeft"
+                          arrow={false}
+                          popupRender={renderDropdown(index)}
+                          onOpenChange={(open) => {
+                            if (!open) setOpenDropdown(null);
+                          }}
+                        >
+                          <span
+                            className="footer__breadcrumb-segment"
+                            onClick={() => handleSegmentClick(index)}
+                            onContextMenu={(e) => handleContextMenu(e, index)}
+                          >
+                            {/^[A-Z]:\\$/i.test(segment) ? segment.substring(0, 2) : segment}
+                          </span>
+                        </Dropdown>
                       </span>
-                      </Dropdown>
                     </Tooltip>
                   </span>
                 );

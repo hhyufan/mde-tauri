@@ -245,6 +245,19 @@
   gap: 8px;
 }
 
+.setting-font-size {
+  width: 180px;
+
+  > .ant-input-number {
+    flex: 1;
+    min-width: 0;
+  }
+
+  .ant-input-number-input {
+    min-width: 0;
+  }
+}
+
 .setting-row__action-btn {
   padding: 6px 12px;
   border-radius: var(--radius-sm);
@@ -523,6 +536,7 @@
       > .ant-input,
       > .ant-input-affix-wrapper,
       > .ant-input-number,
+      > .setting-font-size,
       > .ant-select {
         width: 100% !important;
         min-width: 0;
