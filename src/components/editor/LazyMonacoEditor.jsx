@@ -8,12 +8,13 @@ import { useTranslation } from 'react-i18next';
 import { Spin } from 'antd';
 import { LoadingOutlined } from '@ant-design/icons';
 
-// 必须先执行 `monacoLocaleBoot`，再求值 `monaco-editor`。
-// 原因是 Monaco 会在模块顶层缓存本地化文案，所以这里把启动模块串到
-// 动态导入链最前面，让它和 Monaco 共享同一个懒加载边界：
-// 只有在编辑器真正即将挂载时才初始化语言，而不是在应用启动时提前加载。
+// Monaco 实例创建前必须先完成语言与主题注册。生产构建的 chunk 求值顺序与 dev
+// 不同，用统一门闩可以避免编辑器先用未定义的主题名创建出来，也不会出现先用
+// 内置主题、随后再异步换肤的闪一下。
 const MonacoEditor = lazy(() =>
-  import('@/utils/monacoLocaleBoot').then(() => import('./MonacoEditor'))
+  import('@/utils/monacoRuntimeBoot')
+    .then(({ prepareMonacoRuntime }) => prepareMonacoRuntime())
+    .then(() => import('./MonacoEditor'))
 );
 
 /**

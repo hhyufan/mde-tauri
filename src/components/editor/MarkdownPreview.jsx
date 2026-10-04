@@ -42,6 +42,7 @@ import 'prismjs/components/prism-sql';
 import 'prismjs/components/prism-java';
 import 'prismjs/components/prism-c';
 import 'prismjs/components/prism-cpp';
+import 'prismjs/components/prism-csharp';
 import 'prismjs/components/prism-go';
 import 'prismjs/components/prism-rust';
 import 'prismjs/components/prism-kotlin';
@@ -63,6 +64,8 @@ import useToastStore from '@store/useToastStore';
 import { parseFootnotes, addFootnoteJumpHandlers } from '@utils/footnoteParser';
 import { loadMarkdownImageSrc, parseMarkdownLineHint, resolveMarkdownLinkPath } from '@utils/markdownAssets';
 import MermaidRenderer from './MermaidRenderer';
+import MarkdownCodePre from './MarkdownCodePre';
+import { rehypeCodeBlockIndexes } from '@utils/markdownCodeBlocks';
 import './markdown-preview.scss';
 
 /**
@@ -104,6 +107,7 @@ const LANG_DISPLAY = {
   scss: 'SCSS', sass: 'Sass', bash: 'Bash', shell: 'Shell', sh: 'Shell',
   mermaid: 'Mermaid', jsx: 'JSX', tsx: 'TSX', vue: 'Vue',
   toml: 'TOML', ini: 'INI', lua: 'Lua', r: 'R', dart: 'Dart',
+  cs: 'C#', csharp: 'C#', 'c#': 'C#',
 };
 
 /**
@@ -148,6 +152,7 @@ const rehypePlugins = [
   rehypeRaw,
   [rehypeSanitize, sanitizeSchema],
   rehypeKatex,
+  rehypeCodeBlockIndexes,
 ];
 
 /**
@@ -157,8 +162,8 @@ const rehypePlugins = [
  * @returns {JSX.Element} 代码节点对应的渲染结果。
  */
 const CodeBlock = memo(function CodeBlock({ children, className, ...props }) {
-  const match = /language-(\w+)/.exec(className || '');
-  const lang = match ? match[1] : '';
+  const match = /language-([^\s]+)/.exec(className || '');
+  const lang = (match ? match[1] : '').toLowerCase().replace(/^c#$/, 'csharp');
   const code = String(children).replace(/\n$/, '');
 
   if (lang === 'mermaid') {
@@ -301,30 +306,9 @@ const MarkdownPreview = forwardRef(function MarkdownPreview({ className }, ref) 
   // 与侧边栏一起卡顿的概率。
   const content = useDeferredValue(processedContent);
 
-  /**
-   * 根据当前主题动态装载 Prism 样式表。
-   */
-  const loadPrismTheme = useCallback(() => {
-    const existing = document.getElementById('prism-theme');
-    if (existing) existing.remove();
-
-    const isDark = document.documentElement.dataset.theme === 'dark';
-    const link = document.createElement('link');
-    link.id = 'prism-theme';
-    link.rel = 'stylesheet';
-    link.href = isDark ? '/prism-one-dark.css' : '/prism-one-light.css';
-    document.head.appendChild(link);
-  }, []);
-
-  useEffect(() => {
-    loadPrismTheme();
-    const observer = new MutationObserver(() => loadPrismTheme());
-    observer.observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
-    return () => {
-      observer.disconnect();
-      document.getElementById('prism-theme')?.remove();
-    };
-  }, [loadPrismTheme]);
+  // Prism 的代码块配色随应用样式表一起打包（见 `@styles/prism-theme.scss`），
+  // 这里不再在运行时插入/移除 `<link id="prism-theme">`：那个元素此前由本组件和
+  // Milkdown 编辑器共抢，任何一方卸载都会摘掉另一方正在使用的样式表。
 
   // 代码块语言标签以幂等方式补入：只给尚未添加标签的 `<pre>` 追加按钮，
   // 避免每次渲染都先删后建，造成长文档下不必要的 DOM 抖动和重排。
@@ -489,7 +473,7 @@ const MarkdownPreview = forwardRef(function MarkdownPreview({ className }, ref) 
 
   const components = useMemo(() => ({
     code: CodeBlock,
-    pre: ({ children, ...props }) => <pre style={{ position: 'relative' }} {...props}>{children}</pre>,
+    pre: (props) => <MarkdownCodePre {...props} documentId={activeTabId} filePath={documentPath} fileName={activeTab?.name || 'Markdown'} />,
     h1: makeHeading('h1'),
     h2: makeHeading('h2'),
     h3: makeHeading('h3'),
@@ -555,7 +539,7 @@ const MarkdownPreview = forwardRef(function MarkdownPreview({ className }, ref) 
     img: ({ src, alt, ...props }) => (
       <MarkdownImage src={src} alt={alt} documentPath={documentPath} {...props} />
     ),
-  }), [documentPath, handleLinkClick]);
+  }), [activeTabId, activeTab?.name, documentPath, handleLinkClick]);
 
   const isStale = content !== processedContent;
   const fontSize = previewZoomSync ? editorFontSize : (previewFontSize || editorFontSize);

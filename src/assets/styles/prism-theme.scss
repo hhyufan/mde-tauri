@@ -1,0 +1,19 @@
+/**
+ * Prism 代码块配色。
+ *
+ * 这两套主题以前是 `public/prism-one-*.css`，由「预览」和「所见即所得」两个编辑器
+ * 各自在运行时往 `<head>` 插一个 `<link id="prism-theme">`，并在卸载时把它删掉。
+ * 同一个 id 被两个组件争抢，任何一个卸载都会把另一个正在用的样式表摘掉；而且所见即所得
+ * 模式挂载的是 Milkdown，完全不经过预览组件，于是代码块只有 Prism 生成的 token 结构、
+ * 没有任何颜色。
+ *
+ * 现在两套主题随应用样式表一起打包：浅色是默认值，深色只在 `[data-theme='dark']`
+ * 下生效，因此不存在加载时序、404 或互相摘除的问题。
+ */
+@use 'sass:meta';
+
+@include meta.load-css('prism-one-light');
+
+[data-theme='dark'] {
+  @include meta.load-css('prism-one-dark');
+}

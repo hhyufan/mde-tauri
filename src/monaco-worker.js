@@ -8,10 +8,8 @@ import jsonWorker from 'monaco-editor/esm/vs/language/json/json.worker?worker';
 import cssWorker from 'monaco-editor/esm/vs/language/css/css.worker?worker';
 import htmlWorker from 'monaco-editor/esm/vs/language/html/html.worker?worker';
 import tsWorker from 'monaco-editor/esm/vs/language/typescript/ts.worker?worker';
-// 语言环境会在更早阶段于 src/utils/monacoLocaleBoot.js 中完成初始化
-// （它会在 main.jsx 里最先被导入），以确保设置发生在 monaco-editor
-// 模块代码执行之前。这里不再调用 initMonacoLocale()，因为在当前时机
-// 下，MonacoEditor.jsx 已经导入过 monaco-editor。
+// Monaco 的语言与主题注册由 `src/utils/monacoRuntimeBoot.js` 统一负责，它会在
+// 任何编辑器实例创建之前完成注册。这里只负责 worker 路由。
 
 self.MonacoEnvironment = {
   /**

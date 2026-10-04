@@ -4,22 +4,27 @@
  * 该文件负责在 Monaco、Markdown 所见即所得和只读预览之间切换，并集中
  * 处理排版缩放、分栏拖拽与自动保存触发等工作区级交互。
  */
-import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Component, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Tooltip } from 'antd';
 import useEditorStore from '@store/useEditorStore';
 import useConfigStore from '@store/useConfigStore';
 import MonacoEditor from '@components/editor/LazyMonacoEditor';
 import FloatingToolbar from '@components/editor/FloatingToolbar';
+import FloatingRunButton from '@components/editor/FloatingRunButton';
 import ToastContainer from '@components/ui/Toast';
 import { useFileManager } from '@hooks/useFileManager';
 import { useResponsiveLayout } from '@hooks/useResponsiveLayout';
+import { lazyWithRetry } from '@utils/lazyWithRetry';
+import { openExternal } from '@utils/tauriApi';
+import { externalLink } from '@utils/editorLinks';
 import './editor-content.scss';
 
 // Markdown 相关渲染器保持在懒加载边界之后，确保非 Markdown 文件仍然走
 // 轻量的 Monaco 路径；纯预览模式使用可编辑的所见即所得，分栏预览则只读。
-const MilkdownMarkdownEditor = lazy(() => import('@components/editor/MilkdownMarkdownEditor'));
-const MarkdownPreview = lazy(() => import('@components/editor/MarkdownPreview'));
+const MilkdownMarkdownEditor = lazyWithRetry(() => import('@components/editor/MilkdownMarkdownEditor'));
+const MarkdownPreview = lazyWithRetry(() => import('@components/editor/MarkdownPreview'));
+const TreeEditor = lazyWithRetry(() => import('@components/editor/TreeEditor'));
 
 /**
  * Markdown 预览懒加载期间的占位节点。
@@ -29,6 +34,43 @@ const MarkdownPreview = lazy(() => import('@components/editor/MarkdownPreview'))
 const PreviewFallback = () => (
   <div style={{ flex: 1, minHeight: 0 }} />
 );
+
+/**
+ * 将渲染器加载或初始化错误限制在编辑区内部，避免错误继续冒泡到应用根节点。
+ */
+class RendererErrorBoundary extends Component {
+  state = { error: null };
+
+  static getDerivedStateFromError(error) {
+    return { error };
+  }
+
+  componentDidCatch(error, info) {
+    console.error('Markdown renderer failed:', error, info);
+  }
+
+  render() {
+    if (this.state.error) return this.props.fallback;
+    return this.props.children;
+  }
+}
+
+/**
+ * 渲染器多次加载失败后的局部恢复界面。
+ *
+ * @returns {JSX.Element} 带有重新加载操作的错误提示。
+ */
+function RendererLoadError() {
+  const { t } = useTranslation();
+  return (
+    <div className="editor-content__renderer-error" role="alert">
+      <strong>{t('editor.rendererLoadFailed')}</strong>
+      <button type="button" onClick={() => window.location.reload()}>
+        {t('editor.reloadRenderer')}
+      </button>
+    </div>
+  );
+}
 
 const MIN_FONT_SIZE = 10;
 const MAX_FONT_SIZE = 24;
@@ -164,10 +206,9 @@ function resolveZoomArea(target) {
  */
 function resolveZoomTarget(target, { viewMode, isMarkdown }) {
   if (!isMarkdown) return ZOOM_AREA_EDITOR;
-  if (viewMode === 'preview') return ZOOM_AREA_PREVIEW;
-  if (viewMode !== 'split') return ZOOM_AREA_EDITOR;
-
   const { previewZoomSync = true } = useConfigStore.getState();
+  if (viewMode === 'preview') return previewZoomSync ? ZOOM_TARGET_BOTH : ZOOM_AREA_PREVIEW;
+  if (viewMode !== 'split') return ZOOM_AREA_EDITOR;
   if (previewZoomSync) return ZOOM_TARGET_BOTH;
 
   return resolveZoomArea(target) || ZOOM_AREA_EDITOR;
@@ -199,6 +240,17 @@ function EditorContent() {
     [tabs, activeTabId],
   );
   const isMarkdown = /\.(md|markdown|mdx)$/i.test(activeTabMeta?.name || '');
+  const isTree = activeTabMeta?.ext?.toLowerCase() === 'mgtree';
+  const hasPreview = isMarkdown || isTree;
+  const handleTreeSourceChange = useCallback((content) => {
+    const editor = monacoRef.current?.getEditor?.();
+    const model = editor?.getModel();
+    if (!model) return false;
+    editor.pushUndoStop();
+    editor.executeEdits('tree-editor', [{ range: model.getFullModelRange(), text: content }]);
+    editor.pushUndoStop();
+    return true;
+  }, []);
   const handlePreviewRef = useCallback((instance) => {
     previewRef.current = instance;
     setPreviewSyncHandle((current) => (current === instance ? current : instance));
@@ -314,9 +366,19 @@ function EditorContent() {
       if (Math.abs(wheelAccumulator) < WHEEL_ZOOM_THRESHOLD) return;
 
       const step = wheelAccumulator > 0 ? -1 : 1;
-      const zoomTarget = resolveZoomTarget(event.target, { viewMode, isMarkdown });
+      const zoomTarget = resolveZoomTarget(event.target, { viewMode, isMarkdown: hasPreview });
       wheelAccumulator = 0;
       applyTypography(getNextTypographyUpdate(zoomTarget, step));
+    };
+
+    const handleExternalClick = (event) => {
+      if (!(event.ctrlKey || event.metaKey) || event.button !== 0) return;
+      const anchor = event.target?.closest?.('a[href]');
+      const url = externalLink(anchor?.getAttribute('href'));
+      if (!url) return;
+      event.preventDefault();
+      event.stopPropagation();
+      void openExternal(url).catch((error) => console.error('Unable to open link:', error));
     };
 
     // 触屏双指缩放单独走手势距离比例推导，避免把连续手势强行离散成滚轮步进，
@@ -340,7 +402,7 @@ function EditorContent() {
 
       isPinching = true;
       pinchInitialDistance = distance;
-      pinchZoomTarget = resolveZoomTarget(event.target, { viewMode, isMarkdown });
+      pinchZoomTarget = resolveZoomTarget(event.target, { viewMode, isMarkdown: hasPreview });
       pinchInitialFontSize = getTypographyState(
         pinchZoomTarget === ZOOM_TARGET_BOTH ? ZOOM_AREA_EDITOR : pinchZoomTarget
       ).currentFontSize;
@@ -370,6 +432,7 @@ function EditorContent() {
     };
 
     container.addEventListener('wheel', handleWheel, { passive: false, capture: true });
+    container.addEventListener('click', handleExternalClick, true);
     container.addEventListener('touchstart', handleTouchStart, { passive: true });
     container.addEventListener('touchmove', handleTouchMove, { passive: false });
     container.addEventListener('touchend', handleTouchEnd, { passive: true });
@@ -378,12 +441,13 @@ function EditorContent() {
     return () => {
       if (wheelResetTimer) clearTimeout(wheelResetTimer);
       container.removeEventListener('wheel', handleWheel, { capture: true });
+      container.removeEventListener('click', handleExternalClick, true);
       container.removeEventListener('touchstart', handleTouchStart);
       container.removeEventListener('touchmove', handleTouchMove);
       container.removeEventListener('touchend', handleTouchEnd);
       container.removeEventListener('touchcancel', handleTouchEnd);
     };
-  }, [isMarkdown, setConfig, viewMode]);
+  }, [activeTabId, hasPreview, setConfig, viewMode]);
 
   useEffect(() => {
     if (viewMode !== 'split' || !isMarkdown || !previewZoomSync) return undefined;
@@ -464,16 +528,25 @@ function EditorContent() {
           />
         )}
         {viewMode === 'preview' && isMarkdown && (
-          <Suspense fallback={<PreviewFallback />}>
-            <MilkdownMarkdownEditor
-              key={activeTabId}
-              ref={monacoRef}
-              className="editor-content__preview editor-content__editor--milkdown"
-              onAutoSave={triggerAutoSave}
-            />
-          </Suspense>
+          <RendererErrorBoundary fallback={<RendererLoadError />}>
+            <Suspense fallback={<PreviewFallback />}>
+              <MilkdownMarkdownEditor
+                key={activeTabId}
+                ref={monacoRef}
+                className="editor-content__preview editor-content__editor--milkdown"
+                onAutoSave={triggerAutoSave}
+              />
+            </Suspense>
+          </RendererErrorBoundary>
         )}
-        {viewMode === 'split' && isMarkdown && (
+        {viewMode === 'preview' && isTree && (
+          <RendererErrorBoundary fallback={<RendererLoadError />}>
+            <Suspense fallback={<PreviewFallback />}>
+              <TreeEditor key={activeTabId} className="editor-content__preview" onAutoSave={triggerAutoSave} />
+            </Suspense>
+          </RendererErrorBoundary>
+        )}
+        {viewMode === 'split' && hasPreview && (
           <>
             <MonacoEditor
               key={`${activeTabId}-split`}
@@ -487,15 +560,22 @@ function EditorContent() {
                 onPointerDown={handleDividerPointerDown}
               />
             </Tooltip>
-            <Suspense fallback={<PreviewFallback />}>
-              <MarkdownPreview
-                ref={handlePreviewRef}
-                className="editor-content__preview editor-content__preview--half"
-              />
-            </Suspense>
+            <RendererErrorBoundary fallback={<RendererLoadError />}>
+              <Suspense fallback={<PreviewFallback />}>
+                {isTree ? <TreeEditor
+                  key={activeTabId}
+                  className="editor-content__preview editor-content__preview--half"
+                  onAutoSave={triggerAutoSave}
+                  onSourceChange={handleTreeSourceChange}
+                /> : <MarkdownPreview
+                  ref={handlePreviewRef}
+                  className="editor-content__preview editor-content__preview--half"
+                />}
+              </Suspense>
+            </RendererErrorBoundary>
           </>
         )}
-        {!isMarkdown && viewMode !== 'edit' && (
+        {!hasPreview && viewMode !== 'edit' && (
           <MonacoEditor
             key={`${activeTabId}-fallback`}
             ref={monacoRef}
@@ -504,7 +584,8 @@ function EditorContent() {
           />
         )}
 
-        <div className="editor-content__fade" />
+        {!isTree && <div className="editor-content__fade" />}
+        <FloatingRunButton />
       </div>
 
       {/* 浮动工具栏放在工作区外层，避免被内部 `overflow: hidden` 裁切。 */}

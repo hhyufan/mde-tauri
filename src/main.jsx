@@ -3,12 +3,12 @@
  *
  * ?????????????????????? Ant Design ??????
  */
-// 说明：这里不再直接导入 `monacoLocaleBoot`。
-// 它之前位于本文件顶部，是因为 Monaco 会在模块加载时捕获 NLS 文案，
-// 所以必须在 `monaco-editor` 首次加载前就把语言环境设好。
-// 现在这段启动逻辑已经挪到 `LazyMonacoEditor` 的动态导入链中：
-// Monaco 仍会在真正执行前拿到正确语言，但 NLS 适配层和 zh-hans 字典
-// 不再进入应用首屏启动成本。详见 `src/components/editor/LazyMonacoEditor.jsx`。
+// 说明：Monaco 的语言与主题注册不在应用首屏执行。
+// 整套 `monaco-editor-nls-adapter` 本地化方案已下线（它需要在构建期重写 Monaco
+// 源码，并保证 zh-hans 字典先于编辑器求值），现在 Monaco 使用内置英文界面。
+// 剩余的运行时准备（mgtree 语言 + 两套主题）仍在编辑器挂载前的同一条懒加载
+// 链里完成，详见 `src/components/editor/LazyMonacoEditor.jsx` 与
+// `src/utils/monacoRuntimeBoot.js`。
 
 import React, { lazy, Suspense } from 'react';
 import ReactDOM from 'react-dom/client';
@@ -16,6 +16,7 @@ import { StyleProvider } from '@ant-design/cssinjs';
 import ThemedConfigProvider from '@/antd/ThemedConfigProvider';
 import './i18n';
 import '@styles/index.scss';
+import '@styles/prism-theme.scss';
 import '@styles/antd-overrides.scss';
 
 // StrictMode 在开发态很有价值：它会通过额外执行一次 effect 来暴露副作用问题。

@@ -61,7 +61,7 @@ import { html, xml } from '@codemirror/legacy-modes/mode/xml';
 import { python } from '@codemirror/legacy-modes/mode/python';
 import { sql } from '@codemirror/legacy-modes/mode/sql';
 import { shell } from '@codemirror/legacy-modes/mode/shell';
-import { c, cpp, dart, java, kotlin } from '@codemirror/legacy-modes/mode/clike';
+import { c, cpp, csharp, dart, java, kotlin } from '@codemirror/legacy-modes/mode/clike';
 import { go } from '@codemirror/legacy-modes/mode/go';
 import { rust } from '@codemirror/legacy-modes/mode/rust';
 import { ruby } from '@codemirror/legacy-modes/mode/ruby';
@@ -85,6 +85,7 @@ import 'prismjs/components/prism-sql';
 import 'prismjs/components/prism-java';
 import 'prismjs/components/prism-c';
 import 'prismjs/components/prism-cpp';
+import 'prismjs/components/prism-csharp';
 import 'prismjs/components/prism-go';
 import 'prismjs/components/prism-rust';
 import 'prismjs/components/prism-kotlin';
@@ -107,9 +108,12 @@ import useConfigStore from '@store/useConfigStore';
 import useToastStore from '@store/useToastStore';
 import { useEditorBufferContent } from '@hooks/useEditorBufferContent';
 import { setBuffer } from '@utils/editorBuffer';
+import { isImeComposing } from '@utils/keyboard';
 import { hydrateMarkdownImages, parseMarkdownLineHint, resolveMarkdownLinkPath } from '@utils/markdownAssets';
 import i18n from '@/i18n';
 import MermaidRenderer from './MermaidRenderer';
+import { attachCodeBlockExecutions } from './milkdownCodeBlockRuns';
+import { isAndroidRuntime } from '@utils/platform';
 import './markdown-preview.scss';
 
 /**
@@ -126,6 +130,7 @@ const LANG_DISPLAY = {
   scss: 'SCSS', sass: 'Sass', bash: 'Bash', shell: 'Shell', sh: 'Shell',
   mermaid: 'Mermaid', jsx: 'JSX', tsx: 'TSX', vue: 'Vue',
   toml: 'TOML', ini: 'INI', lua: 'Lua', r: 'R', dart: 'Dart',
+  cs: 'C#', csharp: 'C#', 'c#': 'C#',
 };
 
 const codeHighlightStyle = HighlightStyle.define([
@@ -834,6 +839,7 @@ const codeLanguages = [
   languageDescription('Shell', ['bash', 'shell', 'sh', 'powershell'], shell),
   languageDescription('C', ['c'], c),
   languageDescription('C++', ['cpp', 'c++'], cpp),
+  languageDescription('C#', ['cs', 'csharp', 'c#'], csharp),
   languageDescription('Java', ['java'], java),
   languageDescription('Kotlin', ['kotlin', 'kt'], kotlin),
   languageDescription('Go', ['go'], go),
@@ -939,7 +945,7 @@ function renderCodeBlockPreview(language, content, applyPreview) {
  */
 function isInteractiveToolbarTarget(target) {
   return target instanceof Element
-    && !!target.closest('.tools, .language-button, .preview-toggle-button, .language-picker, .lang-tag');
+    && !!target.closest('.tools, .language-button, .preview-toggle-button, .language-picker, .lang-tag, .md-code-execution');
 }
 
 /**
@@ -1007,6 +1013,7 @@ function getEventTargetElement(target) {
  * @returns {boolean} 事件被消费时返回 `true`。
  */
 function commitTypedCodeBlockLanguage(view, event) {
+  if (isImeComposing(event)) return false;
   if (event.key !== 'Enter') return false;
 
   const target = event.target;
@@ -1224,9 +1231,9 @@ function enhanceCodeBlocks(container, { readOnly, mermaidRoots }) {
     const code = pre.querySelector('code');
     if (!code) return;
 
-    const rawLang = pre.dataset.language
+    const rawLang = (pre.dataset.language
       || [...code.classList].find((item) => item.startsWith('language-'))?.replace('language-', '')
-      || '';
+      || '').toLowerCase().replace(/^c#$/, 'csharp');
 
     if (rawLang) {
       pre.classList.add(`language-${rawLang}`);
@@ -1540,35 +1547,30 @@ function MilkdownInner({
     },
   }), [content]);
 
-  /**
-   * 根据当前主题切换 Prism 高亮样式表。
-   *
-   * @returns {void}
-   */
-  const loadPrismTheme = useCallback(() => {
-    const existing = document.getElementById('prism-theme');
-    if (existing) existing.remove();
-
-    const isDark = document.documentElement.dataset.theme === 'dark';
-    const link = document.createElement('link');
-    link.id = 'prism-theme';
-    link.rel = 'stylesheet';
-    link.href = isDark ? '/prism-one-dark.css' : '/prism-one-light.css';
-    document.head.appendChild(link);
-  }, []);
-
   useEffect(() => {
-    loadPrismTheme();
+    if (editorInfo.loading || !wrapperRef.current || isAndroidRuntime()) return undefined;
+    return attachCodeBlockExecutions({
+      root: wrapperRef.current, documentId: activeTabId, filePath: documentPath,
+      fileName: useEditorStore.getState().tabs.find((tab) => tab.id === activeTabId)?.name || 'Markdown',
+      getView: () => {
+        try { return editorRef.current?.action((ctx) => ctx.get(editorViewCtx)); }
+        catch { return null; }
+      },
+    });
+  }, [activeTabId, documentPath, editorInfo.loading]);
+
+  // Prism 的代码块配色随应用样式表一起打包（见 `@styles/prism-theme.scss`）。
+  // 这里保留主题观察器，因为 Milkdown 需要重渲染才能把新主题传给 Mermaid 等渲染器，
+  // 但不再插入/移除 `<link id="prism-theme">`。
+  useEffect(() => {
     const observer = new MutationObserver(() => {
-      loadPrismTheme();
       setRenderTick((value) => value + 1);
     });
     observer.observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
     return () => {
       observer.disconnect();
-      document.getElementById('prism-theme')?.remove();
     };
-  }, [loadPrismTheme]);
+  }, []);
 
   useEffect(() => {
     const wrapper = wrapperRef.current;

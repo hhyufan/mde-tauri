@@ -9,6 +9,13 @@ import * as monaco from 'monaco-editor';
 import '@/monaco-worker';
 import useEditorStore from '@store/useEditorStore';
 import useConfigStore from '@store/useConfigStore';
+import useLspStore from '@store/useLspStore';
+import { attachMonacoLsp } from '@/services/monacoLsp';
+import { languageSuggestionOptions } from '@/services/monacoLanguageServices';
+import { watchMonacoProblems } from '@/services/monacoProblems';
+import useProblemsStore from '@store/useProblemsStore';
+import { readFileContent, openExternal } from '@utils/tauriApi';
+import { externalLink } from '@utils/editorLinks';
 import { getFileLanguage } from '@utils/fileLanguage';
 import { initMonacoShiki, isMonacoShikiReady, getMonacoThemeName } from '@utils/monacoShiki';
 import { setBuffer, getBuffer, hasBuffer } from '@utils/editorBuffer';
@@ -16,7 +23,6 @@ import MonacoContextMenu from './MonacoContextMenu';
 import MobileSelectionBar from './MobileSelectionBar';
 import MonacoSelectionHandles from './MonacoSelectionHandles';
 import { useResponsiveLayout } from '@hooks/useResponsiveLayout';
-import { setMonacoLocale } from '@utils/monacoLocale';
 import './monaco-editor.scss';
 
 /**
@@ -42,16 +48,17 @@ const MonacoEditorComponent = forwardRef(function MonacoEditorComponent({ classN
   const editorRef = useRef(null);
   const currentTabIdRef = useRef(null);
   const suppressModelChangeRef = useRef(false);
+  const pendingJump = useProblemsStore((state) => state.pendingJump);
 
   // 编辑器只关心当前激活的是哪个标签页，不直接订阅正文内容，因此输入过程
   // 不会反向触发本组件或其他内容感知组件的 React 重渲染。
   const activeTabId = useEditorStore((s) => s.activeTabId);
   const tabsRevision = useEditorStore((s) => s.tabsRevision);
+  const languageRevision = useLspStore((s) => s.revision);
   const markTabDirty = useEditorStore((s) => s.markTabDirty);
   const setCursorPosition = useEditorStore((s) => s.setCursorPosition);
   const setCharacterCount = useEditorStore((s) => s.setCharacterCount);
 
-  const language = useConfigStore((s) => s.language);
   const fontSize = useConfigStore((s) => s.fontSize);
   const fontFamilyBase = useConfigStore((s) => s.fontFamily);
   const lineHeight = useConfigStore((s) => s.lineHeight);
@@ -87,11 +94,9 @@ const MonacoEditorComponent = forwardRef(function MonacoEditorComponent({ classN
     setContextMenu({ visible: false, x: 0, y: 0 });
   }, []);
 
-  // 让 Monaco 自带界面文案与应用语言保持同步。NLS 代理会在渲染时拦截
-  // `localize()`，因此用户下次打开查找框、命令面板等控件时就会应用新语言。
-  useEffect(() => {
-    setMonacoLocale(language);
-  }, [language]);
+  // 说明：Monaco 自带界面文案（查找框、命令面板、右键菜单）目前固定使用其内置英文，
+  // 这是有意为之的过渡状态——之前通过 `monaco-editor-nls-adapter` 在构建期重写
+  // Monaco 源码实现的本地化已经整体下线，相关依赖与启动顺序约束一并移除。
 
   useImperativeHandle(ref, () => ({
     getEditor: () => editorRef.current,
@@ -175,10 +180,20 @@ const MonacoEditorComponent = forwardRef(function MonacoEditorComponent({ classN
 
     editorRef.current = editor;
     setEditorInstance(editor);
+    const linkOpener = monaco.editor.registerLinkOpener({
+      async open(resource) {
+        const url = externalLink(resource.toString());
+        if (!url) return false;
+        try { await openExternal(url); } catch (error) { console.error('Unable to open link:', error); }
+        return true;
+      },
+    });
 
     let dirtyMarkScheduled = false;
     let charCountScheduled = false;
-    let autoSaveScheduled = false;
+    let autoSaveTimer = null;
+    let autoSavePending = false;
+    let isComposing = false;
 
     /**
      * 延迟写入脏标记，避免每次击键都直接触发状态更新。
@@ -211,13 +226,32 @@ const MonacoEditorComponent = forwardRef(function MonacoEditorComponent({ classN
      * 在短暂空闲后触发自动保存回调，合并连续输入期间的多次变更。
      */
     const scheduleAutoSave = () => {
-      if (autoSaveScheduled) return;
-      autoSaveScheduled = true;
-      setTimeout(() => {
-        autoSaveScheduled = false;
+      autoSavePending = true;
+      if (isComposing || autoSaveTimer !== null) return;
+      autoSaveTimer = setTimeout(() => {
+        autoSaveTimer = null;
+        if (isComposing || !autoSavePending) return;
+        autoSavePending = false;
         onAutoSaveRef.current?.();
       }, 300);
     };
+
+    // 组合输入跟踪。监听器挂在编辑器自身的事件分发器上，编辑器 dispose 时会一并
+    // 清理，因此这里不保存 disposable——之前把它存在局部变量里、并在「搜索跳转」
+    // 事件中提前 dispose，会让 `isComposing` 永久停在释放那一刻的值。
+    editor.onDidCompositionStart(() => {
+      isComposing = true;
+      if (autoSaveTimer !== null) {
+        clearTimeout(autoSaveTimer);
+        autoSaveTimer = null;
+      }
+    });
+    editor.onDidCompositionEnd(() => {
+      isComposing = false;
+      // Monaco can emit its final content change after compositionend. Let
+      // that event update the buffer before the pending save is dispatched.
+      if (autoSavePending) scheduleAutoSave();
+    });
 
     editor.onDidChangeModelContent(() => {
       if (suppressModelChangeRef.current) return;
@@ -292,17 +326,25 @@ const MonacoEditorComponent = forwardRef(function MonacoEditorComponent({ classN
       setContextMenu({ visible: true, x, y });
     });
 
-    initMonacoShiki().then(() => {
-      if (editorRef.current) {
+    initMonacoShiki()
+      .then(() => {
+        if (!editorRef.current) return;
         setHighlighterReady(true);
         const dark = document.documentElement.dataset.theme === 'dark';
         try {
           monaco.editor.setTheme(getMonacoThemeName(dark));
-        } catch (_) {
-          monaco.editor.setTheme(dark ? 'vs-dark' : 'vs');
+        } catch (error) {
+          console.error('[mde/highlight] failed to apply Monaco theme:', error);
+          try {
+            monaco.editor.setTheme(dark ? 'vs-dark' : 'vs');
+          } catch (_) {
+            /* Monaco 内置主题同样不可用时保持当前主题，不影响编辑。 */
+          }
         }
-      }
-    });
+      })
+      .catch((error) => {
+        console.error('[mde/highlight] Monaco highlight bootstrap rejected:', error);
+      });
 
     /**
      * 响应大纲跳转事件，将编辑器视口定位到目标行。
@@ -334,6 +376,9 @@ const MonacoEditorComponent = forwardRef(function MonacoEditorComponent({ classN
       editor.focus();
 
       if (jumpDecorTimer) clearTimeout(jumpDecorTimer);
+      // 这里刻意不释放组合事件监听：一旦释放，局部的 `isComposing` 就会永远停留在
+      // 释放瞬间的值，此后自动保存要么彻底不再触发，要么在输入法组合中途触发。
+      if (autoSaveTimer !== null) { clearTimeout(autoSaveTimer); autoSaveTimer = null; }
       if (jumpDecoration) { jumpDecoration.clear(); jumpDecoration = null; }
 
       jumpDecoration = editor.createDecorationsCollection([{
@@ -366,7 +411,10 @@ const MonacoEditorComponent = forwardRef(function MonacoEditorComponent({ classN
       window.removeEventListener('editor:jump-to-line', handleSearchJump);
       window.removeEventListener('unhandledrejection', handleUnhandledRejection);
       if (jumpDecorTimer) clearTimeout(jumpDecorTimer);
+      const model = editor.getModel();
+      linkOpener.dispose();
       editor.dispose();
+      model?.dispose();
       editorRef.current = null;
       setEditorInstance(null);
     };
@@ -383,7 +431,9 @@ const MonacoEditorComponent = forwardRef(function MonacoEditorComponent({ classN
     if (!activeTabId || !tab) {
       currentTabIdRef.current = null;
       suppressModelChangeRef.current = true;
-      editor.setValue('');
+      const previous = editor.getModel();
+      editor.setModel(monaco.editor.createModel('', 'markdown'));
+      previous?.dispose();
       suppressModelChangeRef.current = false;
       return;
     }
@@ -393,6 +443,19 @@ const MonacoEditorComponent = forwardRef(function MonacoEditorComponent({ classN
       ? getBuffer(activeTabId, tab.content || '')
       : tab.content || '';
 
+    const lang = getFileLanguage(tab.name);
+    if (!monaco.languages.getLanguages().some((language) => language.id === lang)) monaco.languages.register({ id: lang });
+    const uri = tab.path && /^(?:[a-z]:[\\/]|\/)/i.test(tab.path)
+      ? monaco.Uri.file(tab.path)
+      : monaco.Uri.parse(`inmemory://mde/${encodeURIComponent(tab.id)}/${encodeURIComponent(tab.name)}`);
+    if (editor.getModel()?.uri.toString() !== uri.toString()) {
+      const previous = editor.getModel();
+      suppressModelChangeRef.current = true;
+      editor.setModel(monaco.editor.createModel(newValue, lang, uri));
+      suppressModelChangeRef.current = false;
+      previous?.dispose();
+    }
+
     if (editor.getValue() !== newValue) {
       const pos = editor.getPosition();
       suppressModelChangeRef.current = true;
@@ -401,12 +464,88 @@ const MonacoEditorComponent = forwardRef(function MonacoEditorComponent({ classN
       if (pos) editor.setPosition(pos);
     }
 
-    const lang = getFileLanguage(tab.name);
     const model = editor.getModel();
-    if (model) monaco.editor.setModelLanguage(model, lang);
+    if (model) {
+      useProblemsStore.getState().registerDocument({ tabId: tab.id, fileName: tab.name, filePath: tab.path || '',
+        uri: model.uri.toString(), modelUri: model.uri.toString() });
+      // 只在语言真的变化时才切换。`setModelLanguage` 会销毁并重建该 model 的
+      // 分词状态；对 Monaco 按需加载的语言，还会重新走一遍异步 tokenizer loader。
+      // 在外部改动、同步回写等场景下反复调用，会让可见行短暂失去 token，
+      // 表现就是「高亮闪烁 / 部分行丢色」。
+      if (model.getLanguageId() !== lang) {
+        monaco.editor.setModelLanguage(model, lang);
+      }
+      const desiredTabSize = lang === 'mgtree' ? 2 : tabSize;
+      const modelOptions = model.getOptions();
+      if (modelOptions.tabSize !== desiredTabSize || !modelOptions.insertSpaces) {
+        model.updateOptions({ tabSize: desiredTabSize, insertSpaces: true });
+      }
+    }
 
     setCharacterCount(newValue.length);
-  }, [activeTabId, tabsRevision, setCharacterCount]);
+  }, [activeTabId, tabsRevision, languageRevision, setCharacterCount, tabSize]);
+
+  useEffect(() => {
+    if (!editorInstance || !pendingJump || pendingJump.tabId !== activeTabId) return;
+    const model = editorInstance.getModel();
+    if (!model) return;
+    const { start, end } = pendingJump.range;
+    const range = model.validateRange(new monaco.Range(start.line + 1, start.character + 1, end.line + 1, end.character + 1));
+    editorInstance.setSelection(range);
+    editorInstance.revealRangeInCenter(range);
+    editorInstance.focus();
+    useProblemsStore.getState().finishJump(pendingJump.token);
+  }, [pendingJump, activeTabId, editorInstance]);
+
+  useEffect(() => {
+    if (!editorInstance) return;
+    let binding;
+    const bind = () => {
+      binding?.dispose();
+      const tab = useEditorStore.getState().getActiveTab();
+      const model = editorInstance.getModel();
+      editorInstance.trigger('language-services', 'hideSuggestWidget', null);
+      editorInstance.trigger('language-services', 'closeParameterHints', null);
+      if (model) editorInstance.updateOptions(languageSuggestionOptions(model.getLanguageId()));
+      binding = model && tab ? attachMonacoLsp(monaco, model, tab) : null;
+    };
+    bind();
+    const problemWatcher = watchMonacoProblems(monaco, editorInstance);
+    const modelChanged = editorInstance.onDidChangeModel(bind);
+    const languageChanged = editorInstance.onDidChangeModelLanguage(bind);
+    const configChanged = useLspStore.subscribe((state, previous) => {
+      if (state.revision === previous.revision) return;
+      bind();
+    });
+    const saved = useEditorStore.subscribe((state, previous) => {
+      const tab = state.tabs.find((tab) => tab.id === state.activeTabId);
+      const before = previous.tabs.find((candidate) => candidate.id === tab?.id);
+      if (tab && before?.modified && !tab.modified) binding?.save?.();
+    });
+    // Resolve definition targets into real tabs, so Monaco's navigation can open another file.
+    const opener = monaco.editor.registerEditorOpener({
+      async openCodeEditor(_source, resource, selection) {
+        if (resource.scheme !== 'file') return false;
+        try {
+          const result = await readFileContent(resource.fsPath);
+          if (!result.success) return false;
+          useEditorStore.getState().openFile({ path: resource.fsPath,
+            name: resource.path.split('/').pop(), content: result.content, encoding: result.encoding });
+          setTimeout(() => {
+            const position = selection?.startLineNumber
+              ? { lineNumber: selection.startLineNumber, column: selection.startColumn } : selection;
+            if (position) { editorInstance.setPosition(position); editorInstance.revealPositionInCenter(position); }
+            editorInstance.focus();
+          }, 0);
+          return true;
+        } catch (_) { return false; }
+      },
+    });
+    return () => {
+      binding?.dispose();
+      modelChanged.dispose(); languageChanged.dispose(); configChanged(); saved(); opener.dispose(); problemWatcher.dispose();
+    };
+  }, [editorInstance]);
 
   // 主题切换时优先使用 Shiki 主题，若高亮器尚未就绪则回退到 Monaco 默认主题。
   useEffect(() => {
@@ -443,7 +582,7 @@ const MonacoEditorComponent = forwardRef(function MonacoEditorComponent({ classN
     if (editorRef.current) {
       editorRef.current.updateOptions({
         wordWrap: wordWrap ? 'on' : 'off',
-        tabSize,
+        tabSize: editorRef.current.getModel()?.getLanguageId() === 'mgtree' ? 2 : tabSize,
         lineNumbers: lineNumbers ? 'on' : 'off',
         minimap,
       });

@@ -2,36 +2,6 @@ import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 import { resolve } from 'path';
 import { readFileSync } from 'fs';
-import { createRequire } from 'module';
-
-const _require = createRequire(import.meta.url);
-const { transform: transformMonacoNls } = _require('monaco-editor-nls-adapter/transform');
-const monacoNlsPlugin = {
-  name: 'monaco-nls-fixed',
-  enforce: 'pre',
-  transform(code, id) {
-    if (id.includes('\x00')) return null;
-    const cleanId = id.split('?')[0].replace(/\\/g, '/');
-    if (!cleanId.endsWith('.js') || !cleanId.includes('monaco-editor')) return null;
-    if (!cleanId.includes('monaco-editor/esm')) return null;
-
-    const result = transformMonacoNls(code, cleanId, {});
-    if (cleanId.endsWith('/vs/editor/contrib/find/browser/findWidget.js')) {
-      const outCode = (result && typeof result === 'object' ? result.code : result) || code;
-      console.log(
-        `[monaco-nls-fixed] findWidget transformed=${outCode.includes("nls.localize('vs/editor/contrib/find/browser/findWidget'")}`
-      );
-    }
-    if (result && typeof result === 'object') {
-      return result;
-    }
-    if (typeof result === 'string' && result !== code) {
-      return { code: result, map: null };
-    }
-    return null;
-  },
-};
-
 
 // Monaco ships a vendored copy of marked.js with a //# sourceMappingURL=marked.umd.js.map
 // comment, but the .map file is not included in the npm package. Vite's loadAndTransform
@@ -59,33 +29,25 @@ const stripMonacoBrokenSourcemaps = {
   },
 };
 
-// Diagnostic plugin — prints whether the NLS transform actually ran on Monaco files.
-// Runs AFTER the NLS plugin (no enforce), so it sees the post-transform code.
-let _nlsReported = { seen: 0, transformed: 0, sampleMissing: [] };
-const nlsDiagnostic = {
-  name: 'nls-diagnostic',
-  apply: 'serve',
-  transform(code, id) {
-    const cleanId = id.split('?')[0].replace(/\\/g, '/');
-    if (!cleanId.includes('monaco-editor') || !cleanId.endsWith('.js')) return null;
-    if (!cleanId.includes('/esm/')) return null;
-    _nlsReported.seen++;
-    const isTransformed =
-      code.includes("nls.localize('vs/") ||
-      code.includes('nls.localize("vs/') ||
-      code.includes("nls.localize2('vs/") ||
-      code.includes('nls.localize2("vs/');
-    if (isTransformed) {
-      _nlsReported.transformed++;
-    } else if (_nlsReported.sampleMissing.length < 3 && /nls\.localize/.test(code)) {
-      _nlsReported.sampleMissing.push(cleanId);
-    }
-    if (_nlsReported.seen % 20 === 0) {
-      console.log(
-        `[nls-diagnostic] seen=${_nlsReported.seen} transformed=${_nlsReported.transformed}` +
-          (_nlsReported.sampleMissing.length
-            ? ` missing-sample=${_nlsReported.sampleMissing[0]}`
-            : '')
+// `monaco-editor-nls-adapter` used to rewrite every `nls.localize(...)` call in
+// Monaco's ESM sources at build time so its UI could be translated through a
+// runtime proxy. That pipeline turned out to be far more fragile than it was
+// worth: it rewrote 160+ upstream modules, needed a custom CJS→ESM proxy shim,
+// and required build-time chunk-order assertions just to keep the locale
+// dictionary ahead of the editor. It has been removed; Monaco now ships its
+// stock English UI, which needs no rewriting at all.
+//
+// This guard keeps the removal honest: any transitive import that reintroduces
+// the adapter fails the build loudly instead of silently rebuilding the whole
+// fragile pipeline.
+const assertNoMonacoNls = {
+  name: 'assert-no-monaco-nls',
+  enforce: 'pre',
+  transform(_code, id) {
+    if (id.includes('monaco-editor-nls-adapter')) {
+      this.error(
+        'monaco-editor-nls-adapter is no longer part of the Monaco pipeline. ' +
+          'Remove the import instead of reintroducing the NLS source rewriting.'
       );
     }
     return null;
@@ -94,16 +56,8 @@ const nlsDiagnostic = {
 
 const host = process.env.TAURI_DEV_HOST;
 
-export default defineConfig(async ({ command }) => ({
-  plugins: [
-    stripMonacoBrokenSourcemaps,
-    monacoNlsPlugin,
-    // The NLS diagnostic plugin is purely a development-time sanity check —
-    // exclude it from production builds so it adds zero cost to the bundled
-    // pipeline.
-    ...(command === 'serve' ? [nlsDiagnostic] : []),
-    react(),
-  ],
+export default defineConfig(async () => ({
+  plugins: [stripMonacoBrokenSourcemaps, assertNoMonacoNls, react()],
 
   resolve: {
     alias: {
@@ -116,15 +70,6 @@ export default defineConfig(async ({ command }) => ({
       '@hooks': resolve(__dirname, './src/hooks'),
       '@utils': resolve(__dirname, './src/utils'),
       '@store': resolve(__dirname, './src/store'),
-      // Redirect the NLS proxy specifier that the vite-plugin injects into monaco
-      // source files to our ESM-native reimplementation. The upstream package
-      // ships CJS-only, which esbuild pre-bundles as `export default` — that
-      // breaks Monaco's `import * as nls from ...; nls.localize(...)` usage.
-      // Our shim provides real named exports so monaco can call them.
-      'monaco-editor-nls-adapter/proxy': resolve(
-        __dirname,
-        'src/vendor/monacoNlsProxy.js'
-      ),
     },
   },
 
@@ -164,7 +109,7 @@ export default defineConfig(async ({ command }) => ({
         // Use a function instead of Rollup's object form so Vite's internal
         // preload helper does not accidentally get placed into monaco-vendor.
         // If the entry imports that helper from monaco-vendor, Monaco executes
-        // at app startup before `monacoLocaleBoot` can seed the NLS dictionary.
+        // at app startup before the highlight/theme bootstrap can run.
         manualChunks(id) {
           if (id.includes('\x00vite/preload-helper')) return 'vite-preload-helper';
           if (!id.includes('node_modules')) return undefined;
@@ -181,7 +126,12 @@ export default defineConfig(async ({ command }) => ({
           const pkgMatch = norm.match(/node_modules\/(@[^/]+\/[^/]+|[^/]+)/);
           const pkgName = pkgMatch ? pkgMatch[1] : '';
 
-          if (norm.includes('monaco-editor')) return 'monaco-vendor';
+          // Keep Monaco in exactly one chunk. Monaco registers its editor
+          // contributions, languages and keybindings as module side effects, so
+          // it must never be duplicated across chunks: a second copy would
+          // create an editor whose tokenizers and keybinding service are
+          // registered on a different module registry.
+          if (pkgName === 'monaco-editor') return 'monaco-vendor';
           if (pkgName === '@antv/g2') return 'antv-vendor';
           if (pkgName === 'axios') return 'axios-vendor';
           if (pkgName === 'react-markdown'
@@ -219,7 +169,13 @@ export default defineConfig(async ({ command }) => ({
   },
 
   optimizeDeps: {
-    include: ['shiki'],
+    // Shiki and its Monaco bridge are loaded lazily by the highlight bootstrap.
+    // Pre-bundling them keeps a cold `vite dev` start from discovering them
+    // mid-session and triggering an extra full reload.
+    include: ['shiki', '@shikijs/monaco'],
+    // Monaco is intentionally served/processed as source: the highlight and
+    // theme bootstrap must run against the same module instance the editor is
+    // created from, and esbuild prebundling would duplicate it.
     exclude: ['monaco-editor'],
   },
 
