@@ -21,6 +21,7 @@ import {
   startDirectoryWatching,
   stopDirectoryWatching,
   onDirectoryChanged,
+  historyCapture,
   showInExplorer,
   getAppDocumentsDir,
   isSafUri,
@@ -686,6 +687,10 @@ export function useFileManager() {
           encoding: result.encoding || 'UTF-8',
           lineEnding: result.line_ending || 'LF',
         });
+        // 确保时间线有“编辑前”的基线：仅当当前内容与最近一条快照不同才写入。
+        // 已有历史（上次退出的终态）时内容一致，会被去重跳过，不会制造重复条目；
+        // 首次编辑或文件被外部修改时则补上一条，避免对比时新旧版本完全相同。
+        if (!isAndroid) historyCapture(filePath, result.content || '').catch(() => {});
         addRecentFile({ name: fileName, path: filePath, ext });
         if (!isAndroid) startFileWatching(filePath).catch(() => {});
       } else {
