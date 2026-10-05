@@ -18,6 +18,7 @@ import { GUEST_USER_SCOPE, isOwnedByUser } from '@store/userScope';
 import { useFileManager } from '@hooks/useFileManager';
 import FileTree from './explorer/FileTree';
 import OutlineView from './outline/OutlineView';
+import Timeline from '@components/history/Timeline';
 import UserMenu from '@components/ui/UserMenu';
 import FileTypeIcon from '@components/ui/FileTypeIcon';
 import { cn } from '@utils/classNames';
@@ -444,6 +445,7 @@ function Sidebar({ onOpenSettings, onOpenStats, onOpenLogin }) {
           <div className="sidebar__view">
             <ExplorerToolbar />
             <FileTree />
+            <Timeline />
           </div>
         )}
         {sidebarView === 'outline' && (

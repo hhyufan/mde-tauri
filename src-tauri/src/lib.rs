@@ -356,6 +356,7 @@ async fn write_file_content(path: String, content: String) -> Result<(), String>
 /// 并返回前端需要的已落盘文件元数据。
 #[tauri::command]
 async fn save_file(
+    app: AppHandle,
     file_path: String,
     content: String,
     encoding: Option<String>,
@@ -393,6 +394,15 @@ async fn save_file(
 
     match atomic_write(path, &encoded_bytes) {
         Ok(_) => {
+            // 保存成功后顺手记录一次本地历史快照；历史记录失败不影响保存结果。
+            // 只有当真正写入了新快照时才通知前端刷新时间线。
+            match capture_history(&app, &file_path, &content) {
+                Ok(true) => {
+                    let _ = app.emit("history-changed", &HistoryChangeEvent { path: file_path.clone() });
+                }
+                Ok(false) => {}
+                Err(history_error) => eprintln!("[history] capture failed: {history_error}"),
+            }
             let file_name = path
                 .file_name()
                 .and_then(|name| name.to_str())
@@ -419,6 +429,175 @@ async fn save_file(
             line_ending: None,
         }),
     }
+}
+
+/// 本地历史快照目录：`app_data_dir()/history/<文件绝对路径的 sha256>`。
+/// 每个文档一个子目录，避免路径转义与跨文件污染。
+fn history_directory(app: &AppHandle, file_path: &str) -> Result<PathBuf, String> {
+    let hash = format!("{:x}", Sha256::digest(file_path.as_bytes()));
+    app.path()
+        .app_data_dir()
+        .map(|path| path.join("history").join(hash))
+        .map_err(|error| format!("Failed to resolve history directory: {error}"))
+}
+
+/// 单个文档保留的历史快照数量上限，超出后裁剪最旧的。
+const HISTORY_MAX_SNAPSHOTS: usize = 100;
+
+/// 相邻快照的最小间隔（毫秒）。自动保存触发频繁，用时间合并避免时间线
+/// 被刷成秒级粒度；长时间连续编辑大约每分钟记录一条，接近 IDE 本地历史的手感。
+const HISTORY_COALESCE_MS: u64 = 60_000;
+
+/// 读取目录下所有快照时间戳（文件名即为毫秒时间戳）。
+fn list_history_timestamps(dir: &Path) -> Result<Vec<u64>, String> {
+    let mut timestamps = Vec::new();
+    for entry in fs::read_dir(dir).map_err(|error| format!("Failed to read history: {error}"))? {
+        let entry = entry.map_err(|error| format!("Failed to read history entry: {error}"))?;
+        if let Ok(ts) = entry.file_name().to_string_lossy().parse::<u64>() {
+            timestamps.push(ts);
+        }
+    }
+    Ok(timestamps)
+}
+
+/// 记录一次快照：内容与上一次一致时跳过，写入后裁剪到上限。
+/// 返回是否真正写入了新快照，供上层决定是否通知前端刷新。
+fn capture_history(app: &AppHandle, file_path: &str, content: &str) -> Result<bool, String> {
+    let dir = history_directory(app, file_path)?;
+    fs::create_dir_all(&dir).map_err(|error| format!("Failed to create history directory: {error}"))?;
+
+    let mut timestamps = list_history_timestamps(&dir)?;
+    timestamps.sort_unstable();
+    let now = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_millis() as u64;
+
+    if let Some(last) = timestamps.last() {
+        if let Ok(previous) = fs::read_to_string(dir.join(last.to_string())) {
+            if previous == content {
+                return Ok(false); // 内容未变，跳过。
+            }
+        }
+        // 距离上次快照太近时合并：保留时间线粒度稳定，不被自动保存刷屏。
+        if now.saturating_sub(*last) < HISTORY_COALESCE_MS {
+            return Ok(false);
+        }
+    }
+
+    atomic_write(&dir.join(now.to_string()), content.as_bytes())?;
+
+    if timestamps.len() + 1 > HISTORY_MAX_SNAPSHOTS {
+        timestamps.sort_unstable();
+        let excess = timestamps.len() + 1 - HISTORY_MAX_SNAPSHOTS;
+        for ts in timestamps.iter().take(excess) {
+            let _ = fs::remove_file(dir.join(ts.to_string()));
+        }
+    }
+    Ok(true)
+}
+
+/// 历史列表项：时间戳 + 字节数，用于时间线展示（不读正文）。
+#[derive(Serialize)]
+struct HistoryEntry {
+    timestamp: u64,
+    bytes: u64,
+}
+
+#[tauri::command]
+async fn history_list(app: AppHandle, file_path: String) -> Result<Vec<HistoryEntry>, String> {
+    let dir = history_directory(&app, &file_path)?;
+    if !dir.exists() {
+        return Ok(Vec::new());
+    }
+    let mut entries = Vec::new();
+    for ts in list_history_timestamps(&dir)? {
+        if let Ok(meta) = fs::metadata(dir.join(ts.to_string())) {
+            entries.push(HistoryEntry { timestamp: ts, bytes: meta.len() });
+        }
+    }
+    entries.sort_by(|a, b| b.timestamp.cmp(&a.timestamp));
+    Ok(entries)
+}
+
+#[tauri::command]
+async fn history_read(app: AppHandle, file_path: String, timestamp: u64) -> Result<String, String> {
+    let dir = history_directory(&app, &file_path)?;
+    fs::read_to_string(dir.join(timestamp.to_string()))
+        .map_err(|error| format!("Failed to read history snapshot: {error}"))
+}
+
+/// 显式记录当前内容为快照（恢复前用来保留“恢复点”）。
+#[tauri::command]
+async fn history_capture(app: AppHandle, file_path: String, content: String) -> Result<(), String> {
+    capture_history(&app, &file_path, &content).map(|_| ())
+}
+
+#[tauri::command]
+async fn history_clear(app: AppHandle, file_path: String) -> Result<(), String> {
+    let dir = history_directory(&app, &file_path)?;
+    if dir.exists() {
+        fs::remove_dir_all(&dir).map_err(|error| format!("Failed to clear history: {error}"))?;
+    }
+    Ok(())
+}
+
+/// 历史快照新增事件：保存后告诉前端刷新当前文件的时间线。
+#[derive(Serialize, Clone)]
+struct HistoryChangeEvent {
+    path: String,
+}
+
+/// 目录内容变化事件：外部增删改时告诉前端刷新资源管理器。
+#[derive(Serialize, Clone)]
+struct DirectoryChangeEvent {
+    dir: String,
+}
+
+/// 目录级监听状态：按目录路径管理 watcher，避免与文件级监听混用。
+static DIRECTORY_WATCHER_STATE: Lazy<Arc<Mutex<HashMap<String, Box<dyn Watcher + Send>>>>> =
+    Lazy::new(|| Arc::new(Mutex::new(HashMap::new())));
+
+/// 监听目录的直接子项变化（新增/删除/重命名），用于让资源管理器
+/// 在外部文件增删后自动刷新。内容写入（Modify(Data)）不在此列，
+/// 避免把高频的自动保存也扩散成整目录刷新。
+#[tauri::command]
+async fn start_directory_watching(app: AppHandle, dir_path: String) -> Result<bool, String> {
+    let path = PathBuf::from(&dir_path);
+    if !path.is_dir() {
+        return Err("Not a directory".to_string());
+    }
+    let app_clone = app.clone();
+    let dir_clone = dir_path.clone();
+    let mut watcher = notify::recommended_watcher(move |res: Result<Event, notify::Error>| {
+        if let Ok(event) = res {
+            let relevant = matches!(
+                event.kind,
+                EventKind::Create(_)
+                    | EventKind::Remove(_)
+                    | EventKind::Modify(notify::event::ModifyKind::Name(_))
+            );
+            if relevant {
+                let _ = app_clone.emit("directory-changed", &DirectoryChangeEvent { dir: dir_clone.clone() });
+            }
+        }
+    })
+    .map_err(|error| format!("Failed to create directory watcher: {error}"))?;
+
+    watcher
+        .watch(&path, RecursiveMode::NonRecursive)
+        .map_err(|error| format!("Failed to watch directory: {error}"))?;
+
+    DIRECTORY_WATCHER_STATE
+        .lock()
+        .unwrap()
+        .insert(dir_path, Box::new(watcher));
+    Ok(true)
+}
+
+#[tauri::command]
+async fn stop_directory_watching(dir_path: String) -> Result<bool, String> {
+    Ok(DIRECTORY_WATCHER_STATE.lock().unwrap().remove(&dir_path).is_some())
 }
 
 fn recovery_directory(app_handle: &AppHandle) -> Result<PathBuf, String> {
@@ -1516,6 +1695,12 @@ pub fn run() {
             get_app_documents_dir,
             get_cli_args,
             open_external,
+            history_list,
+            history_read,
+            history_capture,
+            history_clear,
+            start_directory_watching,
+            stop_directory_watching,
             script_runner::start_script,
             script_runner::stop_script,
             script_runner::write_script_input,

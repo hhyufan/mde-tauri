@@ -18,6 +18,10 @@ import {
   renameFile,
   startFileWatching,
   stopFileWatching,
+  startDirectoryWatching,
+  stopDirectoryWatching,
+  onDirectoryChanged,
+  historyCapture,
   showInExplorer,
   getAppDocumentsDir,
   isSafUri,
@@ -175,6 +179,7 @@ export function useFileManager() {
   const notify = useNotificationStore.getState().notify;
   const t = i18n.t.bind(i18n);
   const isAndroid = isAndroidRuntime();
+  const currentDir = useFileStore((s) => s.currentDir);
   const pendingUntitledSaveRef = useRef(new Set());
   const dismissedAutoSavePromptRef = useRef(new Set());
   const androidDocsDirRef = useRef(null);
@@ -392,6 +397,32 @@ export function useFileManager() {
       notify('error', t('notification.error'), String(err));
     }
   }, [sortDirectoryContents]);
+
+  // 目录切换时同步监听目标：停止旧目录监听，启动新目录监听。
+  // 仅桌面端本地路径生效；SAF URI 与 Android 由各自桥接处理。
+  useEffect(() => {
+    if (isAndroid || !currentDir || isSafUri(currentDir)) return undefined;
+    startDirectoryWatching(currentDir).catch(() => {});
+    return () => {
+      stopDirectoryWatching(currentDir).catch(() => {});
+    };
+  }, [currentDir, isAndroid]);
+
+  // 外部增删/重命名后自动刷新当前目录，避免资源管理器停留在旧快照。
+  useEffect(() => {
+    if (isAndroid) return undefined;
+    let timer = null;
+    const unlisten = onDirectoryChanged(({ dir }) => {
+      const active = useFileStore.getState().currentDir;
+      if (!active || dir !== active) return;
+      if (timer) clearTimeout(timer);
+      timer = setTimeout(() => loadFilesOnly(active), 300);
+    });
+    return () => {
+      if (timer) clearTimeout(timer);
+      unlisten.then((fn) => fn()).catch(() => {});
+    };
+  }, [isAndroid, loadFilesOnly]);
 
   // 供 TabBar 的 “+” 和资源管理器工具栏的 “+” 复用：
   // 若当前已打开目录，则触发资源管理器内联新建文件；
@@ -656,6 +687,9 @@ export function useFileManager() {
           encoding: result.encoding || 'UTF-8',
           lineEnding: result.line_ending || 'LF',
         });
+        // 记录“进入编辑前”的初始状态，作为本地历史的第一条快照；
+        // 与保存/定时快照共用同一套 60 秒合并判定，避免重复记录。
+        if (!isAndroid) historyCapture(filePath, result.content || '').catch(() => {});
         addRecentFile({ name: fileName, path: filePath, ext });
         if (!isAndroid) startFileWatching(filePath).catch(() => {});
       } else {

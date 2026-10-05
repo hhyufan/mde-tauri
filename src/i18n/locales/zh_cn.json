@@ -384,5 +384,16 @@
   "languageServices.phase.downloading": "正在下载",
   "languageServices.phase.extracting": "正在解压",
   "languageServices.phase.installing": "正在安装",
-  "languageServices.phase.uninstalling": "正在卸载"
+  "languageServices.phase.uninstalling": "正在卸载",
+  "history.title": "本地历史",
+  "history.open": "本地历史",
+  "history.empty": "暂无历史记录",
+  "history.current": "当前版本",
+  "history.restore": "恢复此版本",
+  "history.closeDiff": "关闭对比",
+  "history.clear": "清空历史",
+  "history.refresh": "刷新",
+  "history.versions": "{{count}} 个版本",
+  "history.restoreHint": "恢复前会先把当前内容保存为快照，之后仍可再次恢复。",
+  "history.restored": "已恢复到所选版本。"
 }

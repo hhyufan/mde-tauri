@@ -384,5 +384,16 @@
   "languageServices.phase.downloading": "Downloading",
   "languageServices.phase.extracting": "Extracting",
   "languageServices.phase.installing": "Installing",
-  "languageServices.phase.uninstalling": "Uninstalling"
+  "languageServices.phase.uninstalling": "Uninstalling",
+  "history.title": "Local History",
+  "history.open": "Local History",
+  "history.empty": "No history yet",
+  "history.current": "Current",
+  "history.restore": "Restore this version",
+  "history.closeDiff": "Close diff",
+  "history.clear": "Clear history",
+  "history.refresh": "Refresh",
+  "history.versions": "{{count}} versions",
+  "history.restoreHint": "Restoring first snapshots the current content so it can be restored again.",
+  "history.restored": "Restored to the selected version."
 }

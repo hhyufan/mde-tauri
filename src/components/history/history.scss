@@ -1,0 +1,162 @@
+/* 左侧资源管理器底部的历史时间线（VS Code Timeline 同款）。 */
+.timeline {
+  display: flex;
+  flex-direction: column;
+  flex-shrink: 0;
+  max-height: 40%;
+  min-height: 0;
+  border-top: 1px solid var(--border);
+  background: var(--sidebar);
+}
+
+.timeline__header {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 5px 8px 5px 4px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-sec);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.timeline__toggle {
+  display: grid;
+  place-items: center;
+  width: 18px;
+  height: 18px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--text-sec);
+  cursor: pointer;
+  svg { width: 12px; height: 12px; transition: transform 0.12s; }
+  &:hover { color: var(--text); }
+}
+
+.timeline__label {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.timeline__count {
+  font-size: 10px;
+  font-weight: 400;
+  color: var(--text-sec);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 0 6px;
+  line-height: 16px;
+}
+
+.timeline__refresh {
+  display: grid;
+  place-items: center;
+  width: 18px;
+  height: 18px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--text-sec);
+  cursor: pointer;
+  svg { width: 12px; height: 12px; }
+  &:hover { color: var(--text); }
+}
+
+.timeline__list {
+  list-style: none;
+  margin: 0;
+  padding: 0 4px 6px;
+  overflow: auto;
+  flex: 1;
+  min-height: 0;
+}
+
+.timeline__item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  padding: 5px 6px;
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+  cursor: pointer;
+  text-align: left;
+  color: var(--text);
+  &:hover { background: var(--hover); }
+  &.is-selected { background: var(--accent-bg); color: var(--accent); }
+}
+
+.timeline__time {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 11px;
+}
+
+.timeline__size {
+  flex-shrink: 0;
+  font-size: 10px;
+  color: var(--text-sec);
+}
+
+.timeline__placeholder {
+  padding: 10px 8px;
+  font-size: 11px;
+  color: var(--text-sec);
+  opacity: 0.7;
+  text-align: center;
+}
+
+/* 主编辑区的历史对比视图。 */
+.history-diff {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  height: 100%;
+  min-width: 0;
+  min-height: 0;
+}
+
+.history-diff__bar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  height: 38px;
+  flex-shrink: 0;
+  padding: 0 12px;
+  border-bottom: 1px solid var(--border);
+  background: var(--sidebar);
+}
+
+.history-diff__title {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  font-size: 12px;
+  font-weight: 500;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  small { font-size: 10px; font-weight: 400; color: var(--text-sec); }
+}
+
+.history-diff__actions {
+  display: flex;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.history-diff__editor {
+  flex: 1;
+  min-height: 0;
+}

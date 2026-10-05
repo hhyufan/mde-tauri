@@ -9,6 +9,7 @@ import { useTranslation } from 'react-i18next';
 import { Tooltip } from 'antd';
 import useEditorStore from '@store/useEditorStore';
 import useConfigStore from '@store/useConfigStore';
+import useHistoryStore from '@store/useHistoryStore';
 import MonacoEditor from '@components/editor/LazyMonacoEditor';
 import FloatingToolbar from '@components/editor/FloatingToolbar';
 import FloatingRunButton from '@components/editor/FloatingRunButton';
@@ -25,6 +26,7 @@ import './editor-content.scss';
 const MilkdownMarkdownEditor = lazyWithRetry(() => import('@components/editor/MilkdownMarkdownEditor'));
 const MarkdownPreview = lazyWithRetry(() => import('@components/editor/MarkdownPreview'));
 const TreeEditor = lazyWithRetry(() => import('@components/editor/TreeEditor'));
+const HistoryDiffView = lazyWithRetry(() => import('@components/history/HistoryDiffView'));
 
 /**
  * Markdown 预览懒加载期间的占位节点。
@@ -225,6 +227,7 @@ function EditorContent() {
   const tabs = useEditorStore((s) => s.tabRenderList);
   const activeTabId = useEditorStore((s) => s.activeTabId);
   const viewMode = useEditorStore((s) => s.viewMode);
+  const historyDiff = useHistoryStore((s) => s.diff);
   const previewZoomSync = useConfigStore((s) => s.previewZoomSync ?? true);
   const monacoRef = useRef(null);
   const previewRef = useRef(null);
@@ -507,6 +510,17 @@ function EditorContent() {
           <div className="editor-content__empty-title">{t('editor.empty.title')}</div>
           <div className="editor-content__empty-hint">{t('editor.empty.hint')}</div>
         </div>
+      </main>
+    );
+  }
+
+  // 本地历史对比：用 diff 视图覆盖整个编辑区，关闭后回到正常编辑。
+  if (historyDiff && historyDiff.tabId === activeTabId) {
+    return (
+      <main className={`editor-content ${isMobileLayout ? 'editor-content--mobile' : ''}`}>
+        <Suspense fallback={null}>
+          <HistoryDiffView />
+        </Suspense>
       </main>
     );
   }

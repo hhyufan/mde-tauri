@@ -7,12 +7,13 @@
 import { lazy, Suspense, useEffect, useState, useCallback, useMemo, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { listen } from '@tauri-apps/api/event';
-import { appWindow, getCliArgs, onFileChanged, onOpenPaths } from '@utils/tauriApi';
+import { appWindow, getCliArgs, onFileChanged, onOpenPaths, historyCapture } from '@utils/tauriApi';
 import { isImeComposing } from '@utils/keyboard';
 import { rememberDiskBaseline } from '@/services/localFileGuard';
 import { createFileChangeObserver, setLocalFileComposing } from '@/services/localFileOperations';
 import useThemeStore from '@store/useThemeStore';
 import useEditorStore from '@store/useEditorStore';
+import { getBuffer } from '@utils/editorBuffer';
 import useAuthStore from '@store/useAuthStore';
 import useFileStore from '@store/useFileStore';
 import useConfigStore from '@store/useConfigStore';
@@ -220,6 +221,20 @@ function App() {
       document.removeEventListener('compositionend', compositionEnd, true);
       unlisten.then((fn) => fn()).catch(console.error);
     };
+  }, [isAndroid]);
+
+  // 每隔 1 分钟对正在编辑的本地文档做一次快照：即使自动保存未触发
+  // （例如持续输入没有停顿），时间线也能保持稳定粒度。与打开时的初始快照、
+  // 保存快照共用同一套 60 秒合并判定，内容未变或间隔不足时自动跳过。
+  useEffect(() => {
+    if (isAndroid) return undefined;
+    const timer = setInterval(() => {
+      const { activeTabId, tabs } = useEditorStore.getState();
+      const tab = tabs.find((item) => item.id === activeTabId);
+      if (!tab || !tab.path || tab.path.startsWith('cloud://') || tab.path.startsWith('content://')) return;
+      historyCapture(tab.path, getBuffer(tab.id, tab.content || '')).catch(() => {});
+    }, 60_000);
+    return () => clearInterval(timer);
   }, [isAndroid]);
 
   useEffect(() => {

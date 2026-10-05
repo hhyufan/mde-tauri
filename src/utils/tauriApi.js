@@ -173,6 +173,26 @@ async function writeEncodedFile(filePath, content, encoding) {
   return invoke('save_file', { filePath, content, encoding });
 }
 
+/** 列出本地文件的历史快照（时间戳 + 字节数，新→旧）。 */
+export async function historyList(filePath) {
+  return invoke('history_list', { filePath });
+}
+
+/** 读取某个历史快照的完整文本。 */
+export async function historyRead(filePath, timestamp) {
+  return invoke('history_read', { filePath, timestamp });
+}
+
+/** 显式记录当前内容为快照（恢复前用于保留“恢复点”）。 */
+export async function historyCapture(filePath, content) {
+  return invoke('history_capture', { filePath, content });
+}
+
+/** 清空某个文件的全部历史快照。 */
+export async function historyClear(filePath) {
+  return invoke('history_clear', { filePath });
+}
+
 /** Persist an application-managed crash-recovery snapshot. */
 export async function writeRecoverySnapshot(snapshot) {
   return invoke('write_recovery_snapshot', { snapshot });
@@ -418,6 +438,34 @@ export function onFileChanged(callback) {
     return Promise.resolve(() => {});
   }
   return listen('file-changed', (event) => callback(event.payload));
+}
+
+/** 监听一个目录的直接子项变化（新增/删除/重命名）。 */
+export async function startDirectoryWatching(dirPath) {
+  if (typeof window === 'undefined' || !window.__TAURI_INTERNALS__) return false;
+  return invoke('start_directory_watching', { dirPath });
+}
+
+/** 停止监听某个目录。 */
+export async function stopDirectoryWatching(dirPath) {
+  if (typeof window === 'undefined' || !window.__TAURI_INTERNALS__) return false;
+  return invoke('stop_directory_watching', { dirPath });
+}
+
+/** 订阅目录内容变化事件（payload 为 { dir }）。 */
+export function onDirectoryChanged(callback) {
+  if (typeof window === 'undefined' || !window.__TAURI_INTERNALS__) {
+    return Promise.resolve(() => {});
+  }
+  return listen('directory-changed', (event) => callback(event.payload));
+}
+
+/** 订阅历史快照新增事件（payload 为 { path }）。 */
+export function onHistoryChanged(callback) {
+  if (typeof window === 'undefined' || !window.__TAURI_INTERNALS__) {
+    return Promise.resolve(() => {});
+  }
+  return listen('history-changed', (event) => callback(event.payload));
 }
 
 /**
