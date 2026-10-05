@@ -470,8 +470,14 @@ fn capture_history(app: &AppHandle, file_path: &str, content: &str) -> Result<bo
 
     if let Some(last) = timestamps.last() {
         if let Ok(previous) = fs::read_to_string(dir.join(last.to_string())) {
-            // 与上一条快照只有空白差异时不记录，避免格式化/回车刷屏。
+            if previous == content {
+                return Ok(false); // 逐字节相同，无需任何写入。
+            }
             if same_ignoring_whitespace(&previous, content) {
+                // 只有空白差异（回车、缩进、折行位置、行尾空格等）：
+                // 不新增条目，而是用新内容覆写这条快照——既保持时间线干净，
+                // 也让「历史 vs 当前」的对比不再出现纯空白差异。
+                atomic_write(&dir.join(last.to_string()), content.as_bytes())?;
                 return Ok(false);
             }
         }
