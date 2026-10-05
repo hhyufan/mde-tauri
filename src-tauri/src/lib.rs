@@ -446,6 +446,17 @@ fn list_history_timestamps(dir: &Path) -> Result<Vec<u64>, String> {
     Ok(timestamps)
 }
 
+/// 忽略空行与纯空白行后，两份内容是否相同。
+///
+/// 历史去重使用：只增删空行、不改动实际文字时不产生新条目，
+/// 否则在 Markdown 里回车一次就会多出一条时间线记录。
+fn same_ignoring_blank_lines(previous: &str, current: &str) -> bool {
+    previous
+        .lines()
+        .filter(|line| !line.trim().is_empty())
+        .eq(current.lines().filter(|line| !line.trim().is_empty()))
+}
+
 /// 记录一次快照：内容与上一次一致时跳过，写入后裁剪到上限。
 /// 返回是否真正写入了新快照，供上层决定是否通知前端刷新。
 fn capture_history(app: &AppHandle, file_path: &str, content: &str) -> Result<bool, String> {
@@ -461,8 +472,9 @@ fn capture_history(app: &AppHandle, file_path: &str, content: &str) -> Result<bo
 
     if let Some(last) = timestamps.last() {
         if let Ok(previous) = fs::read_to_string(dir.join(last.to_string())) {
-            if previous == content {
-                return Ok(false); // 内容未变，跳过。
+            // 与上一条快照只有空行/空白行差异时不记录，避免纯排版抖动刷屏。
+            if same_ignoring_blank_lines(&previous, content) {
+                return Ok(false);
             }
         }
     }
@@ -1781,5 +1793,18 @@ mod tests {
         assert_eq!(relative, vec![md_raw]);
 
         fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn blank_line_only_changes_are_treated_as_unchanged() {
+        // 仅空行数量、空白行或行尾换行不同 → 视为未变化，不记快照。
+        assert!(same_ignoring_blank_lines("a\nb", "a\n\nb"));
+        assert!(same_ignoring_blank_lines("a\nb", "a\n   \nb"));
+        assert!(same_ignoring_blank_lines("a\nb\n", "a\nb"));
+        assert!(same_ignoring_blank_lines("a\nb", "a\nb"));
+        // 实际文字变化仍然算变化。
+        assert!(!same_ignoring_blank_lines("a\nb", "a\nc"));
+        assert!(!same_ignoring_blank_lines("a\nb", "a\nb\nc"));
+        assert!(!same_ignoring_blank_lines("a\nb", "a b"));
     }
 }
