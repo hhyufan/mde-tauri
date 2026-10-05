@@ -21,7 +21,6 @@ import {
   startDirectoryWatching,
   stopDirectoryWatching,
   onDirectoryChanged,
-  historyCapture,
   showInExplorer,
   getAppDocumentsDir,
   isSafUri,
@@ -687,9 +686,6 @@ export function useFileManager() {
           encoding: result.encoding || 'UTF-8',
           lineEnding: result.line_ending || 'LF',
         });
-        // 记录“进入编辑前”的初始状态，作为本地历史的第一条快照；
-        // 与保存/定时快照共用同一套 60 秒合并判定，避免重复记录。
-        if (!isAndroid) historyCapture(filePath, result.content || '').catch(() => {});
         addRecentFile({ name: fileName, path: filePath, ext });
         if (!isAndroid) startFileWatching(filePath).catch(() => {});
       } else {

@@ -12,6 +12,7 @@ import {
   clearBuffer,
   renameBuffer,
 } from '@utils/editorBuffer';
+import { historyCapture } from '@utils/tauriApi';
 
 let untitledCounter = 1;
 
@@ -233,6 +234,12 @@ const useEditorStore = create(
 
       /** ??????????????????????? */
       closeTab: (tabId) => {
+        // 退出文档时，若内容相对上一次快照有变化，捕获终态——它同时是
+        // 下次进入该文档时的“初始状态”。清理 buffer 前必须读取正文。
+        const closing = get().tabs.find((t) => t.id === tabId);
+        if (closing && closing.path && !closing.path.startsWith('cloud://') && !closing.path.startsWith('content://')) {
+          historyCapture(closing.path, getBuffer(tabId, closing.content || '')).catch(() => {});
+        }
         clearBuffer(tabId);
         const { tabs, activeTabId } = get();
         const filtered = tabs.filter((t) => t.id !== tabId);

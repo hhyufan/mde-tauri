@@ -93,6 +93,7 @@ function App() {
   const toggleEditPreview = useEditorStore((s) => s.toggleEditPreview);
   const closeTab = useEditorStore((s) => s.closeTab);
   const tabs = useEditorStore((s) => s.tabRenderList);
+  const activeTabId = useEditorStore((s) => s.activeTabId);
   const loadToken = useAuthStore((s) => s.loadToken);
   const isLoggedIn = useAuthStore((s) => s.isLoggedIn);
   const userId = useAuthStore((s) => s.user?.id || GUEST_USER_SCOPE);
@@ -224,8 +225,7 @@ function App() {
   }, [isAndroid]);
 
   // 每隔 1 分钟对正在编辑的本地文档做一次快照：即使自动保存未触发
-  // （例如持续输入没有停顿），时间线也能保持稳定粒度。与打开时的初始快照、
-  // 保存快照共用同一套 60 秒合并判定，内容未变或间隔不足时自动跳过。
+  // （例如持续输入没有停顿），时间线也能保持稳定粒度。内容未变时自动跳过。
   useEffect(() => {
     if (isAndroid) return undefined;
     const timer = setInterval(() => {
@@ -236,6 +236,17 @@ function App() {
     }, 60_000);
     return () => clearInterval(timer);
   }, [isAndroid]);
+
+  // 切换活动标签时，捕获上一个标签的终态（退出该文档），作为下次进入的初始态。
+  const prevActiveIdRef = useRef(null);
+  useEffect(() => {
+    const prevId = prevActiveIdRef.current;
+    prevActiveIdRef.current = activeTabId;
+    if (!prevId || prevId === activeTabId) return;
+    const tab = useEditorStore.getState().tabs.find((item) => item.id === prevId);
+    if (!tab || !tab.path || tab.path.startsWith('cloud://') || tab.path.startsWith('content://')) return;
+    historyCapture(tab.path, getBuffer(prevId, tab.content || '')).catch(() => {});
+  }, [activeTabId]);
 
   useEffect(() => {
     let cancelled = false;
@@ -408,6 +419,12 @@ function App() {
       if (shouldPrompt) {
         openUnsavedClosePrompt(useEditorStore.getState().tabRenderList.filter((tab) => tab.modified));
         return;
+      }
+      // 应用正常退出时，为当前活动文档捕获终态（等价于一次“退出编辑”）。
+      const { activeTabId, tabs } = useEditorStore.getState();
+      const activeTab = tabs.find((item) => item.id === activeTabId);
+      if (activeTab && activeTab.path && !activeTab.path.startsWith('cloud://') && !activeTab.path.startsWith('content://')) {
+        historyCapture(activeTab.path, getBuffer(activeTab.id, activeTab.content || '')).catch(() => {});
       }
       allowWindowCloseRef.current = true;
       appWindow.close();

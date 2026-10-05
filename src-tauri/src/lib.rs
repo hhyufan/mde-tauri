@@ -356,7 +356,6 @@ async fn write_file_content(path: String, content: String) -> Result<(), String>
 /// 并返回前端需要的已落盘文件元数据。
 #[tauri::command]
 async fn save_file(
-    app: AppHandle,
     file_path: String,
     content: String,
     encoding: Option<String>,
@@ -394,15 +393,6 @@ async fn save_file(
 
     match atomic_write(path, &encoded_bytes) {
         Ok(_) => {
-            // 保存成功后顺手记录一次本地历史快照；历史记录失败不影响保存结果。
-            // 只有当真正写入了新快照时才通知前端刷新时间线。
-            match capture_history(&app, &file_path, &content) {
-                Ok(true) => {
-                    let _ = app.emit("history-changed", &HistoryChangeEvent { path: file_path.clone() });
-                }
-                Ok(false) => {}
-                Err(history_error) => eprintln!("[history] capture failed: {history_error}"),
-            }
             let file_name = path
                 .file_name()
                 .and_then(|name| name.to_str())
@@ -444,10 +434,6 @@ fn history_directory(app: &AppHandle, file_path: &str) -> Result<PathBuf, String
 /// 单个文档保留的历史快照数量上限，超出后裁剪最旧的。
 const HISTORY_MAX_SNAPSHOTS: usize = 100;
 
-/// 相邻快照的最小间隔（毫秒）。自动保存触发频繁，用时间合并避免时间线
-/// 被刷成秒级粒度；长时间连续编辑大约每分钟记录一条，接近 IDE 本地历史的手感。
-const HISTORY_COALESCE_MS: u64 = 60_000;
-
 /// 读取目录下所有快照时间戳（文件名即为毫秒时间戳）。
 fn list_history_timestamps(dir: &Path) -> Result<Vec<u64>, String> {
     let mut timestamps = Vec::new();
@@ -478,10 +464,6 @@ fn capture_history(app: &AppHandle, file_path: &str, content: &str) -> Result<bo
             if previous == content {
                 return Ok(false); // 内容未变，跳过。
             }
-        }
-        // 距离上次快照太近时合并：保留时间线粒度稳定，不被自动保存刷屏。
-        if now.saturating_sub(*last) < HISTORY_COALESCE_MS {
-            return Ok(false);
         }
     }
 
@@ -527,10 +509,14 @@ async fn history_read(app: AppHandle, file_path: String, timestamp: u64) -> Resu
         .map_err(|error| format!("Failed to read history snapshot: {error}"))
 }
 
-/// 显式记录当前内容为快照（恢复前用来保留“恢复点”）。
+/// 显式记录当前内容为快照（恢复前保留“恢复点”，退出/定时快照共用此入口）。
+/// 写入新快照后发出 history-changed，让前端时间线即时刷新。
 #[tauri::command]
 async fn history_capture(app: AppHandle, file_path: String, content: String) -> Result<(), String> {
-    capture_history(&app, &file_path, &content).map(|_| ())
+    if capture_history(&app, &file_path, &content)? {
+        let _ = app.emit("history-changed", &HistoryChangeEvent { path: file_path });
+    }
+    Ok(())
 }
 
 #[tauri::command]
