@@ -27,8 +27,10 @@
   --md-quote-bg: color-mix(in srgb, var(--accent) 15%, transparent);
   --md-code-bg: color-mix(in srgb, var(--text) 13%, transparent);
   --md-rule: color-mix(in srgb, var(--text) 16%, transparent);
-  --md-row-alt: color-mix(in srgb, var(--text) 6%, transparent);
+  --md-row-alt: color-mix(in srgb, var(--text) 7%, transparent);
   --md-row-hover: color-mix(in srgb, var(--accent) 16%, transparent);
+  --md-table-head-bg: var(--accent);
+  --md-table-head-fg: #fff;
   --md-hash: #f56c6c;
   --md-mark-bg: #ffd416;
   --md-mark-fg: #2f363d;
@@ -732,7 +734,10 @@
   display: block;
 }
 
-.md-preview table {
+.md-preview table,
+// Milkdown 的 tables.css 同样写 `.ProseMirror table`，且位于另一个 CSS chunk，
+// 同级优先级下加载顺序不定；这里显式高一级，保证 separate 与圆角始终生效。
+.md-preview .ProseMirror table {
   // separate 才能让表头/末行的圆角生效；只保留横向分隔线，避免相邻边框叠成双线。
   border-collapse: separate;
   border-spacing: 0;
@@ -747,9 +752,10 @@
   }
 
   // vitality：表头填充主蓝 + 白字，首末列收圆角（贴合编辑器的微圆角尺度）。
+  // 暗色下主蓝偏亮、白字对比不足，令牌在暗色主题里会换成淡蓝底 + 主蓝字。
   th {
-    background: var(--accent);
-    color: #fff;
+    background: var(--md-table-head-bg);
+    color: var(--md-table-head-fg);
     font-weight: 600;
     border-bottom: 0;
   }
@@ -908,4 +914,22 @@
 .katex-display {
   overflow-x: auto;
   padding: 0.5em 0;
+}
+
+/**
+ * 暗色主题下的 markdown 令牌覆盖。
+ *
+ * 深色背景会把浅色主题里 13% 的蓝/灰透明层压得几乎看不见，主蓝本身也变亮，
+ * 表头「填充主蓝 + 白字」的对比度不足。这里统一加强透明层，并把表头换成
+ * 淡蓝底 + 主蓝字，保持 vitality 的层次又不刺眼。
+ */
+html[data-theme='dark'] .md-preview {
+  --md-accent-soft: color-mix(in srgb, var(--accent) 22%, transparent);
+  --md-quote-bg: color-mix(in srgb, var(--accent) 20%, transparent);
+  --md-code-bg: color-mix(in srgb, var(--text) 14%, transparent);
+  --md-rule: color-mix(in srgb, var(--text) 20%, transparent);
+  --md-row-alt: color-mix(in srgb, var(--text) 8%, transparent);
+  --md-row-hover: color-mix(in srgb, var(--accent) 24%, transparent);
+  --md-table-head-bg: color-mix(in srgb, var(--accent) 24%, transparent);
+  --md-table-head-fg: var(--accent);
 }
