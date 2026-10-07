@@ -247,6 +247,16 @@
       color: var(--text);
     }
   }
+
+  // 右上角常驻的开源入口：整体压成淡蓝，不与标签和其它工具按钮抢视觉。
+  button.tabbar__action-btn--repo {
+    color: color-mix(in srgb, var(--accent) 72%, var(--text-sec));
+
+    &:hover {
+      color: var(--accent);
+      background: var(--accent-bg);
+    }
+  }
 }
 
 .tabbar__action-btn {

@@ -25,6 +25,7 @@ import {
   AppstoreOutlined,
 } from '@ant-design/icons';
 import AppMark from '@components/ui/AppMark';
+import { REPO_URL } from '@/configs/repository';
 import { open, save } from '@tauri-apps/plugin-dialog';
 import { readTextFile, writeTextFile } from '@tauri-apps/plugin-fs';
 import { getVersion } from '@tauri-apps/api/app';
@@ -55,8 +56,6 @@ const NAV_ICONS = {
 };
 
 const NAV_KEYS = ['general', 'appearance', 'editor', 'languages', 'cloud', 'about'];
-
-const REPO_URL = 'https://github.com/hhyufan/mde-tauri';
 
 /**
  * 设置弹窗。

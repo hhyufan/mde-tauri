@@ -62,6 +62,7 @@
   "tabbar.toggleToolbar": "切换工具栏",
   "tabbar.splitView": "分屏",
   "tabbar.console": "输出控制台",
+  "tabbar.support": "在 GitHub 上支持 MDE",
   "editor.empty.title": "打开一个文件开始编辑",
   "editor.empty.hint": "按 Ctrl+P 搜索文件",
   "editor.mode.edit": "编辑",

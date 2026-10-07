@@ -62,6 +62,7 @@
   "tabbar.toggleToolbar": "Toggle toolbar",
   "tabbar.splitView": "Split view",
   "tabbar.console": "Output console",
+  "tabbar.support": "Support MDE on GitHub",
   "editor.empty.title": "Open a file to start editing",
   "editor.empty.hint": "Ctrl+P to search files",
   "editor.mode.edit": "Edit",
