@@ -29,15 +29,19 @@
   // 浓度都压在 8% 上下，大面积元素（引用块）才不会显得深。
   --md-tint: var(--accent);
 
-  --md-tint-soft: color-mix(in srgb, var(--md-tint) 14%, transparent);
-  --md-quote-bg: color-mix(in srgb, var(--md-tint) 12%, transparent);
+  --md-tint-soft: color-mix(in srgb, var(--md-tint) 16%, transparent);
+  --md-quote-bg: color-mix(in srgb, var(--md-tint) 15%, transparent);
   --md-code-bg: color-mix(in srgb, var(--md-tint) 8%, color-mix(in srgb, var(--text) 5%, transparent));
   --md-rule: color-mix(in srgb, var(--text) 16%, transparent);
+  // 表格线一律从 --text 推导：--border 在深色主题里是 #3a3a3c 的深灰，
+  // 压在深底上几乎看不见，单元格会完全没有分隔感。
+  --md-row-line: color-mix(in srgb, var(--text) 15%, transparent);
+  --md-cell-line: color-mix(in srgb, var(--text) 10%, transparent);
   // 斑马纹与行 hover 同样取主蓝，只是压得很淡（偏白）；用中性灰会让整张表发闷。
   --md-row-alt: color-mix(in srgb, var(--md-tint) 5%, transparent);
   --md-row-hover: color-mix(in srgb, var(--md-tint) 9%, transparent);
   // 表头：淡蓝底 + 主蓝字，比 vitality 原版的实心填充克制很多，大表格不会压屏。
-  --md-table-head-bg: color-mix(in srgb, var(--md-tint) 16%, transparent);
+  --md-table-head-bg: color-mix(in srgb, var(--md-tint) 20%, transparent);
   --md-table-head-fg: var(--md-tint);
   --md-hash: #f56c6c;
   --md-mark-bg: #ffd416;
@@ -765,9 +769,8 @@
     text-align: left;
     border: 0;
     // 竖线只画在单元格右侧、最后一列不画：separate 布局下相邻边框不会叠成双线。
-    // 颜色比行分隔线更淡，起“分栏”作用但不抢眼。
-    border-right: 1px solid color-mix(in srgb, var(--border) 55%, transparent);
-    border-bottom: 1px solid var(--border);
+    border-right: 1px solid var(--md-cell-line);
+    border-bottom: 1px solid var(--md-row-line);
     transition: background-color var(--md-duration) var(--md-ease);
   }
 
@@ -952,8 +955,14 @@ html[data-theme='dark'] .md-preview {
   --md-quote-bg: color-mix(in srgb, var(--md-tint) 30%, transparent);
   --md-code-bg: color-mix(in srgb, var(--md-tint) 18%, color-mix(in srgb, var(--text) 5%, transparent));
   --md-rule: color-mix(in srgb, var(--text) 20%, transparent);
+  // 表格线在深色下要更亮一档，否则相邻单元格分不开。
+  --md-row-line: color-mix(in srgb, var(--text) 18%, transparent);
+  --md-cell-line: color-mix(in srgb, var(--text) 13%, transparent);
   // 斑马纹与 hover 同样用主蓝：深色下掺白只会变成灰，反而更闷。
-  --md-row-alt: color-mix(in srgb, var(--md-tint) 12%, transparent);
-  --md-row-hover: color-mix(in srgb, var(--md-tint) 18%, transparent);
-  --md-table-head-bg: color-mix(in srgb, var(--md-tint) 28%, transparent);
+  --md-row-alt: color-mix(in srgb, var(--md-tint) 16%, transparent);
+  --md-row-hover: color-mix(in srgb, var(--md-tint) 20%, transparent);
+  // 表头要一眼看出是表头：底色更实，文字换成近白的淡蓝
+  // （深色下原来的「蓝底 + 蓝字」几乎读不出来）。
+  --md-table-head-bg: color-mix(in srgb, var(--md-tint) 34%, transparent);
+  --md-table-head-fg: color-mix(in srgb, var(--md-tint) 35%, var(--text));
 }

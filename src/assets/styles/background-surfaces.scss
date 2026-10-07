@@ -127,7 +127,7 @@ body.mde-has-background,
 
     blockquote {
       // 引用块面积大，浓度比其他元素再低一档，保持和 GitHub 按钮同样的淡蓝观感。
-      background: color-mix(in srgb, var(--md-tint) 12%, transparent);
+      background: color-mix(in srgb, var(--md-tint) 14%, transparent);
     }
 
     pre,
@@ -169,7 +169,7 @@ html[data-theme='dark'] .app--background .md-preview code[class*='language-'] {
 
 html[data-theme='dark'] body.mde-has-background .md-preview blockquote,
 html[data-theme='dark'] .app--background .md-preview blockquote {
-  background: color-mix(in srgb, var(--md-tint) 28%, transparent);
+  background: color-mix(in srgb, var(--md-tint) 30%, transparent);
 }
 
 html[data-theme='dark'] body.mde-has-background .md-preview pre,
@@ -180,7 +180,7 @@ html[data-theme='dark'] .app--background .md-preview pre,
 html[data-theme='dark'] .app--background .md-preview pre[class*='language-'],
 html[data-theme='dark'] .app--background .md-preview .milkdown-code-block,
 html[data-theme='dark'] .app--background .md-preview .md-runnable-code {
-  background: color-mix(in srgb, var(--md-tint) 12%, var(--mde-glass-code));
+  background: color-mix(in srgb, var(--md-tint) 16%, var(--mde-glass-code));
 }
 
 // antd 浮层 portal 到 body：变量与底色都必须在 body 级适配，
