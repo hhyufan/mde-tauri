@@ -27,24 +27,27 @@
   // （按钮就是 --accent 文字 + --accent-bg 底，透明度 8%）。
   // 所有带底色的元素都由它推导，深浅只靠透明度区分，不用另一种色相；
   // 浓度都压在 8% 上下，大面积元素（引用块）才不会显得深。
-  --md-tint: var(--accent);
+  --md-tint: color-mix(in srgb, var(--accent) 45%, #ffffff);
+  // 需要浓蓝的地方（表头文字等）单独走这个，别用提亮后的基调。
+  --md-tint-ink: var(--accent);
 
-  // 引用块与表头保持上一版观感（实心填充会在大分栏表上压屏），
-  // 只把单元格的斑马纹/hover 压到最淡一档。
+  // 底色基调说明：浅色模式把主蓝往白里提亮（#4091ff → ≈#a8c9ff）再算透明度。
+  // 关键是"淡"来自基调本身偏白，而不是靠把透明度压到看不见——
+  // 这样即使很淡，色相也仍然是明确的蓝。（直接用主蓝会在浅底上发深发闷。）
   --md-tint-soft: color-mix(in srgb, var(--md-tint) 16%, transparent);
-  --md-quote-bg: color-mix(in srgb, var(--md-tint) 15%, transparent);
-  --md-code-bg: color-mix(in srgb, var(--md-tint) 8%, color-mix(in srgb, var(--text) 5%, transparent));
-  --md-rule: color-mix(in srgb, var(--text) 16%, transparent);
+  --md-quote-bg: color-mix(in srgb, var(--md-tint) 16%, transparent);
+  --md-code-bg: color-mix(in srgb, var(--md-tint) 8%, color-mix(in srgb, var(--text) 3%, transparent));
+  --md-rule: color-mix(in srgb, var(--text) 12%, transparent);
   // 表格线一律从 --text 推导：--border 在深色主题里是 #3a3a3c 的深灰，
   // 压在深底上几乎看不见，单元格会完全没有分隔感。
-  --md-row-line: color-mix(in srgb, var(--text) 18%, transparent);
-  --md-cell-line: color-mix(in srgb, var(--text) 14%, transparent);
-  // 斑马纹与行 hover 取主蓝（单单元格表格也要有"淡蓝偏白"的底），浓度压到最淡。
-  --md-row-alt: color-mix(in srgb, var(--md-tint) 4%, transparent);
-  --md-row-hover: color-mix(in srgb, var(--md-tint) 8%, transparent);
-  // 表头：淡蓝底 + 主蓝字。
-  --md-table-head-bg: color-mix(in srgb, var(--md-tint) 20%, transparent);
-  --md-table-head-fg: var(--md-tint);
+  --md-row-line: color-mix(in srgb, var(--text) 14%, transparent);
+  --md-cell-line: color-mix(in srgb, var(--text) 10%, transparent);
+  // 斑马纹与行 hover 取主蓝（单单元格表格也要有"淡蓝偏白"的底）。
+  --md-row-alt: color-mix(in srgb, var(--md-tint) 7%, transparent);
+  --md-row-hover: color-mix(in srgb, var(--md-tint) 12%, transparent);
+  // 表头：淡蓝底 + 浓蓝字。
+  --md-table-head-bg: color-mix(in srgb, var(--md-tint) 24%, transparent);
+  --md-table-head-fg: var(--md-tint-ink);
   --md-hash: #f56c6c;
   --md-mark-bg: #ffd416;
   --md-mark-fg: #2f363d;
@@ -953,6 +956,8 @@
  * 所以深色不是小幅加档，而是整体放大到浅色的 2～2.5 倍，蓝色才立得住。
  */
 html[data-theme='dark'] .md-preview {
+  // 深色模式把基调还原成主蓝本身：深底上不需要提亮，反而要够饱和才不发灰。
+  --md-tint: var(--accent);
   --md-tint-soft: color-mix(in srgb, var(--md-tint) 32%, transparent);
   --md-quote-bg: color-mix(in srgb, var(--md-tint) 30%, transparent);
   --md-code-bg: color-mix(in srgb, var(--md-tint) 18%, color-mix(in srgb, var(--text) 5%, transparent));
