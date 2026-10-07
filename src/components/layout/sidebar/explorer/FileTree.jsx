@@ -22,6 +22,7 @@ import { getExplorerFileSyncState } from '@/services/sync/syncPresentation';
 import { cn } from '@utils/classNames';
 import { isImeComposing } from '@utils/keyboard';
 import FileTypeIcon from '@components/ui/FileTypeIcon';
+import ChevronIcon from '@components/ui/ChevronIcon';
 import { isSafUri, safDisplayName } from '@utils/tauriApi';
 import './file-tree.scss';
 
@@ -479,9 +480,7 @@ function FileTree() {
                   </span>
                 </span>
                 <span className="file-tree__breadcrumb-item">
-                  <svg className="file-tree__breadcrumb-chevron" viewBox="0 0 1024 1024" xmlns="http://www.w3.org/2000/svg" style={{ color: 'var(--accent)', opacity: 0.7 }}>
-                    <path d="M704 514.368a52.864 52.864 0 0 1-15.808 37.888L415.872 819.2a55.296 55.296 0 0 1-73.984-2.752 52.608 52.608 0 0 1-2.816-72.512l233.6-228.928-233.6-228.992a52.736 52.736 0 0 1-17.536-53.056 53.952 53.952 0 0 1 40.192-39.424c19.904-4.672 40.832 1.92 54.144 17.216l272.32 266.88c9.92 9.792 15.616 23.04 15.808 36.8z" fill="currentColor" />
-                  </svg>
+                  <ChevronIcon className="file-tree__breadcrumb-chevron" style={{ color: 'var(--accent)', opacity: 0.7 }} />
                   <Tooltip title={t('sidebar.explorer.expandBreadcrumb')} placement="bottom" mouseEnterDelay={0.3}>
                     <span
                       className="file-tree__breadcrumb-ellipsis"
@@ -492,9 +491,7 @@ function FileTree() {
                   </Tooltip>
                 </span>
                 <span className="file-tree__breadcrumb-item">
-                  <svg className="file-tree__breadcrumb-chevron" viewBox="0 0 1024 1024" xmlns="http://www.w3.org/2000/svg" style={{ color: 'var(--accent)', opacity: 0.7 }}>
-                    <path d="M704 514.368a52.864 52.864 0 0 1-15.808 37.888L415.872 819.2a55.296 55.296 0 0 1-73.984-2.752 52.608 52.608 0 0 1-2.816-72.512l233.6-228.928-233.6-228.992a52.736 52.736 0 0 1-17.536-53.056 53.952 53.952 0 0 1 40.192-39.424c19.904-4.672 40.832 1.92 54.144 17.216l272.32 266.88c9.92 9.792 15.616 23.04 15.808 36.8z" fill="currentColor" />
-                  </svg>
+                  <ChevronIcon className="file-tree__breadcrumb-chevron" style={{ color: 'var(--accent)', opacity: 0.7 }} />
                   <span
                     className="file-tree__breadcrumb-part"
                     onClick={() => loadDirectory(currentDir)}
@@ -508,9 +505,7 @@ function FileTree() {
               breadcrumbParts.map((part, i) => (
                 <span key={i} className="file-tree__breadcrumb-item">
                   {i > 0 && (
-                    <svg className="file-tree__breadcrumb-chevron" viewBox="0 0 1024 1024" xmlns="http://www.w3.org/2000/svg" style={{ color: 'var(--accent)', opacity: 0.7 }}>
-                      <path d="M704 514.368a52.864 52.864 0 0 1-15.808 37.888L415.872 819.2a55.296 55.296 0 0 1-73.984-2.752 52.608 52.608 0 0 1-2.816-72.512l233.6-228.928-233.6-228.992a52.736 52.736 0 0 1-17.536-53.056 53.952 53.952 0 0 1 40.192-39.424c19.904-4.672 40.832 1.92 54.144 17.216l272.32 266.88c9.92 9.792 15.616 23.04 15.808 36.8z" fill="currentColor" />
-                    </svg>
+                    <ChevronIcon className="file-tree__breadcrumb-chevron" style={{ color: 'var(--accent)', opacity: 0.7 }} />
                   )}
                   <span
                     className="file-tree__breadcrumb-part"

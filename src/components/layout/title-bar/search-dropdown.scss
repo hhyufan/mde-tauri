@@ -18,6 +18,9 @@
     .search-dropdown__scope { margin-left: auto; min-width: 104px; max-width: 152px;
       .ant-select-selector { border-color: var(--border-light); font: inherit; }
       .ant-select-selection-item { font-size: 11px; color: var(--text-sec); } }
+    // 面包屑同款箭头：字形默认朝右，选择器需要朝下。
+    .search-dropdown__scope .ant-select-arrow { color: var(--text-sec); }
+    .search-dropdown__scope-arrow { width: 10px; height: 10px; transform: rotate(90deg); }
     button:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
   }
   &__modes { display: flex; gap: 2px; padding: 2px; border-radius: 7px; background: var(--hover); button { padding: 0 12px; font: inherit; } }

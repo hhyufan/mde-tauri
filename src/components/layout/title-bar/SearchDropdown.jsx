@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { Select, Tooltip } from 'antd';
 import { SearchOutlined, CloseOutlined, LoadingOutlined, FontSizeOutlined, FolderOpenOutlined, EnterOutlined } from '@ant-design/icons';
 import FileTypeIcon from '@components/ui/FileTypeIcon';
+import ChevronIcon from '@components/ui/ChevronIcon';
 import useWorkspaceSearch from '@hooks/useWorkspaceSearch';
 import { useFileManager } from '@hooks/useFileManager';
 import useEditorStore from '@store/useEditorStore';
@@ -113,6 +114,8 @@ export default function SearchDropdown({ open, onOpen, onClose }) {
           value={search.effectiveScope}
           onChange={(value) => { setScope(value); inputRef.current?.focus(); }}
           popupMatchSelectWidth={false}
+          // 与面包屑、历史折叠按钮共用同款箭头（默认朝右，样式里旋转 90° 朝下）。
+          suffixIcon={<ChevronIcon className="search-dropdown__scope-arrow" />}
           options={[
             { value: 'project', label: t('search.project'), disabled: !search.projectRoot },
             { value: 'folder', label: t('search.folder'), disabled: !search.currentDir },

@@ -31,8 +31,9 @@
   background: transparent;
   color: var(--text-sec);
   cursor: pointer;
-  .anticon { font-size: 12px; transition: transform 0.12s; transform: rotate(-90deg); }
-  .anticon.is-open { transform: none; }
+  // 与面包屑同款箭头：字形默认朝右（收起态），展开时旋转 90° 朝下。
+  svg { width: 12px; height: 12px; transition: transform 0.12s; }
+  svg.is-open { transform: rotate(90deg); }
   &:hover { color: var(--text); }
 }
 

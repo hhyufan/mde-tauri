@@ -1,7 +1,8 @@
 import { useEffect, useState, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Tooltip } from 'antd';
-import { DownOutlined, HistoryOutlined, ReloadOutlined } from '@ant-design/icons';
+import { HistoryOutlined, ReloadOutlined } from '@ant-design/icons';
+import ChevronIcon from '@components/ui/ChevronIcon';
 import useEditorStore from '@store/useEditorStore';
 import useHistoryStore from '@store/useHistoryStore';
 import { historyList, historyRead, onHistoryChanged } from '@utils/tauriApi';
@@ -96,7 +97,7 @@ export default function Timeline() {
           aria-label={t('history.title')}
           onClick={() => setExpanded(!expanded)}
         >
-          <DownOutlined className={expanded ? 'is-open' : ''} />
+          <ChevronIcon className={expanded ? 'is-open' : ''} />
         </button>
         <span className="timeline__label">{t('history.title')}</span>
         <span className="timeline__count">{entries.length}</span>
