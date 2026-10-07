@@ -110,22 +110,31 @@ body.mde-has-background,
   }
 
   // 两种 Markdown 渲染器及可运行代码块共用底色；嵌套容器只绘制一层。
+  //
+  // 玻璃模式仍要保留 markdown 主题（vitality）的蓝调：原先这里把彩色层统一压成
+  // --mde-glass-hover / --mde-glass-code 的中性灰，结果整个 markdown 区域灰成一团。
+  // 现在改为在玻璃底里掺主蓝，既透出底图又不丢色相。
   .md-preview {
     code,
     code[class*='language-'],
     .md-preview__math-source,
     .md-preview__raw-source,
     .milkdown-code-block .md-preview__math-source,
-    .milkdown-code-block .md-preview__raw-source,
-    table th {
-      background: var(--mde-glass-hover);
+    .milkdown-code-block .md-preview__raw-source {
+      // 行内 chip：底图上需要比常规主题更实一点。
+      background: color-mix(in srgb, var(--accent) 20%, transparent);
+    }
+
+    blockquote {
+      background: color-mix(in srgb, var(--accent) 22%, transparent);
     }
 
     pre,
     pre[class*='language-'],
     .milkdown-code-block,
     .md-runnable-code {
-      background: var(--mde-glass-code);
+      // 代码块：只在玻璃底里掺一点点主蓝（微微蓝），整块偏灰但不失色相。
+      background: color-mix(in srgb, var(--accent) 5%, var(--mde-glass-code));
     }
 
     pre code,
@@ -135,8 +144,9 @@ body.mde-has-background,
       background: transparent;
     }
 
+    // 表头不再走玻璃灰，交给 markdown 主题的 --md-table-head-* 令牌（主蓝填充）。
+    // kbd 是深色键帽，同样保持主题自带样式。
     .md-preview__mermaid,
-    .md-preview__kbd,
     .lang-tag,
     .lang-tag:hover,
     .md-code-execution__result {

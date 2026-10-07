@@ -25,12 +25,15 @@
   --md-ease: cubic-bezier(0.65, 0.05, 0.36, 1);
   --md-accent-soft: color-mix(in srgb, var(--accent) 13%, transparent);
   --md-quote-bg: color-mix(in srgb, var(--accent) 15%, transparent);
-  --md-code-bg: color-mix(in srgb, var(--text) 13%, transparent);
+  --md-code-bg: color-mix(in srgb, var(--accent) 7%, color-mix(in srgb, var(--text) 12%, transparent));
   --md-rule: color-mix(in srgb, var(--text) 16%, transparent);
   --md-row-alt: color-mix(in srgb, var(--text) 7%, transparent);
-  --md-row-hover: color-mix(in srgb, var(--accent) 16%, transparent);
-  --md-table-head-bg: var(--accent);
-  --md-table-head-fg: #fff;
+  // vitality 原版的行 hover 是中性灰（#d9d9d9），不是主蓝；用中性色才不会和表头同色。
+  --md-row-hover: color-mix(in srgb, var(--text) 12%, transparent);
+  // 表头用淡蓝底 + 主蓝字，而不是 vitality 原版的实心主蓝填充：
+  // 大表格（例如展示页的分栏表）整条实心蓝会非常压屏。
+  --md-table-head-bg: color-mix(in srgb, var(--accent) 16%, transparent);
+  --md-table-head-fg: var(--accent);
   --md-hash: #f56c6c;
   --md-mark-bg: #ffd416;
   --md-mark-fg: #2f363d;
@@ -751,8 +754,8 @@
     transition: background-color var(--md-duration) var(--md-ease);
   }
 
-  // vitality：表头填充主蓝 + 白字，首末列收圆角（贴合编辑器的微圆角尺度）。
-  // 暗色下主蓝偏亮、白字对比不足，令牌在暗色主题里会换成淡蓝底 + 主蓝字。
+  // vitality：表头用淡蓝底 + 主蓝字，首末列收圆角（贴合编辑器的微圆角尺度）。
+  // 比原版的实心主蓝填充克制很多，大表格不会整条压屏。
   th {
     background: var(--md-table-head-bg);
     color: var(--md-table-head-fg);
@@ -919,17 +922,15 @@
 /**
  * 暗色主题下的 markdown 令牌覆盖。
  *
- * 深色背景会把浅色主题里 13% 的蓝/灰透明层压得几乎看不见，主蓝本身也变亮，
- * 表头「填充主蓝 + 白字」的对比度不足。这里统一加强透明层，并把表头换成
- * 淡蓝底 + 主蓝字，保持 vitality 的层次又不刺眼。
+ * 深色背景会把浅色主题里 13% 的蓝/灰透明层压得几乎看不见，因此统一加强透明层；
+ * 表头色调与浅色保持一致（淡蓝底 + 主蓝字），只是透明层更实一点。
  */
 html[data-theme='dark'] .md-preview {
   --md-accent-soft: color-mix(in srgb, var(--accent) 22%, transparent);
   --md-quote-bg: color-mix(in srgb, var(--accent) 20%, transparent);
-  --md-code-bg: color-mix(in srgb, var(--text) 14%, transparent);
+  --md-code-bg: color-mix(in srgb, var(--accent) 9%, color-mix(in srgb, var(--text) 14%, transparent));
   --md-rule: color-mix(in srgb, var(--text) 20%, transparent);
   --md-row-alt: color-mix(in srgb, var(--text) 8%, transparent);
-  --md-row-hover: color-mix(in srgb, var(--accent) 24%, transparent);
-  --md-table-head-bg: color-mix(in srgb, var(--accent) 24%, transparent);
-  --md-table-head-fg: var(--accent);
+  --md-row-hover: color-mix(in srgb, var(--text) 16%, transparent);
+  --md-table-head-bg: color-mix(in srgb, var(--accent) 20%, transparent);
 }
