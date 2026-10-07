@@ -263,9 +263,11 @@
   }
 
   // 行内代码：蓝调透明底 + 4px 圆角，文字沿用正文颜色。
+  // 左右留 2px 外边距，chip 不会和相邻文字贴在一起。
   code {
     font-family: var(--font-editor);
     font-size: 0.88em;
+    margin: 0 2px;
     padding: 2px 4px;
     border-radius: var(--md-radius-sm);
     background: var(--md-tint-soft);
@@ -287,6 +289,7 @@
     code,
     code[class*='language-'] {
       background: none;
+      margin: 0;
       padding: 0;
       border-radius: 0;
       font-size: inherit;
@@ -758,8 +761,16 @@
     padding: 6px 13px;
     text-align: left;
     border: 0;
+    // 竖线只画在单元格右侧、最后一列不画：separate 布局下相邻边框不会叠成双线。
+    // 颜色比行分隔线更淡，起“分栏”作用但不抢眼。
+    border-right: 1px solid color-mix(in srgb, var(--border) 55%, transparent);
     border-bottom: 1px solid var(--border);
     transition: background-color var(--md-duration) var(--md-ease);
+  }
+
+  th:last-child,
+  td:last-child {
+    border-right: 0;
   }
 
   // vitality：表头用淡蓝底 + 主蓝字，首末列收圆角（贴合编辑器的微圆角尺度）。
