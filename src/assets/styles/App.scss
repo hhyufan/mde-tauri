@@ -58,7 +58,11 @@
   .monaco-editor .margin,
   .monaco-editor .minimap,
   .monaco-editor .minimap-decorations-layer { background: transparent !important; }
-  .editor-content__fade { display: none; }
+  // 底部雾变层保留：默认样式渐隐到实色 --surface，在背景模式下会糊住底图，
+  // 因此改为渐隐到玻璃底色，既维持底部柔化又能透出背景。
+  .editor-content__fade {
+    background: linear-gradient(to bottom, transparent, var(--mde-glass-popup));
+  }
 }
 html[data-theme='dark'] .app--background { background: #181818; }
 @media (max-width: 768px) {
