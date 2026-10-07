@@ -184,9 +184,12 @@ export async function historyRead(filePath, timestamp) {
   return invoke('history_read', { filePath, timestamp });
 }
 
-/** 显式记录当前内容为快照（恢复前用于保留“恢复点”）。 */
-export async function historyCapture(filePath, content) {
-  return invoke('history_capture', { filePath, content });
+/** 记录快照；打开/回滚传 force，回滚附带 restoredFrom，普通记录仍去重。 */
+export async function historyCapture(filePath, content, { force = false, restoredFrom } = {}) {
+  return invoke('history_capture', {
+    filePath, content, force,
+    ...(restoredFrom != null ? { restoredFrom } : {}),
+  });
 }
 
 /** 清空某个文件的全部历史快照。 */

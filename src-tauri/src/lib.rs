@@ -433,6 +433,12 @@ fn history_directory(app: &AppHandle, file_path: &str) -> Result<PathBuf, String
 
 /// 单个文档保留的历史快照数量上限，超出后裁剪最旧的。
 const HISTORY_MAX_SNAPSHOTS: usize = 100;
+static HISTORY_WRITE_LOCK: Mutex<()> = Mutex::new(());
+
+#[derive(Serialize, Deserialize)]
+struct HistoryRollback {
+    restored_from: u64,
+}
 
 /// 读取目录下所有快照时间戳（文件名即为毫秒时间戳）。
 fn list_history_timestamps(dir: &Path) -> Result<Vec<u64>, String> {
@@ -446,19 +452,30 @@ fn list_history_timestamps(dir: &Path) -> Result<Vec<u64>, String> {
     Ok(timestamps)
 }
 
-/// 忽略所有空白字符差异后，两份内容是否相同。
-///
-/// 历史去重使用：只增删空行、行尾空格、行内多余空格或缩进，而不改动实际
-/// 文字时，不产生新的时间线条目——否则在 Markdown 里回车或格式化一次就会
-/// 多出一条记录。比较基于空白分隔的词序列，因此空白的位置与数量都不参与比较。
-fn same_ignoring_whitespace(previous: &str, current: &str) -> bool {
-    previous.split_whitespace().eq(current.split_whitespace())
+/// 历史去重只忽略空行（含仅由空格/制表符构成的行）。
+/// 非空行保留原文比较，避免把代码缩进、字符串空格或实际折行误判为未变化。
+fn same_ignoring_blank_lines(previous: &str, current: &str) -> bool {
+    previous.lines().filter(|line| !line.trim().is_empty())
+        .eq(current.lines().filter(|line| !line.trim().is_empty()))
 }
 
-/// 记录一次快照：内容与上一次一致时跳过，写入后裁剪到上限。
+/// 记录一次快照：普通记录去重，首次打开的 force 记录忽略内容差异，均裁剪到上限。
 /// 返回是否真正写入了新快照，供上层决定是否通知前端刷新。
-fn capture_history(app: &AppHandle, file_path: &str, content: &str) -> Result<bool, String> {
+fn capture_history(app: &AppHandle, file_path: &str, content: &str, force: bool, restored_from: Option<u64>) -> Result<bool, String> {
     let dir = history_directory(app, file_path)?;
+    match restored_from {
+        Some(source) => capture_history_with_source(&dir, content, force, Some(source)),
+        None => capture_history_in(&dir, content, force),
+    }
+}
+
+fn capture_history_in(dir: &Path, content: &str, force: bool) -> Result<bool, String> {
+    capture_history_with_source(dir, content, force, None)
+}
+
+fn capture_history_with_source(dir: &Path, content: &str, force: bool, restored_from: Option<u64>) -> Result<bool, String> {
+    let _write = HISTORY_WRITE_LOCK.lock().map_err(|error| error.to_string())?;
+    let force = force || restored_from.is_some();
     fs::create_dir_all(&dir).map_err(|error| format!("Failed to create history directory: {error}"))?;
 
     let mut timestamps = list_history_timestamps(&dir)?;
@@ -468,28 +485,35 @@ fn capture_history(app: &AppHandle, file_path: &str, content: &str) -> Result<bo
         .unwrap_or_default()
         .as_millis() as u64;
 
-    if let Some(last) = timestamps.last() {
+    if let Some(last) = timestamps.last().filter(|_| !force) {
         if let Ok(previous) = fs::read_to_string(dir.join(last.to_string())) {
             if previous == content {
                 return Ok(false); // 逐字节相同，无需任何写入。
             }
-            if same_ignoring_whitespace(&previous, content) {
-                // 只有空白差异（回车、缩进、折行位置、行尾空格等）：
-                // 不新增条目，而是用新内容覆写这条快照——既保持时间线干净，
-                // 也让「历史 vs 当前」的对比不再出现纯空白差异。
-                atomic_write(&dir.join(last.to_string()), content.as_bytes())?;
+            if same_ignoring_blank_lines(&previous, content) {
+                // 仅增删空行时忽略本次记录，也不覆写已有历史版本。
                 return Ok(false);
             }
         }
     }
 
-    atomic_write(&dir.join(now.to_string()), content.as_bytes())?;
+    // 同一毫秒内的强制记录也必须保留为独立版本，不能覆盖原来的快照。
+    let timestamp = timestamps.last().map_or(now, |last| now.max(last.saturating_add(1)));
+    atomic_write(&dir.join(timestamp.to_string()), content.as_bytes())?;
+    if let Some(restored_from) = restored_from {
+        let metadata = serde_json::to_vec(&HistoryRollback { restored_from }).map_err(|error| error.to_string())?;
+        if let Err(error) = atomic_write(&dir.join(format!("{timestamp}.meta.json")), &metadata) {
+            let _ = fs::remove_file(dir.join(timestamp.to_string()));
+            return Err(error);
+        }
+    }
 
     if timestamps.len() + 1 > HISTORY_MAX_SNAPSHOTS {
         timestamps.sort_unstable();
         let excess = timestamps.len() + 1 - HISTORY_MAX_SNAPSHOTS;
         for ts in timestamps.iter().take(excess) {
             let _ = fs::remove_file(dir.join(ts.to_string()));
+            let _ = fs::remove_file(dir.join(format!("{ts}.meta.json")));
         }
     }
     Ok(true)
@@ -497,21 +521,31 @@ fn capture_history(app: &AppHandle, file_path: &str, content: &str) -> Result<bo
 
 /// 历史列表项：时间戳 + 字节数，用于时间线展示（不读正文）。
 #[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
 struct HistoryEntry {
     timestamp: u64,
     bytes: u64,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    restored_from: Option<u64>,
 }
 
 #[tauri::command]
 async fn history_list(app: AppHandle, file_path: String) -> Result<Vec<HistoryEntry>, String> {
     let dir = history_directory(&app, &file_path)?;
+    list_history_entries(&dir)
+}
+
+fn list_history_entries(dir: &Path) -> Result<Vec<HistoryEntry>, String> {
     if !dir.exists() {
         return Ok(Vec::new());
     }
     let mut entries = Vec::new();
     for ts in list_history_timestamps(&dir)? {
         if let Ok(meta) = fs::metadata(dir.join(ts.to_string())) {
-            entries.push(HistoryEntry { timestamp: ts, bytes: meta.len() });
+            let restored_from = fs::read(dir.join(format!("{ts}.meta.json"))).ok()
+                .and_then(|bytes| serde_json::from_slice::<HistoryRollback>(&bytes).ok())
+                .map(|metadata| metadata.restored_from);
+            entries.push(HistoryEntry { timestamp: ts, bytes: meta.len(), restored_from });
         }
     }
     entries.sort_by(|a, b| b.timestamp.cmp(&a.timestamp));
@@ -525,11 +559,11 @@ async fn history_read(app: AppHandle, file_path: String, timestamp: u64) -> Resu
         .map_err(|error| format!("Failed to read history snapshot: {error}"))
 }
 
-/// 显式记录当前内容为快照（恢复前保留“恢复点”，退出/定时快照共用此入口）。
+/// 显式记录快照；首次打开与回滚绕过去重，回滚来源持久化，普通记录保持去重。
 /// 写入新快照后发出 history-changed，让前端时间线即时刷新。
 #[tauri::command]
-async fn history_capture(app: AppHandle, file_path: String, content: String) -> Result<(), String> {
-    if capture_history(&app, &file_path, &content)? {
+async fn history_capture(app: AppHandle, file_path: String, content: String, force: Option<bool>, restored_from: Option<u64>) -> Result<(), String> {
+    if capture_history(&app, &file_path, &content, force.unwrap_or(false), restored_from)? {
         let _ = app.emit("history-changed", &HistoryChangeEvent { path: file_path });
     }
     Ok(())
@@ -1536,6 +1570,88 @@ mod tests {
     use super::*;
 
     #[test]
+    fn history_open_forces_a_version_even_when_content_is_unchanged() {
+        let root = tempfile::tempdir().unwrap();
+        let dir = root.path();
+        assert!(capture_history_in(dir, "", true).unwrap());
+        assert!(capture_history_in(dir, "", true).unwrap());
+        assert_eq!(list_history_timestamps(dir).unwrap().len(), 2);
+        assert!(!capture_history_in(dir, "", false).unwrap());
+        assert_eq!(list_history_timestamps(dir).unwrap().len(), 2);
+    }
+
+    #[test]
+    fn history_force_preserves_prior_content_and_uses_a_unique_timestamp() {
+        let root = tempfile::tempdir().unwrap();
+        let dir = root.path();
+        // A timestamp ahead of the clock deterministically covers same-ms collisions.
+        let prior = u64::MAX / 2;
+        fs::write(dir.join(prior.to_string()), "a b").unwrap();
+        assert!(capture_history_in(dir, "a  b\n", true).unwrap());
+        assert_eq!(fs::read_to_string(dir.join(prior.to_string())).unwrap(), "a b");
+        assert_eq!(fs::read_to_string(dir.join((prior + 1).to_string())).unwrap(), "a  b\n");
+        assert!(!capture_history_in(dir, "a  b\n\n", false).unwrap());
+        assert_eq!(list_history_timestamps(dir).unwrap().len(), 2);
+        assert!(capture_history_in(dir, "a c", false).unwrap());
+        assert_eq!(list_history_timestamps(dir).unwrap().len(), 3);
+    }
+
+    #[test]
+    fn history_forced_versions_still_obey_the_retention_limit() {
+        let root = tempfile::tempdir().unwrap();
+        let dir = root.path();
+        for timestamp in 1..=HISTORY_MAX_SNAPSHOTS {
+            fs::write(dir.join(timestamp.to_string()), "same").unwrap();
+        }
+        fs::write(dir.join("1.meta.json"), br#"{"restored_from":0}"#).unwrap();
+        assert!(capture_history_in(dir, "same", true).unwrap());
+        assert_eq!(list_history_timestamps(dir).unwrap().len(), HISTORY_MAX_SNAPSHOTS);
+        assert!(!dir.join("1").exists());
+        assert!(!dir.join("1.meta.json").exists());
+        assert!(dir.join("2").exists());
+    }
+
+    #[test]
+    fn history_rollback_is_forced_and_its_marker_survives_reloading() {
+        let root = tempfile::tempdir().unwrap();
+        let dir = root.path();
+        assert!(capture_history_in(dir, "original", true).unwrap());
+        let source = list_history_entries(dir).unwrap()[0].timestamp;
+        assert!(capture_history_with_source(dir, "original", false, Some(source)).unwrap());
+        assert!(capture_history_with_source(dir, "original\n\n", false, Some(source)).unwrap());
+        assert!(!capture_history_in(dir, "original", false).unwrap());
+        let entries = list_history_entries(dir).unwrap();
+        assert_eq!(entries.len(), 3);
+        assert_eq!(entries[0].restored_from, Some(source));
+        assert_eq!(entries[1].restored_from, Some(source));
+        assert_eq!(entries[2].restored_from, None);
+        assert_eq!(fs::read_to_string(dir.join(entries[0].timestamp.to_string())).unwrap(), "original\n\n");
+        let serialized = serde_json::to_value(&entries).unwrap();
+        assert_eq!(serialized[0]["restoredFrom"], source);
+        assert!(serialized[2].get("restoredFrom").is_none());
+    }
+
+    #[test]
+    fn history_blank_line_changes_do_not_add_or_rewrite_a_version() {
+        let root = tempfile::tempdir().unwrap();
+        let dir = root.path();
+        let original = "first\nsecond\n";
+        assert!(capture_history_in(dir, original, true).unwrap());
+        let timestamps = list_history_timestamps(dir).unwrap();
+        for content in ["first\n\nsecond\n", "\nfirst\n \t\nsecond\n\n", "first\nsecond"] {
+            assert!(!capture_history_in(dir, content, false).unwrap());
+            assert_eq!(list_history_timestamps(dir).unwrap(), timestamps);
+            assert_eq!(fs::read_to_string(dir.join(timestamps[0].to_string())).unwrap(), original);
+        }
+        // 实际文字变化仍记录，即使同时存在空行差异。
+        assert!(capture_history_in(dir, "first\n\nchanged\n", false).unwrap());
+        assert_eq!(list_history_timestamps(dir).unwrap().len(), 2);
+        // 新打开文件的起始记录仍然强制保留。
+        assert!(capture_history_in(dir, "first\nchanged\n", true).unwrap());
+        assert_eq!(list_history_timestamps(dir).unwrap().len(), 3);
+    }
+
+    #[test]
     fn atomic_write_replaces_complete_file() {
         let root = std::env::temp_dir().join(format!(
             "mde-atomic-write-{}-{}",
@@ -1588,19 +1704,17 @@ mod tests {
     }
 
     #[test]
-    fn whitespace_only_changes_are_treated_as_unchanged() {
-        // 空行、空白行、行尾空格、行内多余空格、缩进、行尾换行都视为未变化。
-        assert!(same_ignoring_whitespace("a\nb", "a\n\nb"));
-        assert!(same_ignoring_whitespace("a\nb", "a\n   \nb"));
-        assert!(same_ignoring_whitespace("a\nb\n", "a\nb"));
-        assert!(same_ignoring_whitespace("a\nb", "a\nb"));
-        assert!(same_ignoring_whitespace("echo \"x\"", "echo \"x\"   "));
-        assert!(same_ignoring_whitespace("a b", "a    b"));
-        assert!(same_ignoring_whitespace("  a\n    b", "a\nb"));
-        assert!(same_ignoring_whitespace("a\r\nb", "a\nb"));
-        // 实际文字变化仍然算变化。
-        assert!(!same_ignoring_whitespace("a\nb", "a\nc"));
-        assert!(!same_ignoring_whitespace("a\nb", "a\nb\nc"));
-        assert!(!same_ignoring_whitespace("a b", "ab"));
+    fn only_blank_line_changes_are_treated_as_unchanged() {
+        assert!(same_ignoring_blank_lines("a\nb", "a\n\nb"));
+        assert!(!same_ignoring_blank_lines("a\nb", "\n\ta\nb"));
+        assert!(same_ignoring_blank_lines("a\nb", "a\n \t\nb"));
+        assert!(same_ignoring_blank_lines("a\nb\n", "a\nb"));
+        assert!(same_ignoring_blank_lines("a\r\nb", "a\nb"));
+        assert!(same_ignoring_blank_lines("", "\n \t\n"));
+        assert!(!same_ignoring_blank_lines("a\nb", "a\nc"));
+        assert!(!same_ignoring_blank_lines("a\nb", "a\nb\nc"));
+        assert!(!same_ignoring_blank_lines("a b", "a    b"));
+        assert!(!same_ignoring_blank_lines("  a\n    b", "a\nb"));
+        assert!(!same_ignoring_blank_lines("a b", "a\nb"));
     }
 }

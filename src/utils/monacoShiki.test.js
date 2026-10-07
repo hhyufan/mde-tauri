@@ -50,6 +50,16 @@ it('normalizes built-in theme aliases for the real Shiki adapter and editor crea
   expect(mock.nativeCreate).toHaveBeenLastCalledWith({}, { theme: 'one-dark-pro' }, undefined);
 });
 
+it('registers complete fallback theme data before asynchronous initialization or diff editor creation', async () => {
+  await import('./monacoShiki');
+  expect(mock.editor.defineTheme.mock.calls).toHaveLength(2);
+  for (const [, theme] of mock.editor.defineTheme.mock.calls) {
+    // Monaco's tokenTheme getter reads colors directly even with inherit enabled.
+    expect(theme.colors['editor.foreground']).toBeUndefined();
+    expect(theme.colors['editor.background']).toBeUndefined();
+  }
+});
+
 it('keeps readiness and patched methods across module replacement instead of bootstrapping twice', async () => {
   const first = await import('./monacoShiki');
   await Promise.all([first.initMonacoShiki(), first.initMonacoShiki()]);

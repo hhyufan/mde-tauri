@@ -680,6 +680,7 @@ export function useFileManager() {
           encoding: result.encoding || 'UTF-8',
           lineEnding: result.line_ending || 'LF',
         });
+        const alreadyOpen = Boolean(useEditorStore.getState().getTabByPath(filePath));
         openTab({
           name: fileName,
           path: filePath,
@@ -687,10 +688,11 @@ export function useFileManager() {
           encoding: result.encoding || 'UTF-8',
           lineEnding: result.line_ending || 'LF',
         });
-        // 确保时间线有“编辑前”的基线：仅当当前内容与最近一条快照不同才写入。
-        // 已有历史（上次退出的终态）时内容一致，会被去重跳过，不会制造重复条目；
-        // 首次编辑或文件被外部修改时则补上一条，避免对比时新旧版本完全相同。
-        if (!isAndroid) historyCapture(filePath, result.content || '').catch(() => {});
+        // 新打开的文件强制记录起始版本，即使与上次历史内容完全相同。
+        // 已打开标签的重复选择不产生记录，定时/退出快照仍按内容去重。
+        if (!isAndroid && !alreadyOpen) {
+          historyCapture(filePath, result.content || '', { force: true }).catch(() => {});
+        }
         addRecentFile({ name: fileName, path: filePath, ext });
         if (!isAndroid) startFileWatching(filePath).catch(() => {});
       } else {

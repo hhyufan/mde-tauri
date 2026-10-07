@@ -1,6 +1,7 @@
 import { useEffect, useState, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Tooltip } from 'antd';
+import { DownOutlined, HistoryOutlined, ReloadOutlined } from '@ant-design/icons';
 import useEditorStore from '@store/useEditorStore';
 import useHistoryStore from '@store/useHistoryStore';
 import { historyList, historyRead, onHistoryChanged } from '@utils/tauriApi';
@@ -95,18 +96,13 @@ export default function Timeline() {
           aria-label={t('history.title')}
           onClick={() => setExpanded(!expanded)}
         >
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className={expanded ? 'is-open' : ''}>
-            <path d="m6 9 6 6 6-6" />
-          </svg>
+          <DownOutlined className={expanded ? 'is-open' : ''} />
         </button>
         <span className="timeline__label">{t('history.title')}</span>
         <span className="timeline__count">{entries.length}</span>
         <Tooltip title={t('history.refresh')} placement="top" mouseEnterDelay={0.3}>
           <button type="button" className="timeline__refresh" aria-label={t('history.refresh')} onClick={load}>
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <path d="M21 12a9 9 0 1 1-2.64-6.36L21 8" />
-              <path d="M21 3v5h-5" />
-            </svg>
+            <ReloadOutlined />
           </button>
         </Tooltip>
       </header>
@@ -125,6 +121,16 @@ export default function Timeline() {
                   className={'timeline__item' + (diff && diff.timestamp === entry.timestamp ? ' is-selected' : '')}
                   onClick={() => openDiff(entry.timestamp)}
                 >
+                  {entry.restoredFrom != null && (
+                    <Tooltip
+                      title={t('history.rollbackFrom', { time: new Date(entry.restoredFrom).toLocaleString() })}
+                      placement="top" mouseEnterDelay={0.3}
+                    >
+                      <span className="timeline__rollback" role="img" aria-label={t('history.rollback')}>
+                        <HistoryOutlined aria-hidden="true" />
+                      </span>
+                    </Tooltip>
+                  )}
                   <span className="timeline__time">{formatTime(entry.timestamp)}</span>
                   <span className="timeline__size">{formatBytes(entry.bytes)}</span>
                 </button>

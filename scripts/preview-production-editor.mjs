@@ -24,12 +24,18 @@ const originalError = console.error;
 console.error = (...args) => { log(args.map(String).join(' ')); originalError(...args); };
 try {
   const boot = await import('${asset('monacoRuntimeBoot')}');
-  await boot.prepareMonacoRuntime();
   const exports = await import('${asset('monaco-vendor')}');
   const monaco = Object.values(exports).find(v => v?.editor && v?.languages);
   const highlighterExports = await import('${asset('monacoShiki')}');
   const highlighter = highlighterExports.isMonacoShikiReady ? highlighterExports
     : Object.values(highlighterExports).find(v => v?.isMonacoShikiReady && v?.getMonacoThemeName);
+  // Exercise synchronous fallback theme data before Shiki's async bootstrap.
+  const fallback = monaco.editor.createDiffEditor(document.querySelector('#diff'), {
+    theme: highlighter.getMonacoThemeName(false),
+  });
+  fallback.dispose();
+  log('fallbackDiffCreated: true');
+  await boot.prepareMonacoRuntime();
   log('highlighterReady: ' + highlighter.isMonacoShikiReady());
   log('editorFrozen: ' + Object.isFrozen(monaco.editor));
   const editor = monaco.editor.create(document.querySelector('#editor'), {
@@ -42,9 +48,20 @@ try {
   document.querySelector('#dark').onclick = () => { monaco.editor.setTheme(highlighter.getMonacoThemeName(true)); };
   document.querySelector('#light').onclick = () => { monaco.editor.setTheme(highlighter.getMonacoThemeName(false)); };
   log('editorCreated: true');
+  const diff = monaco.editor.createDiffEditor(document.querySelector('#diff'), {
+    theme: highlighter.getMonacoThemeName(false), automaticLayout: true,
+    readOnly: false, originalEditable: false, renderMarginRevertIcon: true,
+    renderGutterMenu: false, glyphMargin: true, ignoreTrimWhitespace: false,
+    useInlineViewWhenSpaceIsLimited: false,
+  });
+  const original = monaco.editor.createModel('first\\nold second\\nold third\\n', 'plaintext');
+  const modified = monaco.editor.createModel('first\\nnew second\\nnew third\\n', 'plaintext');
+  diff.onDidUpdateDiff(() => log('diffChanges: ' + diff.getLineChanges()?.length));
+  diff.setModel({original, modified});
+  log('diffCreated: true');
 } catch (error) { log('BOOT ERROR: ' + error.stack); }
 `;
-const html = '<!doctype html><html><head><meta charset="UTF-8"><title>Production editor verification</title><style nonce="production-test">body{margin:0;font:14px system-ui}#editor{height:55vh}pre{white-space:pre-wrap;max-height:28vh;overflow:auto}</style></head><body><button id="dark">Dark</button><button id="light">Light</button><div id="editor"></div><pre id="report"></pre><pre id="value"></pre><script type="module" src="/check.js"></script></body></html>';
+const html = '<!doctype html><html><head><meta charset="UTF-8"><title>Production editor verification</title><style nonce="production-test">body{margin:0;font:14px system-ui}#editor{height:24vh}#diff{height:48vh}pre{white-space:pre-wrap;max-height:20vh;overflow:auto}</style></head><body><button id="dark">Dark</button><button id="light">Light</button><div id="editor"></div><div id="diff"></div><pre id="report"></pre><pre id="value"></pre><script type="module" src="/check.js"></script></body></html>';
 http.createServer((req,res) => {
   res.setHeader('Content-Security-Policy', csp);
   if (req.url === '/') { res.setHeader('Content-Type','text/html'); return res.end(html); }
