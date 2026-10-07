@@ -3,6 +3,8 @@
  * @description 定义应用根容器、主内容区、拖拽覆盖层与移动端安全区相关的整体布局样式。
  */
 
+@use './background-surfaces';
+
 .app {
   display: flex;
   width: 100%;
@@ -21,6 +23,47 @@
 
 .app__sidebar-backdrop {
   display: none;
+}
+
+// 图片只绘制一层，透明度不影响文字与控件。
+.app--background {
+  isolation: isolate;
+  background: #fff;
+  &::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    pointer-events: none;
+    background: var(--mde-background-image) center / cover no-repeat;
+    opacity: var(--mde-background-opacity, 0.2);
+  }
+  .app__main,
+  .sidebar,
+  .titlebar,
+  .tabbar,
+  .footer,
+  .editor-content__editor,
+  .editor-content__editor--milkdown,
+  .editor-content__preview,
+  .md-preview,
+  .md-preview--milkdown .milkdown,
+  .md-preview--milkdown .milkdown-editor,
+  .timeline,
+  .history-diff__bar,
+  .history-diff__files,
+  .output-console { background: transparent; }
+  .monaco-editor,
+  .monaco-editor-background,
+  .monaco-editor .margin,
+  .monaco-editor .minimap,
+  .monaco-editor .minimap-decorations-layer { background: transparent !important; }
+  .editor-content__fade { display: none; }
+}
+html[data-theme='dark'] .app--background { background: #181818; }
+@media (max-width: 768px) {
+  // 抽屉覆盖正文时保留实色，避免两层内容重叠。
+  .app--background .sidebar { background: var(--sidebar); }
 }
 
 .drag-overlay {

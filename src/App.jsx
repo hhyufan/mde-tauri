@@ -21,6 +21,8 @@ import useLspStore from '@store/useLspStore';
 import { useFileManager } from '@hooks/useFileManager';
 import { useResponsiveLayout } from '@hooks/useResponsiveLayout';
 import { useViewportInsets } from '@hooks/useViewportInsets';
+import { useBackgroundImage } from '@hooks/useBackgroundImage';
+import { getBackgroundTransparency } from '@utils/backgroundImage';
 import { syncEngine } from '@/services/syncEngine';
 import {
   discardRecoverySnapshot,
@@ -98,6 +100,11 @@ function App() {
   const isLoggedIn = useAuthStore((s) => s.isLoggedIn);
   const userId = useAuthStore((s) => s.user?.id || GUEST_USER_SCOPE);
   const autoSave = useConfigStore((s) => s.autoSave);
+  const backgroundEnabled = useConfigStore((s) => s.backgroundEnabled);
+  const backgroundTransparency = useConfigStore((s) => s.backgroundTransparency);
+  const theme = useThemeStore((s) => s.theme);
+  const { url: backgroundUrl } = useBackgroundImage();
+  const hasBackground = backgroundEnabled && Boolean(backgroundUrl);
   const conflictEntries = useSyncStore((s) => s.conflicts);
   const conflicts = useMemo(
     () => conflictEntries.filter((item) => isOwnedByUser(item?.ownerUserId, userId)),
@@ -247,6 +254,16 @@ function App() {
     if (!tab || !tab.path || tab.path.startsWith('cloud://') || tab.path.startsWith('content://')) return;
     historyCapture(tab.path, getBuffer(prevId, tab.content || '')).catch(() => {});
   }, [activeTabId]);
+
+  // 背景模式下把标记同步到 body：antd 弹层（Select / Dropdown / Picker）会
+  // portal 到 body，不在 .app--background 子树内，只有 body 级才能让它们
+  // 继承 --mde-glass-* 变量并参与玻璃化适配。
+  useEffect(() => {
+    const root = document.body;
+    if (!root) return undefined;
+    root.classList.toggle('mde-has-background', hasBackground);
+    return () => root.classList.remove('mde-has-background');
+  }, [hasBackground]);
 
   useEffect(() => {
     let cancelled = false;
@@ -757,11 +774,16 @@ function App() {
       <div
         className={cn(
           'app',
+          hasBackground && 'app--background',
           isDragOver && 'app--drag-over',
           isMobileLayout && 'app--mobile',
           isAndroid && 'app--android',
           isPortrait && 'app--portrait',
         )}
+        style={hasBackground ? {
+          '--mde-background-image': `url("${backgroundUrl}")`,
+          '--mde-background-opacity': (100 - getBackgroundTransparency(backgroundTransparency, theme)) / 100,
+        } : undefined}
       >
         <Sidebar
           onOpenSettings={() => setSettingsOpen(true)}

@@ -42,6 +42,7 @@ import {
 } from '@utils/settingsSync';
 import './settings-modal.scss';
 import LanguageServices from './LanguageServices';
+import BackgroundSettings from './BackgroundSettings';
 
 const NAV_ICONS = {
   general: <SettingOutlined />,
@@ -318,6 +319,7 @@ function SettingsModal({ open: openProp, onClose }) {
 
             {activeNav === 'appearance' && (
               <div className="settings-section">
+                <BackgroundSettings SettingGroup={SettingGroup} SettingRow={SettingRow} />
                 <SettingGroup label={t('settings.group.theme')} />
                 <SettingRow
                   label={t('settings.appearance.colorTheme')}

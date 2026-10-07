@@ -7,7 +7,10 @@ import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { readInitialLanguage } from '@/i18n/language';
 
-const DEVICE_LOCAL_CONFIG_KEYS = new Set(['workspacePath', 'serverUrl', 'syncEnabled']);
+const DEVICE_LOCAL_CONFIG_KEYS = new Set([
+  'workspacePath', 'serverUrl', 'syncEnabled',
+  'backgroundImage', 'backgroundImageName', 'backgroundEnabled', 'backgroundTransparency',
+]);
 const initialLanguage = readInitialLanguage();
 
 /**
@@ -30,6 +33,10 @@ const useConfigStore = create(
       wordWrap: true,
       lineNumbers: true,
       minimap: { enabled: false },
+      backgroundImage: '',
+      backgroundImageName: '',
+      backgroundEnabled: false,
+      backgroundTransparency: { dark: 80, light: 80 },
       autoSave: true,
       workspacePath: '',
       serverUrl: 'https://www.miaogu.xyz',

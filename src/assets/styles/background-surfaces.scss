@@ -1,0 +1,165 @@
+// 背景模式只混合底色，不降低文字、图标或整棵组件树的透明度。
+// 明确覆盖内层表面，避免修改 --surface 后影响弹窗及 Monaco 的主题解析。
+//
+// 变量同时挂在 body 上：antd 弹层（Select / Dropdown / Picker）会 portal 到
+// body，不在 .app--background 子树内，只有 body 级才能让它们继承同一套玻璃底色。
+body.mde-has-background,
+.app--background {
+  --mde-glass-surface: color-mix(in srgb, var(--surface) 38%, transparent);
+  --mde-glass-code: color-mix(in srgb, var(--bg) 38%, transparent);
+  --mde-glass-hover: color-mix(in srgb, var(--text) 7%, transparent);
+  --mde-glass-selected: color-mix(in srgb, var(--accent) 14%, transparent);
+  // 浮层需要更高的不透明度：悬浮在正文之上时仍要保证文字清晰可读。
+  --mde-glass-popup: color-mix(in srgb, var(--surface) 88%, transparent);
+
+  .titlebar__search,
+  .sidebar__tab-slider,
+  .editor-content__run,
+  .editor-content__renderer-error,
+  .editor-content__renderer-error button,
+  .timeline__count,
+  .mde-tree__input,
+  .mde-tree__top,
+  .mde-tree .mde-tree__chevron,
+  .ft {
+    background: var(--mde-glass-surface);
+  }
+
+  .sidebar__tabs,
+  .sidebar__version,
+  .output-console__badge {
+    background: var(--mde-glass-hover);
+  }
+
+  .tabbar__tab:hover {
+    background: var(--mde-glass-hover);
+  }
+
+  .tabbar__tab--active,
+  .tabbar__tab--active:hover {
+    background: var(--mde-glass-surface);
+  }
+
+  .tabbar__tab--renaming {
+    background: var(--mde-glass-surface) !important;
+  }
+
+  // 旧样式用一条实色线遮住标签栏边框，背景模式下不要留下白色接缝。
+  .tabbar__tab--active::after,
+  .tabbar__tab--renaming::after {
+    background: var(--mde-glass-surface);
+  }
+
+  .file-tree__item:hover,
+  .file-tree__nav-btn:hover,
+  .file-tree__breadcrumb-ellipsis:hover,
+  .titlebar__btn:hover,
+  .stb:hover,
+  .sidebar__recent-item:hover,
+  .sidebar__footer-btn:hover,
+  .tabbar__new-tab:hover,
+  .tabbar__action-btn:hover,
+  .tabbar__tab-close:hover,
+  .footer__toggle-sidebar:hover,
+  .footer__mode-toggle:hover,
+  .timeline__item:hover,
+  .ft__btn:hover,
+  .output-console button:hover,
+  .output-console button.is-active,
+  .problems__row:hover {
+    background: var(--mde-glass-hover);
+  }
+
+  .file-tree__item--active,
+  .file-tree__item--active:hover,
+  .file-tree__item--creating,
+  .file-tree__open-btn:hover,
+  .editor-content__run:hover,
+  .editor-content__renderer-error button:hover,
+  .ft__btn--active,
+  .ft__btn--active:hover,
+  .problems__row.is-selected,
+  .problems__row.is-selected:hover {
+    background: var(--mde-glass-selected);
+  }
+
+  .file-tree__breadcrumb-scroll-wrap::after,
+  .footer__breadcrumb::after {
+    background: linear-gradient(to right, transparent, var(--mde-glass-surface));
+  }
+
+  .output-console__body,
+  .problems {
+    background: color-mix(in srgb, var(--surface) 18%, transparent);
+  }
+
+  .mde-tree { background: transparent; }
+  .mde-tree__toolbar { background: var(--mde-glass-surface); }
+  .mde-tree .ant-tree .ant-tree-node-content-wrapper:hover {
+    background: var(--mde-glass-hover);
+  }
+  .mde-tree .ant-tree .ant-tree-switcher:hover .mde-tree__chevron {
+    background: var(--mde-glass-selected);
+  }
+
+  .output-console__settings input,
+  .problems__toolbar input,
+  .problems__toolbar select {
+    background: var(--mde-glass-surface);
+  }
+
+  // 两种 Markdown 渲染器及可运行代码块共用底色；嵌套容器只绘制一层。
+  .md-preview {
+    code,
+    code[class*='language-'],
+    .md-preview__math-source,
+    .md-preview__raw-source,
+    .milkdown-code-block .md-preview__math-source,
+    .milkdown-code-block .md-preview__raw-source,
+    table th {
+      background: var(--mde-glass-hover);
+    }
+
+    pre,
+    pre[class*='language-'],
+    .milkdown-code-block,
+    .md-runnable-code {
+      background: var(--mde-glass-code);
+    }
+
+    pre code,
+    pre code[class*='language-'],
+    .md-runnable-code > pre,
+    .milkdown-code-block pre {
+      background: transparent;
+    }
+
+    .md-preview__mermaid,
+    .md-preview__kbd,
+    .lang-tag,
+    .lang-tag:hover,
+    .md-code-execution__result {
+      background: var(--mde-glass-surface);
+    }
+  }
+}
+
+// antd 浮层 portal 到 body：变量与底色都必须在 body 级适配，
+// 否则下拉/菜单会是一块与背景模式割裂的实色面板。
+body.mde-has-background {
+  .ant-select-dropdown,
+  .ant-dropdown .ant-dropdown-menu,
+  .ant-picker-dropdown .ant-picker-panel-container {
+    background: var(--mde-glass-popup);
+    backdrop-filter: blur(16px);
+  }
+
+  .ant-select-dropdown .ant-select-item-option-active:not(.ant-select-item-option-disabled),
+  .ant-dropdown .ant-dropdown-menu-item:hover {
+    background: var(--mde-glass-hover);
+  }
+
+  .ant-select-dropdown .ant-select-item-option-selected:not(.ant-select-item-option-disabled) {
+    background: var(--mde-glass-selected);
+  }
+}
