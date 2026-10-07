@@ -156,6 +156,33 @@ body.mde-has-background,
   }
 }
 
+/**
+ * 深色 + 背景图：同一浓度在暗色底图上几乎看不出蓝，需要再单独加一档。
+ * 选择器写在顶层——html 不能作为 body 的后代，无法在上面那个块里嵌套。
+ */
+html[data-theme='dark'] body.mde-has-background .md-preview code,
+html[data-theme='dark'] body.mde-has-background .md-preview code[class*='language-'],
+html[data-theme='dark'] .app--background .md-preview code,
+html[data-theme='dark'] .app--background .md-preview code[class*='language-'] {
+  background: color-mix(in srgb, var(--md-tint) 26%, transparent);
+}
+
+html[data-theme='dark'] body.mde-has-background .md-preview blockquote,
+html[data-theme='dark'] .app--background .md-preview blockquote {
+  background: color-mix(in srgb, var(--md-tint) 20%, transparent);
+}
+
+html[data-theme='dark'] body.mde-has-background .md-preview pre,
+html[data-theme='dark'] body.mde-has-background .md-preview pre[class*='language-'],
+html[data-theme='dark'] body.mde-has-background .md-preview .milkdown-code-block,
+html[data-theme='dark'] body.mde-has-background .md-preview .md-runnable-code,
+html[data-theme='dark'] .app--background .md-preview pre,
+html[data-theme='dark'] .app--background .md-preview pre[class*='language-'],
+html[data-theme='dark'] .app--background .md-preview .milkdown-code-block,
+html[data-theme='dark'] .app--background .md-preview .md-runnable-code {
+  background: color-mix(in srgb, var(--md-tint) 8%, var(--mde-glass-code));
+}
+
 // antd 浮层 portal 到 body：变量与底色都必须在 body 级适配，
 // 否则下拉/菜单会是一块与背景模式割裂的实色面板。
 body.mde-has-background {

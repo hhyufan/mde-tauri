@@ -33,8 +33,10 @@
   --md-quote-bg: color-mix(in srgb, var(--md-tint) 8%, transparent);
   --md-code-bg: color-mix(in srgb, var(--md-tint) 5%, color-mix(in srgb, var(--text) 6%, transparent));
   --md-rule: color-mix(in srgb, var(--text) 16%, transparent);
-  --md-row-alt: color-mix(in srgb, var(--md-tint) 4%, transparent);
-  --md-row-hover: color-mix(in srgb, var(--md-tint) 7%, transparent);
+  // 斑马纹与行 hover 走中性色（更接近白/灰），蓝色只留给表头、chip、引用块这些强调元素，
+  // 否则整个表格会泛蓝。
+  --md-row-alt: color-mix(in srgb, var(--text) 4%, transparent);
+  --md-row-hover: color-mix(in srgb, var(--text) 8%, transparent);
   // 表头：淡蓝底 + 主蓝字，比 vitality 原版的实心填充克制很多，大表格不会压屏。
   --md-table-head-bg: color-mix(in srgb, var(--md-tint) 12%, transparent);
   --md-table-head-fg: var(--md-tint);
@@ -263,11 +265,11 @@
   }
 
   // 行内代码：蓝调透明底 + 4px 圆角，文字沿用正文颜色。
-  // 左右留 2px 外边距，chip 不会和相邻文字贴在一起。
+  // 左右留 4px 外边距，chip 不会和相邻文字贴在一起。
   code {
     font-family: var(--font-editor);
     font-size: 0.88em;
-    margin: 0 2px;
+    margin: 0 4px;
     padding: 2px 4px;
     border-radius: var(--md-radius-sm);
     background: var(--md-tint-soft);
@@ -945,11 +947,12 @@
  * 色相仍是同一支主蓝，只是透明度更高。
  */
 html[data-theme='dark'] .md-preview {
-  --md-tint-soft: color-mix(in srgb, var(--md-tint) 15%, transparent);
-  --md-quote-bg: color-mix(in srgb, var(--md-tint) 14%, transparent);
-  --md-code-bg: color-mix(in srgb, var(--md-tint) 7%, color-mix(in srgb, var(--text) 8%, transparent));
+  --md-tint-soft: color-mix(in srgb, var(--md-tint) 26%, transparent);
+  --md-quote-bg: color-mix(in srgb, var(--md-tint) 22%, transparent);
+  --md-code-bg: color-mix(in srgb, var(--md-tint) 12%, color-mix(in srgb, var(--text) 8%, transparent));
   --md-rule: color-mix(in srgb, var(--text) 20%, transparent);
-  --md-row-alt: color-mix(in srgb, var(--md-tint) 6%, transparent);
-  --md-row-hover: color-mix(in srgb, var(--md-tint) 10%, transparent);
-  --md-table-head-bg: color-mix(in srgb, var(--md-tint) 15%, transparent);
+  // 表格的斑马纹与 hover 仍走中性亮色（更接近白），避免深色下变成一格格深蓝。
+  --md-row-alt: color-mix(in srgb, var(--text) 5%, transparent);
+  --md-row-hover: color-mix(in srgb, var(--text) 9%, transparent);
+  --md-table-head-bg: color-mix(in srgb, var(--md-tint) 20%, transparent);
 }
