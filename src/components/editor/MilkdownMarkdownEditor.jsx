@@ -177,7 +177,8 @@ const codeMirrorTheme = CodeMirrorView.theme({
     outline: 'none',
   },
   '.cm-selectionBackground, &.cm-focused .cm-selectionBackground': {
-    backgroundColor: 'color-mix(in srgb, var(--accent) 24%, transparent)',
+    // 与 Monaco 主题的选区色保持一致（共用同一套 --selection-bg 变量）。
+    backgroundColor: 'var(--selection-bg)',
   },
 });
 

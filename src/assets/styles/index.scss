@@ -68,6 +68,8 @@
   --accent: #4091ff;
   --accent-light: #e8f0ff;
   --accent-bg: rgba(64, 145, 255, 0.08);
+  /* 与 Monaco 的 One Light 主题一致（editor.selectionBackground）。 */
+  --selection-bg: #e5e5e6;
   --hover: #f0f0f2;
   --active: #e8e8ea;
   --success: #34c759;
@@ -95,6 +97,8 @@ html[data-theme='dark'] {
   --accent: #5a9fff;
   --accent-light: rgba(90, 159, 255, 0.15);
   --accent-bg: rgba(90, 159, 255, 0.08);
+  /* 与 Monaco 的 One Dark Pro 主题一致（editor.selectionBackground，含 60/255 透明度）。 */
+  --selection-bg: #67769660;
   --hover: rgba(255, 255, 255, 0.06);
   --active: rgba(255, 255, 255, 0.1);
   --success: #30d158;
@@ -152,6 +156,14 @@ body {
 #root {
   height: 100%;
   font-family: var(--font-app);
+}
+
+/*
+ * 文本选中色跟随 Monaco 主题（One Light #E5E5E6 / One Dark Pro #67769660），
+ * 否则 Markdown 正文、控制台等 DOM 文本会沿用浏览器默认的蓝色高亮。
+ */
+::selection {
+  background: var(--selection-bg);
 }
 
 ::-webkit-scrollbar {
