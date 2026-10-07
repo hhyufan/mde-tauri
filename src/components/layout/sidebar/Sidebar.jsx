@@ -21,6 +21,7 @@ import OutlineView from './outline/OutlineView';
 import Timeline from '@components/history/Timeline';
 import UserMenu from '@components/ui/UserMenu';
 import FileTypeIcon from '@components/ui/FileTypeIcon';
+import AppMark from '@components/ui/AppMark';
 import { cn } from '@utils/classNames';
 import './sidebar.scss';
 
@@ -413,8 +414,11 @@ function Sidebar({ onOpenSettings, onOpenStats, onOpenLogin }) {
   return (
     <aside className={cn('sidebar', !sidebarVisible && 'sidebar--hidden')}>
       <div className="sidebar__header">
-        <div className="sidebar__logo">M</div>
-        <h1 className="sidebar__title">{t('app.name')}</h1>
+        <AppMark size={32} />
+        <div className="sidebar__brand">
+          <h1 className="sidebar__title">{t('app.name')}</h1>
+          <p className="sidebar__descriptor">{t('app.descriptor')}</p>
+        </div>
       </div>
 
       <div className="sidebar__tabs" role="tablist" aria-label={t('sidebar.tabs')}>

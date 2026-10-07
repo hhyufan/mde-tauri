@@ -1,5 +1,6 @@
 {
-  "app.name": "Markdown Editor",
+  "app.name": "MDE",
+  "app.descriptor": "Markdown Editor",
   "sidebar.tab.explorer": "Files",
   "sidebar.tab.outline": "Outline",
   "sidebar.tab.recent": "Recent",

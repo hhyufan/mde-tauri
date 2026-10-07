@@ -1,0 +1,18 @@
+/**
+ * 应用标识样式。
+ *
+ * 图标资源本身是蓝色圆形（四角透明），这里只负责尺寸、圆形裁切与一层轻投影，
+ * 让它在侧栏/关于页的平面上看起来是"贴上去的"，而不是压在文字旁边。
+ */
+.app-mark {
+  --app-mark-size: 32px;
+  width: var(--app-mark-size);
+  height: var(--app-mark-size);
+  border-radius: 50%;
+  display: block;
+  flex-shrink: 0;
+  object-fit: contain;
+  user-select: none;
+  -webkit-user-drag: none;
+  filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.18));
+}

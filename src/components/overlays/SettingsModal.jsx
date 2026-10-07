@@ -24,6 +24,7 @@ import {
   StarFilled,
   AppstoreOutlined,
 } from '@ant-design/icons';
+import AppMark from '@components/ui/AppMark';
 import { open, save } from '@tauri-apps/plugin-dialog';
 import { readTextFile, writeTextFile } from '@tauri-apps/plugin-fs';
 import { getVersion } from '@tauri-apps/api/app';
@@ -545,9 +546,7 @@ function SettingsModal({ open: openProp, onClose }) {
             {activeNav === 'about' && (
               <div className="settings-section">
                 <div className="settings-about__hero">
-                  <div className="settings-about__logo">
-                    <EditOutlined />
-                  </div>
+                  <AppMark size={56} className="settings-about__logo" />
                   <div className="settings-about__name">{t('app.name')}</div>
                   {appVersion && (
                     <div className="settings-about__version">v{appVersion}</div>
