@@ -1440,6 +1440,47 @@ async fn open_external(url: String) -> Result<(), String> {
     open::that(url).map_err(|e| format!("Failed to open URL: {}", e))
 }
 
+/// 去掉 Windows 11 为无边框窗口绘制的系统强调色边框。
+///
+/// `decorations: false` 的窗口仍带 DWM 阴影框，Win11 会沿框画一圈系统强调色
+/// （多数情况下就是蓝色）。把 `DWMWA_BORDER_COLOR` 设为 `DWMWA_COLOR_NONE`
+/// 只去掉这圈边框、保留窗口阴影；旧系统不认识该属性时静默忽略。
+#[cfg(windows)]
+fn clear_window_border(window: &tauri::WebviewWindow<tauri::Wry>) {
+    use std::ffi::c_void;
+
+    #[link(name = "dwmapi")]
+    extern "system" {
+        fn DwmSetWindowAttribute(
+            hwnd: *mut c_void,
+            attribute: u32,
+            value: *const c_void,
+            size: u32,
+        ) -> i32;
+    }
+
+    const DWMWA_BORDER_COLOR: u32 = 34;
+    const DWMWA_COLOR_NONE: u32 = 0xFFFF_FFFE;
+
+    let Ok(hwnd) = window.hwnd() else {
+        return;
+    };
+    // 各版本 windows crate 的 `HWND` 内层可能是指针或整数，统一取整数值。
+    let raw = hwnd.0 as isize;
+    if raw == 0 {
+        return;
+    }
+    let color = DWMWA_COLOR_NONE;
+    unsafe {
+        DwmSetWindowAttribute(
+            raw as *mut c_void,
+            DWMWA_BORDER_COLOR,
+            std::ptr::addr_of!(color).cast::<c_void>(),
+            std::mem::size_of::<u32>() as u32,
+        );
+    }
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 /// 桌面端 `main()` 与移动端入口共用的 Tauri 启动逻辑。
 ///
@@ -1454,17 +1495,21 @@ pub fn run() {
         .plugin(tauri_plugin_updater::Builder::new().build())
         .plugin(tauri_plugin_process::init());
 
-    // 避免把额外初始化逻辑带入生产启动路径；
-    // 只有调试构建才会自动打开 devtools，便于本地排查桥接行为。
-    #[cfg(all(debug_assertions, not(target_os = "android")))]
-    {
-        builder = builder.setup(|app| {
-            if let Some(main_window) = app.get_webview_window("main") {
-                main_window.open_devtools();
-            }
-            Ok(())
-        });
-    }
+    // 启动期初始化：调试构建自动打开 devtools；Windows 下额外去掉 Win11
+    // 沿无边框窗口绘制的系统强调色边框。
+    builder = builder.setup(|app| {
+        let main_window = app.get_webview_window("main");
+        #[cfg(all(debug_assertions, not(target_os = "android")))]
+        if let Some(window) = main_window.as_ref() {
+            window.open_devtools();
+        }
+        #[cfg(windows)]
+        if let Some(window) = main_window.as_ref() {
+            clear_window_border(window);
+        }
+        let _ = &main_window;
+        Ok(())
+    });
 
     // 桌面端单实例：应用已运行时再次双击关联文件，第二进程会把参数转发给
     // 首实例，由首实例在现有窗口打开标签并聚焦，而不是另开一个新窗口。
