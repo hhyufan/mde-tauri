@@ -9,8 +9,9 @@ body.mde-has-background,
   --mde-glass-code: color-mix(in srgb, var(--bg) 38%, transparent);
   --mde-glass-hover: color-mix(in srgb, var(--text) 7%, transparent);
   --mde-glass-selected: color-mix(in srgb, var(--accent) 14%, transparent);
-  // 浮层需要更高的不透明度：悬浮在正文之上时仍要保证文字清晰可读。
-  --mde-glass-popup: color-mix(in srgb, var(--surface) 88%, transparent);
+  // 浮层（搜索下拉、antd 弹层）比正文表面略实一点，但仍要透出底图：
+  // 之前 88% 几乎等于实色，看起来像没有适配背景模式。
+  --mde-glass-popup: color-mix(in srgb, var(--surface) 60%, transparent);
 
   .titlebar__search,
   .sidebar__tab-slider,
