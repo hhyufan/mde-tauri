@@ -1440,13 +1440,20 @@ async fn open_external(url: String) -> Result<(), String> {
     open::that(url).map_err(|e| format!("Failed to open URL: {}", e))
 }
 
-/// 去掉 Windows 11 为无边框窗口绘制的系统强调色边框。
+/// 调整无边框窗口的 DWM 外观。
 ///
-/// `decorations: false` 的窗口仍带 DWM 阴影框，Win11 会沿框画一圈系统强调色
-/// （多数情况下就是蓝色）。把 `DWMWA_BORDER_COLOR` 设为 `DWMWA_COLOR_NONE`
-/// 只去掉这圈边框、保留窗口阴影；旧系统不认识该属性时静默忽略。
+/// 背景：Windows 下 Tauri 把「无边框窗口的 1px 边框」和 DWM 阴影绑在一起，
+/// 只要 `shadow: true`，Win11 就会沿窗口画一圈系统强调色（通常为蓝色）的边框。
+/// 因此窗口配置里关闭了 `shadow`（见 tauri.conf.json），这里再做两件事：
+///
+/// - `DWMWA_WINDOW_CORNER_PREFERENCE` 显式要求圆角，补回关闭阴影后失去的
+///   Win11 圆角外观；
+/// - `DWMWA_BORDER_COLOR` 置为 `DWMWA_COLOR_NONE`，万一以后重新开启阴影，
+///   边框依然不会出现。
+///
+/// 旧版 Windows 不认识这些属性，调用失败时静默忽略。
 #[cfg(windows)]
-fn clear_window_border(window: &tauri::WebviewWindow<tauri::Wry>) {
+fn style_window_frame(window: &tauri::WebviewWindow<tauri::Wry>) {
     use std::ffi::c_void;
 
     #[link(name = "dwmapi")]
@@ -1459,7 +1466,9 @@ fn clear_window_border(window: &tauri::WebviewWindow<tauri::Wry>) {
         ) -> i32;
     }
 
+    const DWMWA_WINDOW_CORNER_PREFERENCE: u32 = 33;
     const DWMWA_BORDER_COLOR: u32 = 34;
+    const DWMWCP_ROUND: u32 = 2;
     const DWMWA_COLOR_NONE: u32 = 0xFFFF_FFFE;
 
     let Ok(hwnd) = window.hwnd() else {
@@ -1470,14 +1479,19 @@ fn clear_window_border(window: &tauri::WebviewWindow<tauri::Wry>) {
     if raw == 0 {
         return;
     }
-    let color = DWMWA_COLOR_NONE;
-    unsafe {
-        DwmSetWindowAttribute(
-            raw as *mut c_void,
-            DWMWA_BORDER_COLOR,
-            std::ptr::addr_of!(color).cast::<c_void>(),
-            std::mem::size_of::<u32>() as u32,
-        );
+
+    for (attribute, value) in [
+        (DWMWA_WINDOW_CORNER_PREFERENCE, DWMWCP_ROUND),
+        (DWMWA_BORDER_COLOR, DWMWA_COLOR_NONE),
+    ] {
+        unsafe {
+            DwmSetWindowAttribute(
+                raw as *mut c_void,
+                attribute,
+                std::ptr::addr_of!(value).cast::<c_void>(),
+                std::mem::size_of::<u32>() as u32,
+            );
+        }
     }
 }
 
@@ -1495,8 +1509,8 @@ pub fn run() {
         .plugin(tauri_plugin_updater::Builder::new().build())
         .plugin(tauri_plugin_process::init());
 
-    // 启动期初始化：调试构建自动打开 devtools；Windows 下额外去掉 Win11
-    // 沿无边框窗口绘制的系统强调色边框。
+    // 启动期初始化：调试构建自动打开 devtools；Windows 下补回关闭阴影后
+    // 失去的窗口圆角，并确保 DWM 不绘制强调色边框。
     builder = builder.setup(|app| {
         let main_window = app.get_webview_window("main");
         #[cfg(all(debug_assertions, not(target_os = "android")))]
@@ -1505,7 +1519,7 @@ pub fn run() {
         }
         #[cfg(windows)]
         if let Some(window) = main_window.as_ref() {
-            clear_window_border(window);
+            style_window_frame(window);
         }
         let _ = &main_window;
         Ok(())

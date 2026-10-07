@@ -26,6 +26,7 @@
         "visible": true,
         "transparent": false,
         "decorations": false,
+        "shadow": false,
         "devtools": true,
         "dragDropEnabled": true,
         "backgroundColor": "#121212"
