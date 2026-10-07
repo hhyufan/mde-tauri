@@ -49,6 +49,7 @@ function TabBar({ onRequestCloseTab }) {
   const toggleConsole = useScriptStore((s) => s.setOpen);
   const notify = useNotificationStore((s) => s.notify);
   const autoSave = useConfigStore((s) => s.autoSave);
+  const syncEnabled = useConfigStore((s) => s.syncEnabled);
   const userId = useAuthStore((s) => s.user?.id || GUEST_USER_SCOPE);
   const isLoggedIn = useAuthStore((s) => s.isLoggedIn);
   const pathToId = useFileIdStore((s) => s.pathToId);
@@ -313,24 +314,26 @@ function TabBar({ onRequestCloseTab }) {
             </button>
           </Tooltip>
         )}
-        {/* 当前文件在此设备上的云同步关联开关。 */}
-        <Tooltip
-          title={t(isLinkedForSync ? 'tabbar.disableCloudSync' : 'tabbar.enableCloudSync')}
-          placement="bottom"
-          mouseEnterDelay={0.3}
-        >
-          <button
-            className={cn('tabbar__action-btn', isLinkedForSync && 'tabbar__action-btn--active')}
-            onClick={handleBookmark}
-            disabled={!activeTab?.path}
-            aria-label={t(isLinkedForSync ? 'tabbar.disableCloudSync' : 'tabbar.enableCloudSync')}
-            type="button"
+        {/* 当前文件在此设备上的云同步关联开关；总开关关闭时不渲染。 */}
+        {syncEnabled && (
+          <Tooltip
+            title={t(isLinkedForSync ? 'tabbar.disableCloudSync' : 'tabbar.enableCloudSync')}
+            placement="bottom"
+            mouseEnterDelay={0.3}
           >
-            <svg viewBox="0 0 24 24" fill={isLinkedForSync ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth="2">
-              <path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z" />
-            </svg>
-          </button>
-        </Tooltip>
+            <button
+              className={cn('tabbar__action-btn', isLinkedForSync && 'tabbar__action-btn--active')}
+              onClick={handleBookmark}
+              disabled={!activeTab?.path}
+              aria-label={t(isLinkedForSync ? 'tabbar.disableCloudSync' : 'tabbar.enableCloudSync')}
+              type="button"
+            >
+              <svg viewBox="0 0 24 24" fill={isLinkedForSync ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth="2">
+                <path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z" />
+              </svg>
+            </button>
+          </Tooltip>
+        )}
         {/* Markdown 和树文件的源码 / 渲染分栏。 */}
         {(isMarkdown || activeTab?.ext?.toLowerCase() === 'mgtree') && (
           <Tooltip title={t('tabbar.splitView')} placement="bottom" mouseEnterDelay={0.3}>

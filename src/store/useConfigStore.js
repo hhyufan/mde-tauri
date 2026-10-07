@@ -40,7 +40,8 @@ const useConfigStore = create(
       autoSave: true,
       workspacePath: '',
       serverUrl: 'https://www.miaogu.xyz',
-      syncEnabled: true,
+      // 云同步总开关：默认关闭。关闭时不渲染任何云入口，同步引擎也整体暂停。
+      syncEnabled: false,
       configUpdatedAt: 0,
       syncableConfigUpdatedAt: 0,
 

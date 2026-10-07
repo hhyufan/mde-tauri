@@ -99,6 +99,7 @@ function App() {
   const isLoggedIn = useAuthStore((s) => s.isLoggedIn);
   const userId = useAuthStore((s) => s.user?.id || GUEST_USER_SCOPE);
   const autoSave = useConfigStore((s) => s.autoSave);
+  const syncEnabled = useConfigStore((s) => s.syncEnabled);
   const backgroundEnabled = useConfigStore((s) => s.backgroundEnabled);
   const backgroundTransparency = useConfigStore((s) => s.backgroundTransparency);
   const theme = useThemeStore((s) => s.theme);
@@ -292,10 +293,11 @@ function App() {
   }, [isMobileLayout, setSidebarVisible]);
 
   useEffect(() => {
-    if (isLoggedIn) {
+    // 总开关关闭时不触发任何同步动作，避免无谓的鉴权/网络请求。
+    if (isLoggedIn && syncEnabled) {
       syncEngine.fullSync();
     }
-  }, [isLoggedIn]);
+  }, [isLoggedIn, syncEnabled]);
 
   useEffect(() => {
     if (cliArgsOpenedRef.current || isAndroid) return;

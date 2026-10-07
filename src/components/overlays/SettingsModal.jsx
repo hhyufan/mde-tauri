@@ -460,6 +460,17 @@ function SettingsModal({ open: openProp, onClose }) {
 
             {activeNav === 'cloud' && (
               <div className="settings-section">
+                {/* 云同步总开关：关闭后界面不再出现任何云入口，同步引擎也整体暂停。 */}
+                <SettingGroup label={t('settings.group.cloud')} />
+                <SettingRow
+                  label={t('settings.cloud.syncEnabled')}
+                  desc={t('settings.cloud.syncEnabledDesc')}
+                >
+                  <Switch
+                    checked={config.syncEnabled}
+                    onChange={(v) => handleChange('syncEnabled', v)}
+                  />
+                </SettingRow>
                 <SettingGroup label={t('settings.group.connection')} />
                 <SettingRow
                   label={t('settings.cloud.serverUrl')}
@@ -471,15 +482,6 @@ function SettingsModal({ open: openProp, onClose }) {
                     onChange={(e) => handleChange('serverUrl', e.target.value)}
                     placeholder="https://www.miaogu.xyz"
                     disabled={isLoggedIn}
-                  />
-                </SettingRow>
-                <SettingRow
-                  label={t('settings.cloud.syncEnabled')}
-                  desc={t('settings.cloud.syncEnabledDesc')}
-                >
-                  <Switch
-                    checked={config.syncEnabled}
-                    onChange={(v) => handleChange('syncEnabled', v)}
                   />
                 </SettingRow>
                 <SettingGroup label={t('settings.group.account')} />

@@ -2,6 +2,7 @@ import { useState, useCallback } from 'react';
 import { Dropdown } from 'antd';
 import { useTranslation } from 'react-i18next';
 import useAuthStore from '@store/useAuthStore';
+import useConfigStore from '@store/useConfigStore';
 import { syncEngine } from '@/services/syncEngine';
 import './user-menu.scss';
 
@@ -13,9 +14,13 @@ import './user-menu.scss';
 function UserMenu({ onOpenLogin }) {
   const { t } = useTranslation();
   const { user, isLoggedIn, logout } = useAuthStore();
+  const syncEnabled = useConfigStore((s) => s.syncEnabled);
   const [menuOpen, setMenuOpen] = useState(false);
 
   const close = useCallback(() => setMenuOpen(false), []);
+
+  // 本地优先：云同步总开关关闭时，登录与账号入口整块不渲染。
+  if (!syncEnabled) return null;
 
   if (!isLoggedIn) {
     return (

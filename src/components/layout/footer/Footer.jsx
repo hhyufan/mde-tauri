@@ -3,6 +3,7 @@ import { useHorizontalDragScroll } from '@hooks/useHorizontalDragScroll';
 import { useTranslation } from 'react-i18next';
 import { Dropdown, Tooltip } from 'antd';
 import useEditorStore from '@store/useEditorStore';
+import useConfigStore from '@store/useConfigStore';
 import { useFileManager } from '@hooks/useFileManager';
 import { getDirectoryContents, isSafUri, safDisplayName, showInExplorer } from '@utils/tauriApi';
 import { splitPath, buildFullPath } from '@utils/pathUtils';
@@ -61,6 +62,7 @@ function Footer() {
   const activeTabId = useEditorStore((s) => s.activeTabId);
   const cursorPosition = useEditorStore((s) => s.cursorPosition);
   const characterCount = useEditorStore((s) => s.characterCount);
+  const syncEnabled = useConfigStore((s) => s.syncEnabled);
   const { openFileFromPath } = useFileManager();
   const activeTab = useMemo(
     () => tabs.find((item) => item.id === activeTabId) || null,
@@ -301,8 +303,13 @@ function Footer() {
         <span>{activeTab?.encoding || 'UTF-8'}</span>
         <span className="footer__sep" />
         <span>{activeTab?.lineEnding || 'LF'}</span>
-        <span className="footer__sep" />
-        <SyncStatusIndicator />
+        {/* 在线/离线状态随云同步总开关显示。 */}
+        {syncEnabled && (
+          <>
+            <span className="footer__sep" />
+            <SyncStatusIndicator />
+          </>
+        )}
       </div>
     </footer>
   );
