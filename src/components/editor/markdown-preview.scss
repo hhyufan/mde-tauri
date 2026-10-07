@@ -124,13 +124,15 @@
   }
 
   // 引用块：淡蓝圆角块，不再使用左侧竖线。
+  // 不覆盖文字颜色：原先用 --text-sec，深色下（#98989d）会让整块引用泛灰、像被禁用了。
+  // 区分层次交给底色，文字沿用正文色。
   blockquote {
     margin: 1em 0;
     padding: 8px 12px;
     border: none;
     border-radius: var(--md-radius);
     background: var(--md-quote-bg);
-    color: var(--text-sec);
+    color: var(--text);
 
     p:last-child { margin-bottom: 0; }
   }
