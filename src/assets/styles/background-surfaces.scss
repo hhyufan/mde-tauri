@@ -111,9 +111,9 @@ body.mde-has-background,
 
   // 两种 Markdown 渲染器及可运行代码块共用底色；嵌套容器只绘制一层。
   //
-  // 玻璃模式仍要保留 markdown 主题（vitality）的蓝调：原先这里把彩色层统一压成
+  // 玻璃模式仍要保留 markdown 主题的淡蓝基调：原先这里把彩色层统一压成
   // --mde-glass-hover / --mde-glass-code 的中性灰，结果整个 markdown 区域灰成一团。
-  // 现在改为在玻璃底里掺主蓝，既透出底图又不丢色相。
+  // 现在改为在玻璃底里掺 --md-tint（.md-preview 定义、可继承），既透出底图又不丢色相。
   .md-preview {
     code,
     code[class*='language-'],
@@ -121,20 +121,21 @@ body.mde-has-background,
     .md-preview__raw-source,
     .milkdown-code-block .md-preview__math-source,
     .milkdown-code-block .md-preview__raw-source {
-      // 行内 chip：底图上需要比常规主题更实一点。
-      background: color-mix(in srgb, var(--accent) 20%, transparent);
+      // 行内 chip：底图上需要比常规主题略实一点，但仍在淡蓝档内。
+      background: color-mix(in srgb, var(--md-tint) 13%, transparent);
     }
 
     blockquote {
-      background: color-mix(in srgb, var(--accent) 22%, transparent);
+      // 引用块面积大，浓度比其他元素再低一档，保持和 GitHub 按钮同样的淡蓝观感。
+      background: color-mix(in srgb, var(--md-tint) 10%, transparent);
     }
 
     pre,
     pre[class*='language-'],
     .milkdown-code-block,
     .md-runnable-code {
-      // 代码块：只在玻璃底里掺一点点主蓝（微微蓝），整块偏灰但不失色相。
-      background: color-mix(in srgb, var(--accent) 5%, var(--mde-glass-code));
+      // 代码块：只在玻璃底里掺一点点蓝（微微蓝），整块偏灰但不失色相。
+      background: color-mix(in srgb, var(--md-tint) 4%, var(--mde-glass-code));
     }
 
     pre code,

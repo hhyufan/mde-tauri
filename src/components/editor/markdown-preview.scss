@@ -23,17 +23,21 @@
   --md-radius: var(--radius-sm);
   --md-duration: 0.2s;
   --md-ease: cubic-bezier(0.65, 0.05, 0.36, 1);
-  --md-accent-soft: color-mix(in srgb, var(--accent) 13%, transparent);
-  --md-quote-bg: color-mix(in srgb, var(--accent) 15%, transparent);
-  --md-code-bg: color-mix(in srgb, var(--accent) 7%, color-mix(in srgb, var(--text) 12%, transparent));
+  // markdown 底色基调：取 UI 主蓝，也就是侧栏 GitHub 按钮那支淡蓝
+  // （按钮就是 --accent 文字 + --accent-bg 底，透明度 8%）。
+  // 所有带底色的元素都由它推导，深浅只靠透明度区分，不用另一种色相；
+  // 浓度都压在 8% 上下，大面积元素（引用块）才不会显得深。
+  --md-tint: var(--accent);
+
+  --md-tint-soft: color-mix(in srgb, var(--md-tint) 9%, transparent);
+  --md-quote-bg: color-mix(in srgb, var(--md-tint) 8%, transparent);
+  --md-code-bg: color-mix(in srgb, var(--md-tint) 5%, color-mix(in srgb, var(--text) 6%, transparent));
   --md-rule: color-mix(in srgb, var(--text) 16%, transparent);
-  --md-row-alt: color-mix(in srgb, var(--text) 7%, transparent);
-  // vitality 原版的行 hover 是中性灰（#d9d9d9），不是主蓝；用中性色才不会和表头同色。
-  --md-row-hover: color-mix(in srgb, var(--text) 12%, transparent);
-  // 表头用淡蓝底 + 主蓝字，而不是 vitality 原版的实心主蓝填充：
-  // 大表格（例如展示页的分栏表）整条实心蓝会非常压屏。
-  --md-table-head-bg: color-mix(in srgb, var(--accent) 16%, transparent);
-  --md-table-head-fg: var(--accent);
+  --md-row-alt: color-mix(in srgb, var(--md-tint) 4%, transparent);
+  --md-row-hover: color-mix(in srgb, var(--md-tint) 7%, transparent);
+  // 表头：淡蓝底 + 主蓝字，比 vitality 原版的实心填充克制很多，大表格不会压屏。
+  --md-table-head-bg: color-mix(in srgb, var(--md-tint) 12%, transparent);
+  --md-table-head-fg: var(--md-tint);
   --md-hash: #f56c6c;
   --md-mark-bg: #ffd416;
   --md-mark-fg: #2f363d;
@@ -264,7 +268,7 @@
     font-size: 0.88em;
     padding: 2px 4px;
     border-radius: var(--md-radius-sm);
-    background: var(--md-accent-soft);
+    background: var(--md-tint-soft);
     color: inherit;
   }
 
@@ -720,7 +724,8 @@
 
   .tableWrapper {
     overflow-x: auto;
-    margin: 1em 0;
+    // 表格间距统一由 table 自身承担，相邻表格之间才有一致的上下留白。
+    margin: 0;
   }
 }
 
@@ -730,7 +735,8 @@
 
 .md-preview__table-wrap {
   overflow-x: auto;
-  margin: 1em 0;
+  // 同上：间距交给 table，避免包裹层与表格两道外边距叠加。
+  margin: 0;
 }
 
 .md-preview__milkdown-mermaid {
@@ -745,6 +751,8 @@
   border-collapse: separate;
   border-spacing: 0;
   width: 100%;
+  // 相邻表格之间靠自身外边距留白（包裹层已归零，避免两道边距叠加）。
+  margin: 1em 0;
 
   th, td {
     padding: 6px 13px;
@@ -795,7 +803,7 @@
   .node ellipse,
   .node polygon,
   .node path {
-    fill: var(--md-accent-soft) !important;
+    fill: var(--md-tint-soft) !important;
     stroke: var(--accent) !important;
   }
 
@@ -922,15 +930,15 @@
 /**
  * 暗色主题下的 markdown 令牌覆盖。
  *
- * 深色背景会把浅色主题里 13% 的蓝/灰透明层压得几乎看不见，因此统一加强透明层；
- * 表头色调与浅色保持一致（淡蓝底 + 主蓝字），只是透明层更实一点。
+ * 深色背景会把浅色主题里的透明层压得几乎看不见，因此统一加强；
+ * 色相仍是同一支主蓝，只是透明度更高。
  */
 html[data-theme='dark'] .md-preview {
-  --md-accent-soft: color-mix(in srgb, var(--accent) 22%, transparent);
-  --md-quote-bg: color-mix(in srgb, var(--accent) 20%, transparent);
-  --md-code-bg: color-mix(in srgb, var(--accent) 9%, color-mix(in srgb, var(--text) 14%, transparent));
+  --md-tint-soft: color-mix(in srgb, var(--md-tint) 15%, transparent);
+  --md-quote-bg: color-mix(in srgb, var(--md-tint) 14%, transparent);
+  --md-code-bg: color-mix(in srgb, var(--md-tint) 7%, color-mix(in srgb, var(--text) 8%, transparent));
   --md-rule: color-mix(in srgb, var(--text) 20%, transparent);
-  --md-row-alt: color-mix(in srgb, var(--text) 8%, transparent);
-  --md-row-hover: color-mix(in srgb, var(--text) 16%, transparent);
-  --md-table-head-bg: color-mix(in srgb, var(--accent) 20%, transparent);
+  --md-row-alt: color-mix(in srgb, var(--md-tint) 6%, transparent);
+  --md-row-hover: color-mix(in srgb, var(--md-tint) 10%, transparent);
+  --md-table-head-bg: color-mix(in srgb, var(--md-tint) 15%, transparent);
 }
