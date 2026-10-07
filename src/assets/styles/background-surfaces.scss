@@ -122,12 +122,12 @@ body.mde-has-background,
     .milkdown-code-block .md-preview__math-source,
     .milkdown-code-block .md-preview__raw-source {
       // 行内 chip：底图上需要比常规主题略实一点，但仍在淡蓝档内。
-      background: color-mix(in srgb, var(--md-tint) 13%, transparent);
+      background: color-mix(in srgb, var(--md-tint) 16%, transparent);
     }
 
     blockquote {
       // 引用块面积大，浓度比其他元素再低一档，保持和 GitHub 按钮同样的淡蓝观感。
-      background: color-mix(in srgb, var(--md-tint) 10%, transparent);
+      background: color-mix(in srgb, var(--md-tint) 12%, transparent);
     }
 
     pre,
@@ -135,7 +135,7 @@ body.mde-has-background,
     .milkdown-code-block,
     .md-runnable-code {
       // 代码块：只在玻璃底里掺一点点蓝（微微蓝），整块偏灰但不失色相。
-      background: color-mix(in srgb, var(--md-tint) 4%, var(--mde-glass-code));
+      background: color-mix(in srgb, var(--md-tint) 5%, var(--mde-glass-code));
     }
 
     pre code,
@@ -164,12 +164,12 @@ html[data-theme='dark'] body.mde-has-background .md-preview code,
 html[data-theme='dark'] body.mde-has-background .md-preview code[class*='language-'],
 html[data-theme='dark'] .app--background .md-preview code,
 html[data-theme='dark'] .app--background .md-preview code[class*='language-'] {
-  background: color-mix(in srgb, var(--md-tint) 26%, transparent);
+  background: color-mix(in srgb, var(--md-tint) 32%, transparent);
 }
 
 html[data-theme='dark'] body.mde-has-background .md-preview blockquote,
 html[data-theme='dark'] .app--background .md-preview blockquote {
-  background: color-mix(in srgb, var(--md-tint) 20%, transparent);
+  background: color-mix(in srgb, var(--md-tint) 28%, transparent);
 }
 
 html[data-theme='dark'] body.mde-has-background .md-preview pre,
@@ -180,7 +180,7 @@ html[data-theme='dark'] .app--background .md-preview pre,
 html[data-theme='dark'] .app--background .md-preview pre[class*='language-'],
 html[data-theme='dark'] .app--background .md-preview .milkdown-code-block,
 html[data-theme='dark'] .app--background .md-preview .md-runnable-code {
-  background: color-mix(in srgb, var(--md-tint) 8%, var(--mde-glass-code));
+  background: color-mix(in srgb, var(--md-tint) 12%, var(--mde-glass-code));
 }
 
 // antd 浮层 portal 到 body：变量与底色都必须在 body 级适配，
