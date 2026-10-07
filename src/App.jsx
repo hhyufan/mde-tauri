@@ -52,7 +52,6 @@ import '@styles/App.scss';
  */
 // 顶层浮层默认都不会在首屏出现，因此统一使用懒加载，避免把较重的依赖
 // 提前打进入口包；其中 `StatsPanel` 还会额外引入体积较大的 `@antv/g2`。
-const SearchModal = lazy(() => import('@components/overlays/SearchModal'));
 const SettingsModal = lazy(() => import('@components/overlays/SettingsModal'));
 const StatsPanel = lazy(() => import('@components/overlays/StatsPanel'));
 const LoginModal = lazy(() => import('@components/overlays/LoginModal'));
@@ -111,6 +110,8 @@ function App() {
     [conflictEntries, userId],
   );
   const [searchOpen, setSearchOpen] = useState(false);
+  const openSearch = useCallback(() => setSearchOpen(true), []);
+  const closeSearch = useCallback(() => setSearchOpen(false), []);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [statsOpen, setStatsOpen] = useState(false);
   const [loginOpen, setLoginOpen] = useState(false);
@@ -800,7 +801,9 @@ function App() {
         )}
         <div className="app__main">
           <TitleBar
-            onOpenSearch={() => setSearchOpen(true)}
+            searchOpen={searchOpen}
+            onOpenSearch={openSearch}
+            onCloseSearch={closeSearch}
             onRequestClose={requestWindowClose}
           />
           <TabBar onRequestCloseTab={requestTabClose} />
@@ -846,7 +849,6 @@ function App() {
         )}
       </div>
       <Suspense fallback={null}>
-        {searchOpen && <SearchModal open={searchOpen} onClose={() => setSearchOpen(false)} />}
         {settingsOpen && <SettingsModal open={settingsOpen} onClose={() => setSettingsOpen(false)} />}
         {statsOpen && <StatsPanel open={statsOpen} onClose={() => setStatsOpen(false)} />}
         {loginOpen && <LoginModal open={loginOpen} onClose={() => setLoginOpen(false)} />}

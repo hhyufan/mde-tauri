@@ -1,0 +1,62 @@
+.titlebar__search.search-dropdown {
+  position: relative;
+  cursor: text;
+  padding: 0 12px;
+  gap: 8px;
+  input { flex: 1; min-width: 0; border: 0; outline: 0; background: transparent; color: var(--text); font: inherit; height: 100%; &::placeholder { color: var(--text-dim); } }
+  > .anticon { color: var(--text-sec); font-size: 16px; }
+  &--open { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-bg); }
+  kbd { font: 10px var(--font-app); border: 1px solid var(--border-light); border-radius: 4px; padding: 1px 4px; color: var(--text-sec); white-space: nowrap; }
+}
+.search-dropdown {
+  &__clear { border: 0; background: transparent; color: var(--text-sec); cursor: pointer; width: 24px; height: 24px; border-radius: 5px; &:hover { background: var(--hover); } }
+  &__panel { position: absolute; top: calc(100% + 8px); left: 0; width: min(680px, calc(100vw - 320px)); min-width: 380px; z-index: 800; background: var(--surface); border: 1px solid var(--border); border-radius: 12px; box-shadow: var(--shadow-lg); overflow: hidden; color: var(--text); cursor: default; font-size: 12px; }
+  &__toolbar { display: flex; align-items: center; gap: 6px; padding: 8px 10px; border-bottom: 1px solid var(--border-light);
+    button { display: inline-flex; align-items: center; justify-content: center; border: 0; background: transparent; color: var(--text-sec); cursor: pointer; height: 28px; min-width: 28px; border-radius: 5px;
+      &:hover { background: var(--hover); } &[aria-pressed='true'], &[aria-selected='true'] { color: var(--accent); background: var(--accent-bg); } &:disabled { opacity: .35; cursor: default; } }
+    // 范围选择用 antd Select：原生 <select> 的弹层由系统绘制，无法跟随主题与玻璃背景。
+    .search-dropdown__scope { margin-left: auto; min-width: 104px; max-width: 152px;
+      .ant-select-selector { border-color: var(--border-light); font: inherit; }
+      .ant-select-selection-item { font-size: 11px; color: var(--text-sec); } }
+    button:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+  }
+  &__modes { display: flex; gap: 2px; padding: 2px; border-radius: 7px; background: var(--hover); button { padding: 0 12px; font: inherit; } }
+  &__context { display: flex; align-items: center; gap: 8px; padding: 8px 12px 5px; font-size: 11px; color: var(--text-dim); }
+  &__root { margin-left: auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  &__results { max-height: min(440px, calc(100dvh - 205px)); overflow-y: auto; padding: 4px 6px 6px; }
+  &__empty { padding: 28px 12px; text-align: center; color: var(--text-sec); }
+  &__item { display: flex; align-items: center; gap: 10px; padding: 8px 10px; border-radius: 6px; cursor: pointer; &[aria-selected='true'] { background: var(--accent-bg); .search-dropdown__enter { opacity: .7; } } > svg { width: 18px; height: 18px; flex-shrink: 0; } }
+  &__info { flex: 1; min-width: 0; }
+  &__name { display: flex; align-items: center; gap: 7px; font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  &__filename { overflow: hidden; text-overflow: ellipsis; }
+  &__path, &__preview { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-size: 11px; color: var(--text-sec); margin-top: 2px; }
+  &__preview { font-family: var(--font-editor); color: var(--text); margin-top: 4px; }
+  &__line { color: var(--text-sec); font: 11px var(--font-editor); }
+  &__tag { margin-left: auto; font-size: 10px; color: var(--text-dim); }
+  &__dirty { width: 5px; height: 5px; border-radius: 50%; background: var(--accent); flex-shrink: 0; }
+  &__enter { opacity: 0; color: var(--accent); }
+  &__error { padding: 8px 12px; color: var(--error); background: color-mix(in srgb, var(--error) 6%, transparent); overflow-wrap: anywhere; }
+  &__notice { padding: 4px 12px; color: var(--text-sec); font-size: 11px; }
+  &__footer { display: flex; flex-wrap: wrap; gap: 6px 14px; padding: 8px 12px; color: var(--text-dim); border-top: 1px solid var(--border-light); font-size: 10px; span { display: inline-flex; align-items: center; gap: 3px; } }
+  mark { background: color-mix(in srgb, var(--accent) 18%, transparent); color: inherit; border-radius: 2px; font-weight: 600; }
+}
+// 背景（玻璃）模式：面板与其内部控件改用玻璃底色，避免出现实色方块。
+// 浮层变量 --mde-glass-popup 定义在 body 级，这里同时覆盖面板内的 antd 控件。
+.app--background {
+  .search-dropdown__panel { background: var(--mde-glass-popup); backdrop-filter: blur(16px); }
+  .search-dropdown__clear:hover,
+  .search-dropdown__toolbar button:hover { background: var(--mde-glass-hover); }
+  .search-dropdown__toolbar button[aria-pressed='true'],
+  .search-dropdown__toolbar button[aria-selected='true'] { background: var(--mde-glass-selected); }
+  .search-dropdown__modes { background: var(--mde-glass-hover); }
+  .search-dropdown__item:hover { background: var(--mde-glass-hover); }
+  .search-dropdown__item[aria-selected='true'] { background: var(--mde-glass-selected); }
+  .search-dropdown__error { background: color-mix(in srgb, var(--error) 14%, transparent); }
+  .search-dropdown__footer { border-top-color: transparent; }
+  // 范围选择器本体（弹层在 body 级由 background-surfaces 统一适配）。
+  .search-dropdown__scope .ant-select-selector { background: var(--mde-glass-surface); }
+}
+@media (max-width: 768px) {
+  .search-dropdown__panel { position: fixed; top: calc(58px + env(safe-area-inset-top)); left: 8px; right: 8px; width: auto; min-width: 0; }
+  .search-dropdown__shortcut, .search-dropdown__footer > span:last-child { display: none; }
+}

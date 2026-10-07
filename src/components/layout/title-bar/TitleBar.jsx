@@ -4,6 +4,7 @@ import { Tooltip } from 'antd';
 import { appWindow } from '@utils/tauriApi';
 import useEditorStore from '@store/useEditorStore';
 import { useResponsiveLayout } from '@hooks/useResponsiveLayout';
+import SearchDropdown from './SearchDropdown';
 import './titlebar.scss';
 
 /**
@@ -45,9 +46,9 @@ function PinIcon({ className }) {
  * 负责侧边栏开关、搜索入口，以及桌面端的最小化/最大化/关闭窗口控制。
  * 在移动端与 Android 上则退化成更轻量的导航头。
  */
-function TitleBar({ onOpenSearch, onRequestClose }) {
+function TitleBar({ searchOpen, onOpenSearch, onCloseSearch, onRequestClose }) {
   const { t } = useTranslation();
-  const { toggleSidebar } = useEditorStore();
+  const toggleSidebar = useEditorStore((state) => state.toggleSidebar);
   const [isMaximized, setIsMaximized] = useState(false);
   const [isPinned, setIsPinned] = useState(false);
   const { isMobileLayout, isAndroid } = useResponsiveLayout();
@@ -96,13 +97,7 @@ function TitleBar({ onOpenSearch, onRequestClose }) {
         </svg>
       </TbBtn>
 
-      <div className="titlebar__search" onClick={onOpenSearch}>
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-          <circle cx="11" cy="11" r="8" />
-          <line x1="21" y1="21" x2="16.65" y2="16.65" />
-        </svg>
-        {t('topbar.search.placeholder')}
-      </div>
+      <SearchDropdown open={searchOpen} onOpen={onOpenSearch} onClose={onCloseSearch} />
 
       <div className="titlebar__drag" />
 

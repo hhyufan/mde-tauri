@@ -14,12 +14,13 @@ use std::path::{Path, PathBuf};
 use std::process::Command;
 use std::sync::{Arc, Mutex};
 use std::time::{SystemTime, UNIX_EPOCH};
-use tauri::{async_runtime, AppHandle, Emitter, Manager};
+use tauri::{AppHandle, Emitter, Manager};
 mod language_plugins;
 mod lsp;
 #[cfg(windows)]
 mod msvc;
 mod script_runner;
+mod search;
 
 /// 返回给前端的轻量级文件系统条目元数据，
 /// 用于资源管理器界面展示文件和目录。
@@ -154,7 +155,6 @@ static FILE_WATCHER_STATE: Lazy<Arc<Mutex<FileWatcherState>>> = Lazy::new(|| {
     }))
 });
 
-static CANCELLED_SEARCHES: Lazy<Mutex<HashSet<String>>> = Lazy::new(|| Mutex::new(HashSet::new()));
 static DIAGNOSTIC_LOG_LOCK: Lazy<Mutex<()>> = Lazy::new(|| Mutex::new(()));
 const DIAGNOSTIC_LOG_LIMIT: u64 = 2 * 1024 * 1024;
 const DIAGNOSTIC_LOG_FILES: usize = 5;
@@ -1214,218 +1214,6 @@ async fn stop_file_watching(file_path: String) -> Result<bool, String> {
     }
 }
 
-/// 返回给前端的搜索结果项，
-/// 用于表示文件名命中或 Markdown 文件内容命中。
-#[derive(Serialize, Deserialize, Debug, Clone)]
-struct SearchResult {
-    name: String,
-    path: String,
-    is_dir: bool,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    matched_line: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    line_number: Option<u32>,
-}
-
-/// 判断路径是否使用了递归搜索索引支持的 Markdown 扩展名之一。
-fn is_markdown_ext(path: &Path) -> bool {
-    match path.extension().and_then(|e| e.to_str()) {
-        Some(ext) => {
-            let e = ext.to_lowercase();
-            e == "md" || e == "markdown" || e == "mdx"
-        }
-        None => false,
-    }
-}
-
-/// 内容搜索的第一阶段辅助函数：
-/// 先收集 Markdown 文件路径，不立即读取文件内容。
-fn collect_md_paths(dir: &Path, out: &mut Vec<std::path::PathBuf>, task_id: &str) {
-    if CANCELLED_SEARCHES.lock().unwrap().contains(task_id) || out.len() >= 10_000 {
-        return;
-    }
-    let entries = match fs::read_dir(dir) {
-        Ok(e) => e,
-        Err(_) => return,
-    };
-    for entry in entries.flatten() {
-        let path = entry.path();
-        let name = entry.file_name().to_string_lossy().to_lowercase();
-        if name.starts_with('.') || name == "node_modules" || name == "target" || name == "dist" {
-            continue;
-        }
-        if path.is_dir() {
-            collect_md_paths(&path, out, task_id);
-        } else if is_markdown_ext(&path) {
-            out.push(path);
-        }
-    }
-}
-
-/// 内容搜索的第二阶段辅助函数：
-/// 扫描已加载的文件内容，并提取命中行的预览文本。
-fn search_content_lines(path: &Path, content: &str, query_lower: &str) -> Vec<SearchResult> {
-    let name = path
-        .file_name()
-        .unwrap_or_default()
-        .to_string_lossy()
-        .to_string();
-    let path_str = path.to_string_lossy().to_string();
-    let mut results = Vec::new();
-    for (i, line) in content.lines().enumerate() {
-        if line.to_lowercase().contains(query_lower) {
-            let preview = if line.len() > 120 {
-                format!("{}...", &line[..120])
-            } else {
-                line.to_string()
-            };
-            results.push(SearchResult {
-                name: name.clone(),
-                path: path_str.clone(),
-                is_dir: false,
-                matched_line: Some(preview),
-                line_number: Some((i + 1) as u32),
-            });
-        }
-    }
-    results
-}
-
-/// 当前端只请求路径匹配而不读取文件内容时，
-/// 使用的递归文件名遍历逻辑。
-fn walk_names(dir: &Path, query_lower: &str, results: &mut Vec<SearchResult>, limit: usize) {
-    if results.len() >= limit {
-        return;
-    }
-    let entries = match fs::read_dir(dir) {
-        Ok(e) => e,
-        Err(_) => return,
-    };
-    for entry in entries.flatten() {
-        if results.len() >= limit {
-            return;
-        }
-        let path = entry.path();
-        let name = entry.file_name().to_string_lossy().to_string();
-        if name.starts_with('.') || name == "node_modules" || name == "target" || name == "dist" {
-            continue;
-        }
-        if path.is_dir() {
-            walk_names(&path, query_lower, results, limit);
-        } else if name.to_lowercase().contains(query_lower) {
-            results.push(SearchResult {
-                name,
-                path: path.to_string_lossy().to_string(),
-                is_dir: false,
-                matched_line: None,
-                line_number: None,
-            });
-        }
-    }
-}
-
-/// 按文件名或文件内容搜索 Markdown 文件，
-/// 并向前端搜索面板返回轻量结果记录。
-#[tauri::command]
-async fn search_files(
-    dir_path: String,
-    query: String,
-    search_content: bool,
-    max_results: Option<usize>,
-    task_id: Option<String>,
-) -> Result<Vec<SearchResult>, String> {
-    use std::path::PathBuf;
-
-    let root_path = PathBuf::from(&dir_path);
-    if !root_path.is_dir() {
-        return Err("Directory does not exist".to_string());
-    }
-
-    let query_lower: Arc<str> = query.to_lowercase().into();
-    let limit = max_results.unwrap_or(100);
-    let task_id = task_id.unwrap_or_else(|| {
-        format!(
-            "search-{}",
-            SystemTime::now()
-                .duration_since(UNIX_EPOCH)
-                .unwrap_or_default()
-                .as_nanos()
-        )
-    });
-    CANCELLED_SEARCHES.lock().unwrap().remove(&task_id);
-
-    if search_content {
-        // 在执行内容扫描前，先在线程池中收集候选 Markdown 路径，
-        // 让异步执行器线程继续留给 UI 相关任务使用。
-        let root_clone = root_path.clone();
-        let collect_task_id = task_id.clone();
-        let md_paths = async_runtime::spawn_blocking(move || {
-            let mut paths = Vec::new();
-            collect_md_paths(&root_clone, &mut paths, &collect_task_id);
-            paths
-        })
-        .await
-        .map_err(|e| e.to_string())?;
-
-        // 在线程池中并行读取和扫描文件，
-        // 避免大工作区搜索在单线程上串行执行。
-        let mut results = Vec::new();
-        for batch in md_paths.chunks(4) {
-            if results.len() >= limit || CANCELLED_SEARCHES.lock().unwrap().contains(&task_id) {
-                break;
-            }
-            let handles: Vec<_> = batch
-                .iter()
-                .cloned()
-                .map(|path| {
-                    let q = Arc::clone(&query_lower);
-                    async_runtime::spawn_blocking(move || {
-                        if fs::metadata(&path)
-                            .map(|meta| meta.len() > 5 * 1024 * 1024)
-                            .unwrap_or(true)
-                        {
-                            return vec![];
-                        }
-                        match fs::read_to_string(&path) {
-                            Ok(content) => search_content_lines(&path, &content, &q),
-                            Err(_) => vec![],
-                        }
-                    })
-                })
-                .collect();
-            for handle in handles {
-                if let Ok(file_results) = handle.await {
-                    for r in file_results {
-                        if results.len() >= limit {
-                            break;
-                        }
-                        results.push(r);
-                    }
-                }
-            }
-        }
-        CANCELLED_SEARCHES.lock().unwrap().remove(&task_id);
-        Ok(results)
-    } else {
-        // 仅文件名搜索仍放在线程池执行，
-        // 因为递归遍历目录本身就是同步文件系统操作。
-        let q = query_lower.to_string();
-        let results = async_runtime::spawn_blocking(move || {
-            let mut out = Vec::new();
-            walk_names(&root_path, &q, &mut out, limit);
-            out
-        })
-        .await
-        .map_err(|e| e.to_string())?;
-        Ok(results)
-    }
-}
-
-#[tauri::command]
-async fn cancel_search(task_id: String) -> bool {
-    CANCELLED_SEARCHES.lock().unwrap().insert(task_id)
-}
-
 /// 在宿主平台的文件管理器中显示指定文件或目录。
 #[tauri::command]
 async fn show_in_explorer(path: String) -> Result<String, String> {
@@ -1690,8 +1478,8 @@ pub fn run() {
             delete_file,
             start_file_watching,
             stop_file_watching,
-            search_files,
-            cancel_search,
+            search::search_files,
+            search::cancel_search,
             show_in_explorer,
             show_main_window,
             get_app_documents_dir,

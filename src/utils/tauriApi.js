@@ -8,6 +8,7 @@ import { invoke } from '@tauri-apps/api/core';
 import { listen } from '@tauri-apps/api/event';
 import { getCurrentWindow } from '@tauri-apps/api/window';
 import { rememberDiskBaseline, withFileOperation } from '@/services/localFileGuard';
+import { contentSearchResults, fileSearchScore } from '@utils/searchMatching';
 import {
   isSafUri,
   listFolder as safListFolder,
@@ -342,38 +343,58 @@ export async function stopFileWatching(filePath) {
 /**
  * 在目录内搜索文件。
  *
- * SAF 场景下降级为当前层级的名称匹配，以避免深层遍历带来的性能问题。
+ * 搜索本地目录或 SAF 树；文本搜索不限定扩展名。
  */
-export async function searchFiles(dirPath, query, searchContent = false, maxResults = 100, taskId) {
+const safSearchTasks = new Map();
+export async function searchFiles(dirPath, query, searchContent = false, maxResults = 100, taskId, options = {}) {
   if (isSafUri(dirPath)) {
-    // SAF 树遍历远慢于 `std::fs`，每深入一层都意味着新的 ContentResolver 查询；
-    // 因此这里只保留“当前目录单层名称搜索”，保证搜索面板仍可用于快速定位文件。
+    const state = { cancelled: false };
+    safSearchTasks.set(taskId, state);
+    const response = { results: [], truncated: false, skippedFiles: 0 };
     try {
-      const q = (query || '').toLowerCase();
-      if (!q) return [];
-      const children = await safListFolder(dirPath);
-      const matches = [];
-      for (const c of children) {
-        if (matches.length >= maxResults) break;
-        if (c.name.toLowerCase().includes(q)) {
-          matches.push({
-            name: c.name,
-            path: c.path,
-            is_dir: !!c.is_dir,
-            matched_line: null,
-            line_number: null,
-          });
+      const q = (query || '').trim();
+      if (!q) return response;
+      const pending = [{ path: dirPath, relative: '' }], seen = new Set();
+      while (pending.length && !state.cancelled) {
+        const folder = pending.pop();
+        if (seen.has(folder.path)) continue;
+        seen.add(folder.path);
+        let children;
+        try { children = await safListFolder(folder.path); }
+        catch (error) { if (folder.path === dirPath) throw error; response.skippedFiles++; continue; }
+        for (const child of children) {
+          if (state.cancelled) break;
+          const relative = folder.relative + child.name;
+          if (child.is_dir) {
+            if (options.includeExcluded || !(child.name.startsWith('.') || ['node_modules', 'target', 'dist', 'build', 'vendor', '__pycache__'].includes(child.name.toLowerCase()))) {
+              pending.push({ path: child.path, relative: relative + '/' });
+            }
+          } else if (searchContent) {
+            try {
+              if ((await safStatUri(child.path))?.size > 5 * 1024 * 1024) { response.skippedFiles++; continue; }
+              const { content: text } = await safReadFileText(child.path);
+              if (text.includes('\0')) { response.skippedFiles++; continue; }
+              response.results.push(...contentSearchResults({ id: child.path, ...child }, text, q, options.caseSensitive, maxResults + 1 - response.results.length));
+              if (response.results.length > maxResults) { response.results.length = maxResults; response.truncated = true; return response; }
+            } catch (_) { response.skippedFiles++; }
+          } else {
+            const score = fileSearchScore(child.name, relative, q, options.caseSensitive);
+            if (score === null) continue;
+            response.results.push({ name: child.name, path: child.path, is_dir: false, score });
+            response.results.sort((a, b) => a.score - b.score || a.path.localeCompare(b.path));
+            if (response.results.length > maxResults) { response.results.pop(); response.truncated = true; }
+          }
         }
       }
-      return matches;
-    } catch (_) {
-      return [];
-    }
+      return response;
+    } finally { safSearchTasks.delete(taskId); }
   }
-  return invoke('search_files', { dirPath, query, searchContent, maxResults, taskId });
+  return invoke('search_files', { dirPath, query, searchContent, maxResults, taskId, options });
 }
 
 export async function cancelSearch(taskId) {
+  const safTask = safSearchTasks.get(taskId);
+  if (safTask) { safTask.cancelled = true; return true; }
   if (!taskId || !window.__TAURI_INTERNALS__) return false;
   return invoke('cancel_search', { taskId });
 }
