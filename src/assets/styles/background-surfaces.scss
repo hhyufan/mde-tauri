@@ -121,21 +121,21 @@ body.mde-has-background,
     .md-preview__raw-source,
     .milkdown-code-block .md-preview__math-source,
     .milkdown-code-block .md-preview__raw-source {
-      // 行内 chip：底图上要压得住，浓度对齐常规主题的实值档。
-      background: color-mix(in srgb, var(--md-tint) 22%, transparent);
+      // 行内 chip：底图上比常规主题略实一点即可。
+      background: color-mix(in srgb, var(--md-tint) 16%, transparent);
     }
 
     blockquote {
-      // 引用块与常规主题同步（25% 档），玻璃下略降一点避免糊住底图。
-      background: color-mix(in srgb, var(--md-tint) 22%, transparent);
+      // 引用块面积大，浓度比常规主题再降一档，避免糊住底图。
+      background: color-mix(in srgb, var(--md-tint) 14%, transparent);
     }
 
     pre,
     pre[class*='language-'],
     .milkdown-code-block,
     .md-runnable-code {
-      // 代码块：玻璃底掺蓝，整块要能看出是代码区。
-      background: color-mix(in srgb, var(--md-tint) 12%, var(--mde-glass-code));
+      // 代码块：玻璃底里掺一点点蓝，整块偏灰但不失色相。
+      background: color-mix(in srgb, var(--md-tint) 5%, var(--mde-glass-code));
     }
 
     pre code,
@@ -164,12 +164,12 @@ html[data-theme='dark'] body.mde-has-background .md-preview code,
 html[data-theme='dark'] body.mde-has-background .md-preview code[class*='language-'],
 html[data-theme='dark'] .app--background .md-preview code,
 html[data-theme='dark'] .app--background .md-preview code[class*='language-'] {
-  background: color-mix(in srgb, var(--md-tint) 48%, transparent);
+  background: color-mix(in srgb, var(--md-tint) 32%, transparent);
 }
 
 html[data-theme='dark'] body.mde-has-background .md-preview blockquote,
 html[data-theme='dark'] .app--background .md-preview blockquote {
-  background: color-mix(in srgb, var(--md-tint) 46%, transparent);
+  background: color-mix(in srgb, var(--md-tint) 30%, transparent);
 }
 
 html[data-theme='dark'] body.mde-has-background .md-preview pre,
@@ -180,7 +180,7 @@ html[data-theme='dark'] .app--background .md-preview pre,
 html[data-theme='dark'] .app--background .md-preview pre[class*='language-'],
 html[data-theme='dark'] .app--background .md-preview .milkdown-code-block,
 html[data-theme='dark'] .app--background .md-preview .md-runnable-code {
-  background: color-mix(in srgb, var(--md-tint) 24%, var(--mde-glass-code));
+  background: color-mix(in srgb, var(--md-tint) 16%, var(--mde-glass-code));
 }
 
 // antd 浮层 portal 到 body：变量与底色都必须在 body 级适配，
