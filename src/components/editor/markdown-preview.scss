@@ -11,6 +11,33 @@
   // 为长文档的滚动和绘制启用 GPU 加速。
   contain: content;
 
+  /**
+   * vitality 主题令牌。
+   *
+   * 圆角、蓝调透明层与缓动集中在这里，元素样式只表达语义；透明层一律用
+   * color-mix 从当前主题的 --accent / --text 推导，深色模式自动成立。
+   */
+  // 圆角贴合编辑器既有尺度：小 chip 4px，块级一律沿用按钮/输入框的 --radius-sm（6px）。
+  // 比 vitality 原始的 8px 更克制，markdown 区块不会比 UI 面板还圆。
+  --md-radius-sm: 4px;
+  --md-radius: var(--radius-sm);
+  --md-duration: 0.2s;
+  --md-ease: cubic-bezier(0.65, 0.05, 0.36, 1);
+  --md-accent-soft: color-mix(in srgb, var(--accent) 13%, transparent);
+  --md-quote-bg: color-mix(in srgb, var(--accent) 15%, transparent);
+  --md-code-bg: color-mix(in srgb, var(--text) 13%, transparent);
+  --md-rule: color-mix(in srgb, var(--text) 16%, transparent);
+  --md-row-alt: color-mix(in srgb, var(--text) 6%, transparent);
+  --md-row-hover: color-mix(in srgb, var(--accent) 16%, transparent);
+  --md-hash: #f56c6c;
+  --md-mark-bg: #ffd416;
+  --md-mark-fg: #2f363d;
+  --md-kbd-bg: #333;
+  --md-kbd-fg: #eee;
+  --md-kbd-border: #444;
+  --md-kbd-shadow: #222;
+  --md-notebook: url("data:image/svg+xml,%3Csvg width='48' height='48' viewBox='0 0 48 48' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M10 6C10 4.89543 10.8954 4 12 4H40C41.1046 4 42 4.89543 42 6V42C42 43.1046 41.1046 44 40 44H12C10.8954 44 10 43.1046 10 42V6Z' stroke='%23000' stroke-width='4' stroke-linejoin='round'/%3E%3Cpath d='M34 6V42' stroke='%23000' stroke-width='4' stroke-linecap='round'/%3E%3Cpath d='M6 14H14' stroke='%23000' stroke-width='4' stroke-linecap='round'/%3E%3Cpath d='M6 24H14' stroke='%23000' stroke-width='4' stroke-linecap='round'/%3E%3Cpath d='M6 34H14' stroke='%23000' stroke-width='4' stroke-linecap='round'/%3E%3Cpath d='M27 4H39' stroke='%23000' stroke-width='4' stroke-linecap='round'/%3E%3Cpath d='M27 44H39' stroke='%23000' stroke-width='4' stroke-linecap='round'/%3E%3C/svg%3E");
+
   &--stale {
     // 当延迟渲染尚未完成时，给出一个非常轻微的提示，表示预览
     // 比编辑器落后一步。几乎不会带来额外绘制成本。
@@ -18,17 +45,44 @@
   }
 
   h1, h2, h3, h4, h5, h6 {
-    margin-top: 1.2em;
+    margin-top: 1.4em;
     margin-bottom: 0.6em;
     font-weight: 600;
-    line-height: 1.35;
+    line-height: 1.5;
     color: var(--text);
   }
 
-  h1 { font-size: 2em; border-bottom: 1px solid var(--border-light); padding-bottom: 0.3em; }
-  h2 { font-size: 1.5em; border-bottom: 1px solid var(--border-light); padding-bottom: 0.25em; }
-  h3 { font-size: 1.25em; }
-  h4 { font-size: 1.1em; }
+  // vitality：标题不带下边框；h1 居中并前置笔记本图标，h2 前置红色 #。
+  h1 {
+    font-size: 2.1em;
+    text-align: center;
+
+    &::before {
+      content: '';
+      display: inline-block;
+      width: 0.85em;
+      height: 0.7em;
+      margin-right: 8px;
+      vertical-align: -0.02em;
+      background-color: currentColor;
+      -webkit-mask: var(--md-notebook) no-repeat center / contain;
+      mask: var(--md-notebook) no-repeat center / contain;
+    }
+  }
+
+  h2 {
+    font-size: 1.55em;
+
+    &::before {
+      content: '#';
+      margin-right: 6px;
+      color: var(--md-hash);
+    }
+  }
+
+  h3 { font-size: 1.3em; }
+  h4 { font-size: 1.12em; }
+  h5, h6 { font-size: 1em; color: var(--text-sec); }
 
   p { margin-bottom: 1em; }
 
@@ -38,18 +92,34 @@
     font-synthesis: style;
   }
 
+  // 链接：常态无下划线，hover 时从中线向两侧展开 1px 下划线。
   a {
+    position: relative;
     color: var(--accent);
     text-decoration: none;
-    &:hover { text-decoration: underline; }
+
+    &::before {
+      content: '';
+      position: absolute;
+      bottom: -2px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 0;
+      height: 1px;
+      background-color: var(--accent);
+      transition: width var(--md-duration) var(--md-ease);
+    }
+
+    &:hover::before { width: 100%; }
   }
 
+  // 引用块：淡蓝圆角块，不再使用左侧竖线。
   blockquote {
     margin: 1em 0;
-    padding: 0.5em 1em;
-    border-left: 4px solid var(--accent);
-    background: var(--accent-bg);
-    border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+    padding: 8px 12px;
+    border: none;
+    border-radius: var(--md-radius);
+    background: var(--md-quote-bg);
     color: var(--text-sec);
 
     p:last-child { margin-bottom: 0; }
@@ -60,6 +130,15 @@
     padding-left: 1.8em;
     li { margin-bottom: 0.25em; }
   }
+
+  // vitality：列表标记取主蓝；有序列表改用 lower-roman。
+  ul li::marker,
+  ol li::marker {
+    color: var(--accent);
+    font-weight: 600;
+  }
+
+  ol { list-style-type: lower-roman; }
 
   ul li {
     list-style-type: disc;
@@ -150,25 +229,38 @@
     accent-color: var(--accent);
   }
 
+  // vitality：勾选后的待办整行划掉并变淡。
+  li.task-list-item:has(> input[type='checkbox']:checked),
+  li[data-item-type='task'][data-checked='true'] {
+    color: color-mix(in srgb, var(--text) 55%, transparent);
+    text-decoration: line-through;
+  }
+
   hr {
-    border: none;
-    border-top: 1px solid var(--border);
-    margin: 1.5em 0;
+    height: 2px;
+    margin: 16px 0;
+    padding: 0;
+    border: 0 none;
+    border-radius: 1px;
+    background-color: var(--md-rule);
+    overflow: hidden;
+    box-sizing: content-box;
   }
 
   img {
     max-width: 100%;
-    border-radius: var(--radius-sm);
+    border-radius: var(--md-radius);
     margin: 0.5em 0;
   }
 
+  // 行内代码：蓝调透明底 + 4px 圆角，文字沿用正文颜色。
   code {
     font-family: var(--font-editor);
     font-size: 0.88em;
-    background: var(--hover);
-    padding: 2px 6px;
-    border-radius: 4px;
-    color: var(--accent);
+    padding: 2px 4px;
+    border-radius: var(--md-radius-sm);
+    background: var(--md-accent-soft);
+    color: inherit;
   }
 
   pre {
@@ -179,9 +271,9 @@
     font-family: var(--font-editor);
     font-size: 0.9em;
     line-height: 1.6;
-    background: var(--bg);
-    border-radius: var(--radius-sm);
-    border: 1px solid var(--border-light);
+    background: var(--md-code-bg);
+    border: none;
+    border-radius: var(--md-radius);
 
     code,
     code[class*='language-'] {
@@ -641,23 +733,35 @@
 }
 
 .md-preview table {
-  border-collapse: collapse;
+  // separate 才能让表头/末行的圆角生效；只保留横向分隔线，避免相邻边框叠成双线。
+  border-collapse: separate;
+  border-spacing: 0;
   width: 100%;
 
   th, td {
-    border: 1px solid var(--border);
-    padding: 8px 12px;
+    padding: 6px 13px;
     text-align: left;
+    border: 0;
+    border-bottom: 1px solid var(--border);
+    transition: background-color var(--md-duration) var(--md-ease);
   }
 
+  // vitality：表头填充主蓝 + 白字，首末列收圆角（贴合编辑器的微圆角尺度）。
   th {
-    background: var(--hover);
+    background: var(--accent);
+    color: #fff;
     font-weight: 600;
+    border-bottom: 0;
   }
 
-  tr:nth-child(even) td {
-    background: var(--accent-bg);
-  }
+  th:first-child { border-top-left-radius: var(--md-radius); }
+  th:last-child { border-top-right-radius: var(--md-radius); }
+  tr:last-child td:first-child { border-bottom-left-radius: var(--md-radius); }
+  tr:last-child td:last-child { border-bottom-right-radius: var(--md-radius); }
+
+  tr:nth-child(even) td { background: var(--md-row-alt); }
+  tr:hover td { background: var(--md-row-hover); }
+  tr:last-child td { border-bottom: 0; }
 }
 
 
@@ -674,6 +778,16 @@
   svg {
     max-width: 100%;
     height: auto;
+  }
+
+  // vitality：流程图节点填充主蓝透明、描边主蓝。
+  .node rect,
+  .node circle,
+  .node ellipse,
+  .node polygon,
+  .node path {
+    fill: var(--md-accent-soft) !important;
+    stroke: var(--accent) !important;
   }
 
   &--error {
@@ -748,15 +862,17 @@
 /* 键盘按键 */
 .md-preview__kbd {
   display: inline-block;
-  padding: 2px 6px;
+  margin: 0.15em;
+  padding: 0.2em 0.6em;
   font-size: 0.82em;
   font-family: var(--font-editor);
   line-height: 1.4;
-  color: var(--text);
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: 3px;
-  box-shadow: 0 1px 1px rgba(0,0,0,0.08), inset 0 -1px 0 rgba(0,0,0,0.06);
+  color: var(--md-kbd-fg);
+  background: var(--md-kbd-bg);
+  border: 1px solid var(--md-kbd-border);
+  border-bottom-color: #555;
+  border-radius: var(--md-radius-sm);
+  box-shadow: 0 0.18em 0 0.04em var(--md-kbd-shadow);
 }
 
 /* 详情 / 摘要 */
@@ -778,14 +894,15 @@
 
 /* 高亮标记 */
 .md-preview mark {
-  background: rgba(255, 213, 79, 0.4);
+  background: var(--md-mark-bg);
+  color: var(--md-mark-fg);
   padding: 1px 4px;
-  border-radius: 2px;
+  border-radius: var(--md-radius-sm);
 }
 
 /* 删除线（GFM） */
 .md-preview del {
-  color: var(--text-dim);
+  color: color-mix(in srgb, var(--text) 50%, transparent);
 }
 
 .katex-display {
