@@ -394,6 +394,37 @@
   border-radius: 4px;
 }
 
+// 底栏常驻的开源入口：沿用登录按钮的淡蓝胶囊尺寸，避免小块空着一角。
+.sidebar__support {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  border: none;
+  background: var(--accent-bg);
+  color: var(--accent);
+  padding: 4px 8px;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  font-family: var(--font-app);
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 1;
+  white-space: nowrap;
+  flex-shrink: 0;
+  transition: all 0.15s;
+
+  svg {
+    width: 13px;
+    height: 13px;
+    flex-shrink: 0;
+  }
+
+  &:hover {
+    background: var(--accent);
+    color: #fff;
+  }
+}
+
 .sidebar__status-dot {
   width: 6px;
   height: 6px;
