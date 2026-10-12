@@ -456,5 +456,14 @@
   "moki.theme.light": "Daylight · Light",
   "moki.theme.dark": "Night reading · Dark",
   "moki.theme.lightDesc": "A cheerful wave in daylight",
-  "moki.theme.darkDesc": "A relaxed moment of night reading"
+  "moki.theme.darkDesc": "A relaxed moment of night reading",
+  "empty.a11y": "{{title}}",
+  "empty.files.title": "Nothing here yet",
+  "empty.files.hint": "Open a folder and Moki will line everything up for you.",
+  "empty.outline.title": "No chapters yet",
+  "empty.outline.hint": "Add a # to a heading and the outline grows itself.",
+  "empty.recent.title": "No pages opened yet",
+  "empty.recent.hint": "Open a document and this list will remember it.",
+  "empty.search.title": "Nothing matched…",
+  "empty.search.hint": "Try another keyword and I'll look again."
 }

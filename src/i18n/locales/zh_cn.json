@@ -456,5 +456,14 @@
   "moki.theme.light": "晴笺 · 浅色",
   "moki.theme.dark": "夜读 · 深色",
   "moki.theme.lightDesc": "挥手笑迎，明亮轻快",
-  "moki.theme.darkDesc": "托腮夜读，松弛安静"
+  "moki.theme.darkDesc": "托腮夜读，松弛安静",
+  "empty.a11y": "{{title}}",
+  "empty.files.title": "这里空空的，一个文件都还没有",
+  "empty.files.hint": "打开一个文件夹吧，Moki 会帮你把它们排得整整齐齐。",
+  "empty.outline.title": "还没有章节呢～",
+  "empty.outline.hint": "给标题加上 #，目录就会自己长出来。",
+  "empty.recent.title": "最近还没有翻开过哪一页",
+  "empty.recent.hint": "打开一份文档，这里会记住你们的相遇。",
+  "empty.search.title": "翻遍了也没找到…",
+  "empty.search.hint": "换个关键词试试？我再去翻一遍。"
 }

@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import useEditorStore from '@store/useEditorStore';
 import { useEditorBufferContent } from '@hooks/useEditorBufferContent';
+import MokiStatusEmpty from '@components/moki/MokiStatusEmpty';
 import './outline.scss';
 
 /**
@@ -190,7 +191,7 @@ function OutlineView() {
     return <div className="outline__empty">{t('sidebar.outline.noFile')}</div>;
   }
   if (items.length === 0) {
-    return <div className="outline__empty">{t('sidebar.outline.empty')}</div>;
+    return <MokiStatusEmpty title={t('empty.outline.title')} hint={t('empty.outline.hint')} />;
   }
 
   return (

@@ -1,6 +1,7 @@
 import useThemeStore from '@store/useThemeStore';
 import bustAtlas from '@/assets/characters/moki-day-night-bust.png';
 import themeAtlas from '@/assets/characters/moki-themes.png';
+import statusAtlas from '@/assets/characters/moki-status-empty.png';
 import './moki.scss';
 
 /**
@@ -23,6 +24,14 @@ const ATLASES = {
     offset: {
       light: { left: '-5.75%', top: '5%' },
       dark: { left: '3.06%', top: '0%' },
+    },
+  },
+  // 空状态专用立绘（887×887 方形单格，重心几乎居中，仅轻微上移）。
+  status: {
+    src: statusAtlas,
+    offset: {
+      light: { left: '-1.45%', top: '-3.85%' },
+      dark: { left: '0.85%', top: '-4.41%' },
     },
   },
 };

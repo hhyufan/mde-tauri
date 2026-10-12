@@ -23,6 +23,7 @@ import Timeline from '@components/history/Timeline';
 import UserMenu from '@components/ui/UserMenu';
 import FileTypeIcon from '@components/ui/FileTypeIcon';
 import AppMark from '@components/ui/AppMark';
+import MokiStatusEmpty from '@components/moki/MokiStatusEmpty';
 import { openExternal } from '@utils/tauriApi';
 import { REPO_URL } from '@/configs/repository';
 import { cn } from '@utils/classNames';
@@ -282,7 +283,11 @@ function RecentList({ onOpenStats }) {
     <div className="sidebar__view">
       <RecentToolbar onOpenStats={onOpenStats} />
       {sortedFiles.length === 0 ? (
-        <div className="sidebar__placeholder"><p>{t('sidebar.recent.empty')}</p></div>
+        <MokiStatusEmpty
+          title={t('empty.recent.title')}
+          hint={t('empty.recent.hint')}
+          compact
+        />
       ) : (
         <div className="sidebar__recent-list">
           {sortedFiles.map((f) => {
