@@ -5,18 +5,21 @@
 
 ```
 examples/
-├── hello.ts        TypeScript · 接口 + 类 + 泛型函数
-├── utils.js        JavaScript · 与 hello.ts 同一服务，验证多后缀
-├── hello.py        Python · dataclass + 类型标注
-├── hello.rs        Rust · struct + impl
-├── Hello.java      Java · record + stream
-├── Hello.cs        C# · record + LINQ
-├── Hello.kt        Kotlin · data class + 扩展函数
-├── notes/          Markdown 示例（编辑器自身的渲染能力）
-└── web/            HTML / CSS 配对
+├── feature-tour.md   能一览：标题 / 表格 / 任务列表 / 引用
+├── hello.ts          TypeScript · 接口 + 类 + 泛型函数
+├── utils.js          JavaScript · 与 hello.ts 同服务，验证多后缀
+├── hello.py          Python · dataclass + 类型标注
+├── hello.rs          Rust · struct + impl
+├── Hello.java        Java · record + stream
+├── Hello.cs          C# · record + LINQ
+├── Hello.kt          Kotlin · data class + 扩展函数
+├── notes/            子目录 1
+│   ├── code-lab.md       可直接运行的代码块
+│   └── knowledge-tree.md3 树文件（缩进即层级，与大纲联动）
+└── web/              子目录 2 · HTML + CSS 配对
 ```
 
-| 路径 | 语言 | 语言服务 |
+| 路径 | 语言 / 能力 | 语言服务 |
 | --- | --- | --- |
 | `hello.ts` `utils.js` | JavaScript / TypeScript | mde.typescript |
 | `hello.py` | Python | mde.pyright |
@@ -25,6 +28,8 @@ examples/
 | `Hello.cs` | C# | mde.csharp |
 | `Hello.kt` | Kotlin | mde.kotlin |
 | `web/` | HTML / CSS | mde.html · mde.css |
+| `notes/knowledge-tree.md3` | 树文件 · 缩进层级 | 编辑器内置树视图 |
+| `notes/code-lab.md` | 代码块运行 | 内置控制台 |
 
 ## 为什么是扁平的
 
