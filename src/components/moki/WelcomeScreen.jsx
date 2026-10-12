@@ -54,7 +54,7 @@ export default function WelcomeScreen() {
               <strong>{t('moki.openFile')}</strong>
               <small>{t('moki.openFileDesc')}</small>
             </span>
-            <kbd>Ctrl O</kbd>
+            <kbd>Ctrl + O</kbd>
           </button>
           <button type="button" className="moki-action" onClick={openFolderDialog}>
             <FolderOpenOutlined />
