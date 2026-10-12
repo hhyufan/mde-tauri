@@ -1,0 +1,11 @@
+{
+  "viewport": {
+    "width": 1600,
+    "height": 1000
+  },
+  "errors": [],
+  "fixtures": [
+    "code-run.png",
+    "sync-conflict.png"
+  ]
+}
