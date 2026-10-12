@@ -18,6 +18,29 @@
     background-size: 200% 100%;
     background-repeat: no-repeat;
     pointer-events: none;
+    /* 换装过渡：两帧各占一层，靠交叉淡入淡出（cross-fade）完成切换。
+       滑动式过渡会让两帧同时横移，读起来像轮播图；淡入淡出才是"同一角色换了状态"。
+       非当前帧额外做轻微放大 + 虚化，淡出时像"化开"，当前帧则对焦到清晰。 */
+    opacity: 0;
+    transform: scale(1.05);
+    filter: blur(8px);
+    transition: opacity 0.45s ease, transform 0.45s ease, filter 0.45s ease;
+  }
+
+  &--light > .moki-sprite__art--light,
+  &--dark > .moki-sprite__art--dark {
+    opacity: 1;
+    transform: scale(1);
+    filter: blur(0);
+  }
+}
+
+/* 尊重系统的减少动态效果偏好：换装直接切，不做缩放与虚化 */
+@media (prefers-reduced-motion: reduce) {
+  .moki-sprite__art {
+    transition: none;
+    transform: none;
+    filter: none;
   }
 }
 .moki-ambient {

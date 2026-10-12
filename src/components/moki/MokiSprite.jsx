@@ -31,18 +31,25 @@ export default function MokiSprite({ theme: explicitTheme, art = 'bust' }) {
   const theme = useThemeStore((state) => state.theme);
   const mode = (explicitTheme || theme) === 'dark' ? 'dark' : 'light';
   const atlas = ATLASES[art] || ATLASES.bust;
-  const offset = atlas.offset[mode] || atlas.offset.light;
   return (
     <span aria-hidden="true" className={`moki-sprite moki-sprite--${mode}`}>
-      <span
-        className="moki-sprite__art"
-        style={{
-          backgroundImage: `url(${atlas.src})`,
-          backgroundPosition: `${mode === 'dark' ? 100 : 0}% 0%`,
-          left: offset.left,
-          top: offset.top,
-        }}
-      />
+      {/* 两帧各占一层：切换主题时靠交叉淡入淡出完成"换装"，
+          比直接改 background-position 硬切更像人物状态变化（见 moki.scss）。 */}
+      {['light', 'dark'].map((frame) => {
+        const offset = atlas.offset[frame] || atlas.offset.light;
+        return (
+          <span
+            key={frame}
+            className={`moki-sprite__art moki-sprite__art--${frame}`}
+            style={{
+              backgroundImage: `url(${atlas.src})`,
+              backgroundPosition: `${frame === 'dark' ? 100 : 0}% 0%`,
+              left: offset.left,
+              top: offset.top,
+            }}
+          />
+        );
+      })}
     </span>
   );
 }
