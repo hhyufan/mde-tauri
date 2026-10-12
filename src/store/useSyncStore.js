@@ -958,7 +958,7 @@ const useSyncStore = create(
       })),
     }),
     {
-      name: 'mde-sync-state',
+      name: 'mokidown-sync-state',
       version: SYNC_STATE_SCHEMA_VERSION,
       storage: createJSONStorage(() => syncStateStorage),
       migrate: (persisted) => migratePersistedState(persisted),

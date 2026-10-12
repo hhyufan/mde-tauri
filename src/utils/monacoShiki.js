@@ -42,7 +42,7 @@ const SHIKI_LANGS = [
 
 // Monaco keeps Shiki's patched methods across Vite module replacement. Keep its
 // readiness and single initialization task on the same instance as those methods.
-const RUNTIME_KEY = Symbol.for('mde.monaco.shiki.runtime');
+const RUNTIME_KEY = Symbol.for('mokidown.monaco.shiki.runtime');
 const runtime = monaco.editor[RUNTIME_KEY] ||= {
   ready: false, promise: null,
   create: monaco.editor.create, setTheme: monaco.editor.setTheme,
@@ -157,7 +157,7 @@ export function initMonacoShiki() {
       monaco.editor.create = fallbackCreate;
       monaco.editor.setTheme = fallbackSetTheme;
       console.error(
-        '[mde/highlight] Shiki bootstrap failed, falling back to Monaco built-in themes:',
+        '[mokidown/highlight] Shiki bootstrap failed, falling back to Monaco built-in themes:',
         error,
       );
     }

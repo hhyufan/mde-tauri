@@ -148,7 +148,7 @@ export default function MonacoSelectionHandles({ editor, enabled = true }) {
       : { lineNumber: sel.startLineNumber, column: sel.startColumn };
 
     draggingRef.current = { pointerId: e.pointerId, anchor, side, handleEl };
-    document.documentElement.classList.add('mde--selection-dragging');
+    document.documentElement.classList.add('moki--selection-dragging');
   };
 
   /**
@@ -194,7 +194,7 @@ export default function MonacoSelectionHandles({ editor, enabled = true }) {
       // 已释放则忽略。
     }
     draggingRef.current = null;
-    document.documentElement.classList.remove('mde--selection-dragging');
+    document.documentElement.classList.remove('moki--selection-dragging');
     editor?.focus();
   };
 

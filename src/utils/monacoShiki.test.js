@@ -15,7 +15,7 @@ vi.mock('@store/useLspStore', () => { throw new Error('Highlighter imported appl
 beforeEach(() => {
   vi.resetModules();
   vi.clearAllMocks();
-  delete mock.editor[Symbol.for('mde.monaco.shiki.runtime')];
+  delete mock.editor[Symbol.for('mokidown.monaco.shiki.runtime')];
   mock.nativeCreate = mock.editor.create = vi.fn(() => ({ dispose: vi.fn() }));
   mock.nativeSetTheme = mock.editor.setTheme = vi.fn();
   document.documentElement.dataset.theme = 'light';

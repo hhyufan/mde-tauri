@@ -35,8 +35,8 @@
     inset: 0;
     z-index: -1;
     pointer-events: none;
-    background: var(--mde-background-image) center / cover no-repeat;
-    opacity: var(--mde-background-opacity, 0.2);
+    background: var(--moki-background-image) center / cover no-repeat;
+    opacity: var(--moki-background-opacity, 0.2);
   }
   .app__main,
   .sidebar,
@@ -61,7 +61,7 @@
   // 底部雾变层保留：默认样式渐隐到实色 --surface，在背景模式下会糊住底图，
   // 因此改为渐隐到玻璃底色，既维持底部柔化又能透出背景。
   .editor-content__fade {
-    background: linear-gradient(to bottom, transparent, var(--mde-glass-popup));
+    background: linear-gradient(to bottom, transparent, var(--moki-glass-popup));
   }
 }
 html[data-theme='dark'] .app--background { background: #181818; }
@@ -147,7 +147,7 @@ html[data-theme='dark'] .app--background { background: #181818; }
   .app {
     // 100dvh 会跟踪动态视口高度（不包含浏览器顶部/底部界面以及
     // Android Chrome / WebView 中软键盘占用的空间）。配合下面的
-    // --mde-kb-inset 回退值，即使在 IME 显示时不更新 dvh 的浏览器里，
+    // --moki-kb-inset 回退值，即使在 IME 显示时不更新 dvh 的浏览器里，
     // 也能保持布局可达。
     height: 100dvh;
     overflow: hidden;
@@ -178,7 +178,7 @@ html[data-theme='dark'] .app--background { background: #181818; }
 
 // 当屏幕键盘打开时，从底部内边距中移除系统导航栏 / 安全区插入值
 // （IME 已经会把自己的界面顶上来，因此这里不应重复计算）。
-html.mde--kb-open .app__main {
+html.moki--kb-open .app__main {
   padding-bottom: 0;
 }
 

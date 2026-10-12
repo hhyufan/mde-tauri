@@ -13,7 +13,7 @@ export function normalizeLanguage(value, fallback = 'en') {
 /**
  * Resolve one startup language for React, the config store and Monaco.
  * The app setting is authoritative; i18next's cache is only a compatibility
- * fallback for profiles created before language lived in mde-config.
+ * fallback for profiles created before language lived in mokidown-config.
  *
  * @param {object} [options]
  * @param {Storage | null} [options.storage]
@@ -30,7 +30,7 @@ export function readInitialLanguage(options = {}) {
 
   if (storage) {
     try {
-      const configLanguage = JSON.parse(storage.getItem('mde-config') || 'null')
+      const configLanguage = JSON.parse(storage.getItem('mokidown-config') || 'null')
         ?.state?.language;
       if (configLanguage) return normalizeLanguage(configLanguage);
     } catch {

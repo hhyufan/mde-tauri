@@ -508,7 +508,7 @@ const useEditorStore = create(
       })),
     }),
     {
-      name: 'mde-editor',
+      name: 'mokidown-editor',
       partialize: (state) => ({
         sidebarVisible: state.sidebarVisible,
         sidebarView: state.sidebarView,

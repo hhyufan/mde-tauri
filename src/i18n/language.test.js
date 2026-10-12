@@ -18,7 +18,7 @@ describe('startup language resolution', () => {
 
   it('uses the app config as the single authoritative persisted value', () => {
     const storage = createStorage({
-      'mde-config': JSON.stringify({ state: { language: 'en' } }),
+      'mokidown-config': JSON.stringify({ state: { language: 'en' } }),
       i18nextLng: 'zh-CN',
     });
 
@@ -36,9 +36,9 @@ describe('startup language resolution', () => {
       .toBe('zh');
   });
 
-  it('continues to legacy fallbacks when mde-config is malformed', () => {
+  it('continues to legacy fallbacks when mokidown-config is malformed', () => {
     const storage = createStorage({
-      'mde-config': '{broken',
+      'mokidown-config': '{broken',
       i18nextLng: 'zh-CN',
     });
 

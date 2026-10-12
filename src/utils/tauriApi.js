@@ -214,20 +214,20 @@ export async function clearRecoverySnapshot() {
 
 export async function setRefreshCredential(token) {
   if (!window.__TAURI_INTERNALS__) {
-    localStorage.setItem('mde-dev-refresh-token', token);
+    localStorage.setItem('mokidown-dev-refresh-token', token);
     return;
   }
   return invoke('set_refresh_credential', { token });
 }
 
 export async function getRefreshCredential() {
-  if (!window.__TAURI_INTERNALS__) return localStorage.getItem('mde-dev-refresh-token');
+  if (!window.__TAURI_INTERNALS__) return localStorage.getItem('mokidown-dev-refresh-token');
   return invoke('get_refresh_credential');
 }
 
 export async function deleteRefreshCredential() {
   if (!window.__TAURI_INTERNALS__) {
-    localStorage.removeItem('mde-dev-refresh-token');
+    localStorage.removeItem('mokidown-dev-refresh-token');
     return;
   }
   return invoke('delete_refresh_credential');

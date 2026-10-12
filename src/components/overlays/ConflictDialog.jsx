@@ -76,65 +76,72 @@ function MonacoConflictDiff({
 
   useEffect(() => {
     if (!containerRef.current) return undefined;
+    let disposed = false;
+    // StrictMode replays mount effects. Do not start worker diffs for that
+    // immediately disposed instance, whose models would vanish mid-request.
+    const frame = requestAnimationFrame(() => {
+      const diffEditor = monaco.editor.createDiffEditor(containerRef.current, {
+        theme: getMonacoThemeName(theme === 'dark'),
+        automaticLayout: true,
+        readOnly: true,
+        originalEditable: false,
+        renderSideBySide: true,
+        useInlineViewWhenSpaceIsLimited: false,
+        enableSplitViewResizing: true,
+        renderOverviewRuler: false,
+        overviewRulerBorder: false,
+        minimap: { enabled: false },
+        scrollBeyondLastLine: false,
+        renderLineHighlight: 'none',
+        roundedSelection: false,
+        glyphMargin: false,
+        folding: false,
+        lineDecorationsWidth: 10,
+        lineNumbers: 'on',
+        lineNumbersMinChars,
+        lineNumbersPadding: 0,
+        wordWrap: 'on',
+        wrappingIndent: 'same',
+        tabSize,
+        fontSize,
+        fontFamily: monacoFontFamily,
+        lineHeight,
+        stickyScroll: { enabled: false },
+        diffAlgorithm: 'advanced',
+        hideUnchangedRegions: {
+          enabled: true,
+          contextLineCount: 2,
+          minimumLineCount: 3,
+          revealLineCount: 2,
+        },
+        scrollbar: {
+          verticalScrollbarSize: 6,
+          horizontalScrollbarSize: 6,
+          useShadows: false,
+        },
+      });
 
-    const diffEditor = monaco.editor.createDiffEditor(containerRef.current, {
-      theme: getMonacoThemeName(theme === 'dark'),
-      automaticLayout: true,
-      readOnly: true,
-      originalEditable: false,
-      renderSideBySide: true,
-      useInlineViewWhenSpaceIsLimited: false,
-      enableSplitViewResizing: true,
-      renderOverviewRuler: false,
-      overviewRulerBorder: false,
-      minimap: { enabled: false },
-      scrollBeyondLastLine: false,
-      renderLineHighlight: 'none',
-      roundedSelection: false,
-      glyphMargin: false,
-      folding: false,
-      lineDecorationsWidth: 10,
-      lineNumbers: 'on',
-      lineNumbersMinChars,
-      lineNumbersPadding: 0,
-      wordWrap: 'on',
-      wrappingIndent: 'same',
-      tabSize,
-      fontSize,
-      fontFamily: monacoFontFamily,
-      lineHeight,
-      stickyScroll: { enabled: false },
-      diffAlgorithm: 'advanced',
-      hideUnchangedRegions: {
-        enabled: true,
-        contextLineCount: 2,
-        minimumLineCount: 3,
-        revealLineCount: 2,
-      },
-      scrollbar: {
-        verticalScrollbarSize: 6,
-        horizontalScrollbarSize: 6,
-        useShadows: false,
-      },
-    });
+      const originalModel = monaco.editor.createModel(original, language);
+      const modifiedModel = monaco.editor.createModel(modified, language);
+      diffEditor.setModel({
+        original: originalModel,
+        modified: modifiedModel,
+      });
 
-    const originalModel = monaco.editor.createModel(original, language);
-    const modifiedModel = monaco.editor.createModel(modified, language);
-    diffEditor.setModel({
-      original: originalModel,
-      modified: modifiedModel,
-    });
+      diffEditorRef.current = diffEditor;
+      originalModelRef.current = originalModel;
+      modifiedModelRef.current = modifiedModel;
 
-    diffEditorRef.current = diffEditor;
-    originalModelRef.current = originalModel;
-    modifiedModelRef.current = modifiedModel;
-
-    initMonacoShiki().then(() => {
-      setHighlighterReady(true);
-      monaco.editor.setTheme(getMonacoThemeName(theme === 'dark'));
+      initMonacoShiki().then(() => {
+        if (disposed) return;
+        setHighlighterReady(true);
+        monaco.editor.setTheme(getMonacoThemeName(theme === 'dark'));
+      });
     });
 
     return () => {
+      disposed = true;
+      cancelAnimationFrame(frame);
       diffEditorRef.current?.dispose();
       originalModelRef.current?.dispose();
       modifiedModelRef.current?.dispose();
@@ -158,11 +165,11 @@ function MonacoConflictDiff({
       const nextLeft = leftPane?.getBoundingClientRect().width || 0;
       const nextRight = rightPane?.getBoundingClientRect().width || 0;
       if (!nextLeft || !nextRight) return;
-      setPaneWidths((prev) => (
+      setPaneWidths((prev) =>
         prev.left === nextLeft && prev.right === nextRight
           ? prev
-          : { left: nextLeft, right: nextRight }
-      ));
+          : { left: nextLeft, right: nextRight },
+      );
     };
 
     const frameId = requestAnimationFrame(syncPaneWidths);
@@ -192,8 +199,10 @@ function MonacoConflictDiff({
   }, [original, modified]);
 
   useEffect(() => {
-    if (originalModelRef.current) monaco.editor.setModelLanguage(originalModelRef.current, language);
-    if (modifiedModelRef.current) monaco.editor.setModelLanguage(modifiedModelRef.current, language);
+    if (originalModelRef.current)
+      monaco.editor.setModelLanguage(originalModelRef.current, language);
+    if (modifiedModelRef.current)
+      monaco.editor.setModelLanguage(modifiedModelRef.current, language);
   }, [language]);
 
   useEffect(() => {
@@ -216,9 +225,10 @@ function MonacoConflictDiff({
     monaco.editor.setTheme(theme === 'dark' ? 'vs-dark' : 'vs');
   }, [theme, highlighterReady]);
 
-  const labelStyle = paneWidths.left && paneWidths.right
-    ? { gridTemplateColumns: `${paneWidths.left}px ${paneWidths.right}px` }
-    : undefined;
+  const labelStyle =
+    paneWidths.left && paneWidths.right
+      ? { gridTemplateColumns: `${paneWidths.left}px ${paneWidths.right}px` }
+      : undefined;
 
   return (
     <div ref={wrapperRef} className="conflict-dialog__diff-shell">
@@ -268,7 +278,7 @@ function ConflictDialog({ open, conflicts, onResolve, onClose }) {
       width="min(1180px, 94vw)"
       centered
       destroyOnHidden
-      rootClassName="mde-conflict-modal-root"
+      rootClassName="moki-conflict-modal-root"
       styles={{ body: { padding: 0 }, content: { padding: 0 } }}
     >
       <div className="conflict-dialog">

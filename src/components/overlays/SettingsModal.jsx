@@ -45,6 +45,8 @@ import {
 import './settings-modal.scss';
 import LanguageServices from './LanguageServices';
 import BackgroundSettings from './BackgroundSettings';
+import MokiSettings from '@components/moki/MokiSettings';
+import MokiSprite from '@components/moki/MokiSprite';
 
 const NAV_ICONS = {
   general: <SettingOutlined />,
@@ -110,7 +112,7 @@ function SettingsModal({ open: openProp, onClose }) {
 
   async function handleExportDiagnostics() {
     const destination = await save({
-      defaultPath: `mde-diagnostics-${new Date().toISOString().slice(0, 10)}.json`,
+      defaultPath: `mokidown-diagnostics-${new Date().toISOString().slice(0, 10)}.json`,
       filters: [{ name: 'JSON', extensions: ['json'] }],
     });
     if (!destination) return;
@@ -179,7 +181,7 @@ function SettingsModal({ open: openProp, onClose }) {
     setCloudBusy(true);
     try {
       const path = await save({
-        defaultPath: 'mde-settings.json',
+        defaultPath: 'mokidown-settings.json',
         filters: [{ name: 'JSON', extensions: ['json'] }],
       });
       if (!path) return;
@@ -235,7 +237,7 @@ function SettingsModal({ open: openProp, onClose }) {
       destroyOnHidden
       maskClosable
       closable
-      rootClassName={`mde-settings-modal-root${fullScreen ? ' mde-settings-modal-root--fullscreen' : ''}`}
+      rootClassName={`moki-settings-modal-root${fullScreen ? ' moki-settings-modal-root--fullscreen' : ''}`}
       styles={{ body: { padding: 0 }, content: { padding: 0 } }}
       title={null}
     >
@@ -319,6 +321,7 @@ function SettingsModal({ open: openProp, onClose }) {
 
             {activeNav === 'appearance' && (
               <div className="settings-section">
+                <MokiSettings SettingGroup={SettingGroup} SettingRow={SettingRow} />
                 <BackgroundSettings SettingGroup={SettingGroup} SettingRow={SettingRow} />
                 <SettingGroup label={t('settings.group.theme')} />
                 <SettingRow
@@ -547,6 +550,7 @@ function SettingsModal({ open: openProp, onClose }) {
             {activeNav === 'about' && (
               <div className="settings-section">
                 <div className="settings-about__hero">
+                  <div className="moki-about"><MokiSprite /><span>{t('moki.caption')}</span></div>
                   <AppMark size={56} className="settings-about__logo" />
                   <div className="settings-about__name">{t('app.name')}</div>
                   {appVersion && (

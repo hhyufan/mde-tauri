@@ -13,5 +13,5 @@ fn main() {
         }
     }
 
-    mde_lib::run()
+    mokidown_lib::run()
 }

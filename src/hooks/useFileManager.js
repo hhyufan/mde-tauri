@@ -186,7 +186,7 @@ export function useFileManager() {
   const androidBootstrappedRef = useRef(false);
 
   // 解析并缓存应用专属 Documents 目录。Android 上它通常位于
-  // `/data/data/com.mde.app/files/Documents`，是无需额外权限或 SAF
+  // `/data/data/com.mokidown.app/files/Documents`，是无需额外权限或 SAF
   // 即可稳定写入的位置；桌面端通常不走这里，因为用户可以通过对话框自由选路。
   /**
    * 解析并缓存应用私有 Documents 目录。

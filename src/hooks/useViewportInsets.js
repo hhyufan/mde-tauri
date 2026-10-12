@@ -6,8 +6,8 @@
  */
 import { useEffect } from 'react';
 
-const KB_VAR = '--mde-kb-inset';
-const KB_OPEN_CLASS = 'mde--kb-open';
+const KB_VAR = '--moki-kb-inset';
+const KB_OPEN_CLASS = 'moki--kb-open';
 // 低于该阈值时，将高度差视为 Android 导航栏或浏览器外壳抖动，而不是输入法已打开，
 // 以免系统栏高度轻微波动时页面跟着抖动。
 const KB_OPEN_THRESHOLD = 100;

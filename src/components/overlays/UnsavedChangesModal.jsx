@@ -52,7 +52,7 @@ function UnsavedChangesModal({
       destroyOnHidden
       maskClosable={false}
       closable={!loading}
-      rootClassName="mde-unsaved-modal-root"
+      rootClassName="moki-unsaved-modal-root"
       className="header-modal"
     >
       <div className="unsaved-modal">

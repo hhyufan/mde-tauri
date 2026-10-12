@@ -223,21 +223,21 @@ fn configure_kotlin_classpath(
     let resolver = directory_path.join("kotlin-language-server");
     fs::create_dir(&resolver).map_err(|error| error.to_string())?;
     #[cfg(windows)]
-    fs::write(resolver.join("classpath.bat"), "@echo off\r\nsetlocal DisableDelayedExpansion\r\nchcp 65001 >nul\r\n<nul set /p \"=%MDE_KOTLIN_CLASSPATH%\"\r\nexit /b 0\r\n").map_err(|error| error.to_string())?;
+    fs::write(resolver.join("classpath.bat"), "@echo off\r\nsetlocal DisableDelayedExpansion\r\nchcp 65001 >nul\r\n<nul set /p \"=%MOKIDOWN_KOTLIN_CLASSPATH%\"\r\nexit /b 0\r\n").map_err(|error| error.to_string())?;
     #[cfg(not(windows))]
     {
         use std::os::unix::fs::PermissionsExt;
         let script = resolver.join("classpath.sh");
         fs::write(
             &script,
-            "#!/bin/sh\nprintf '%s' \"$MDE_KOTLIN_CLASSPATH\"\n",
+            "#!/bin/sh\nprintf '%s' \"$MOKIDOWN_KOTLIN_CLASSPATH\"\n",
         )
         .map_err(|error| error.to_string())?;
         fs::set_permissions(&script, fs::Permissions::from_mode(0o700))
             .map_err(|error| error.to_string())?;
     }
     cmd.env("XDG_CONFIG_HOME", directory_path)
-        .env("MDE_KOTLIN_CLASSPATH", classpath);
+        .env("MOKIDOWN_KOTLIN_CLASSPATH", classpath);
     Ok(directory)
 }
 
@@ -744,7 +744,7 @@ mod tests {
             })
             .collect();
         let expected = environment
-            .get(std::ffi::OsStr::new("MDE_KOTLIN_CLASSPATH"))
+            .get(std::ffi::OsStr::new("MOKIDOWN_KOTLIN_CLASSPATH"))
             .unwrap()
             .to_string_lossy()
             .into_owned();

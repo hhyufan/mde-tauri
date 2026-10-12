@@ -145,7 +145,7 @@ const useFileIdStore = create(
       reset: () => set({ pathToId: {}, idToPath: {} }),
     }),
     {
-      name: 'mde-file-ids',
+      name: 'mokidown-file-ids',
     },
   ),
 );

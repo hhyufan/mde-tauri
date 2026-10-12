@@ -1,8 +1,8 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "mde",
+  "productName": "mokidown",
   "version": "0.1.0",
-  "identifier": "com.mde.app",
+  "identifier": "com.mokidown.app",
   "build": {
     "beforeDevCommand": "npm run dev -- --port 1421",
     "devUrl": "http://localhost:1421",
@@ -13,7 +13,7 @@
   "app": {
     "windows": [
       {
-        "title": "Markdown Editor",
+        "title": "MokiDown",
         "width": 1200,
         "height": 800,
         "minWidth": 800,

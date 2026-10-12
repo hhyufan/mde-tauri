@@ -10,7 +10,7 @@ export default function MarkdownCodePre({ children, node, documentId, filePath, 
   const source = code?.children?.map((child) => child.value || '').join('').replace(/\n$/, '') || '';
   if (!language || isAndroidRuntime()) return <pre {...props}>{children}</pre>;
   return <div className="md-runnable-code"><pre {...props}>{children}</pre>
-    <CodeBlockExecution blockKey={codeBlockKey(documentId, node.data.mdeBlockIndex)} language={language}
+    <CodeBlockExecution blockKey={codeBlockKey(documentId, node.data.mokidownBlockIndex)} language={language}
       source={source} filePath={filePath} fileName={fileName} />
   </div>;
 }

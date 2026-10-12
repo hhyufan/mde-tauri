@@ -249,7 +249,7 @@ const useFileStore = create(
       setSortOrder: (order) => set({ sortOrder: order }),
     }),
     {
-      name: 'mde-files',
+      name: 'mokidown-files',
       // 不持久化运行时目录内容和导航栈，只保留需要跨重启延续的用户数据。
       partialize: (state) => ({
         recentFiles: state.recentFiles,

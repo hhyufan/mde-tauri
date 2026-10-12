@@ -39,7 +39,7 @@
 
 // 当用户正在拖拽手柄时，降低浮动操作栏透明度，
 // 避免它抢占视觉注意力或拦截拖拽操作。
-html.mde--selection-dragging .mobile-selection-bar {
+html.moki--selection-dragging .mobile-selection-bar {
   opacity: 0.25;
   pointer-events: none;
 }

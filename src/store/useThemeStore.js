@@ -48,7 +48,7 @@ const useThemeStore = create(
        */
       initTheme: () => {
         // 只有在没有本地持久化结果时才回退到系统主题偏好。
-        const persisted = localStorage.getItem('mde-theme');
+        const persisted = localStorage.getItem('mokidown-theme');
         const savedTheme = persisted ? JSON.parse(persisted)?.state?.theme : null;
         const initial = savedTheme || (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
         document.documentElement.dataset.theme = initial;
@@ -59,7 +59,7 @@ const useThemeStore = create(
       },
     }),
     {
-      name: 'mde-theme',
+      name: 'mokidown-theme',
       // store 回填完成后立即把持久化主题应用到 DOM，避免首屏闪烁。
       onRehydrateStorage: () => (state) => {
         if (state?.theme) {

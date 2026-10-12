@@ -110,7 +110,7 @@ const useExternalDocsStore = create(
       reset: () => set({ docs: {} }),
     }),
     {
-      name: 'mde-external-docs',
+      name: 'mokidown-external-docs',
     },
   ),
 );

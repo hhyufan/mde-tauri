@@ -207,7 +207,7 @@ fn unique_temp_path(target: &Path) -> Result<PathBuf, String> {
         .duration_since(UNIX_EPOCH)
         .unwrap_or_default()
         .as_nanos();
-    Ok(parent.join(format!(".{name}.{nonce}.mde-recovery.tmp")))
+    Ok(parent.join(format!(".{name}.{nonce}.moki-recovery.tmp")))
 }
 
 #[cfg(windows)]
@@ -757,7 +757,12 @@ async fn clear_recovery_snapshot(app_handle: AppHandle) -> Result<(), String> {
     Ok(())
 }
 
-const CREDENTIAL_SERVICE: &str = "com.mde.app";
+const CREDENTIAL_SERVICE: &str = "com.mokidown.app";
+/// 品牌更名前的凭据服务名（旧版 bundle identifier）。
+///
+/// 旧条目仍然留在系统钥匙串里，只在读取不到新条目时当作一次性迁移来源，
+/// 复制成功后不再访问，因此用户不需要重新登录。
+const LEGACY_CREDENTIAL_SERVICE: &str = "com.mde.app";
 const REFRESH_TOKEN_ACCOUNT: &str = "refresh-token";
 
 #[tauri::command]
@@ -774,8 +779,27 @@ async fn get_refresh_credential() -> Result<Option<String>, String> {
         .map_err(|error| format!("Failed to open credential store: {error}"))?;
     match entry.get_password() {
         Ok(token) => Ok(Some(token)),
-        Err(keyring::Error::NoEntry) => Ok(None),
+        Err(keyring::Error::NoEntry) => {
+            // 品牌更名后的一次性迁移：新服务名下还没有凭据时，回到旧服务名里找一份，
+            // 复制到新服务名后再返回；旧条目保留，不删除用户数据。
+            let Some(token) = legacy_refresh_credential() else {
+                return Ok(None);
+            };
+            let _ = entry.set_password(&token);
+            Ok(Some(token))
+        }
         Err(error) => Err(format!("Failed to read credential: {error}")),
+    }
+}
+
+/// 读取旧凭据服务名下的刷新令牌。
+///
+/// 这是纯兼容路径：任何读取失败都按“没有旧凭据”处理，绝不影响新凭据的正常流程。
+fn legacy_refresh_credential() -> Option<String> {
+    let entry = keyring::Entry::new(LEGACY_CREDENTIAL_SERVICE, REFRESH_TOKEN_ACCOUNT).ok()?;
+    match entry.get_password() {
+        Ok(token) => Some(token),
+        Err(_) => None,
     }
 }
 
@@ -783,6 +807,11 @@ async fn get_refresh_credential() -> Result<Option<String>, String> {
 async fn delete_refresh_credential() -> Result<(), String> {
     let entry = keyring::Entry::new(CREDENTIAL_SERVICE, REFRESH_TOKEN_ACCOUNT)
         .map_err(|error| format!("Failed to open credential store: {error}"))?;
+    // 退出登录时必须把旧服务名下的条目一起删掉：否则下一次读取会把它当成
+    // “待迁移的旧凭据”再复制回来，用户会莫名保持登录状态。
+    if let Ok(legacy) = keyring::Entry::new(LEGACY_CREDENTIAL_SERVICE, REFRESH_TOKEN_ACCOUNT) {
+        let _ = legacy.delete_credential();
+    }
     match entry.delete_credential() {
         Ok(()) | Err(keyring::Error::NoEntry) => Ok(()),
         Err(error) => Err(format!("Failed to delete credential: {error}")),
@@ -790,21 +819,41 @@ async fn delete_refresh_credential() -> Result<(), String> {
 }
 
 fn diagnostic_directory(app_handle: &AppHandle) -> Result<PathBuf, String> {
-    app_handle
+    let directory = app_handle
         .path()
         .app_data_dir()
         .map(|path| path.join("diagnostics"))
-        .map_err(|error| format!("Failed to resolve diagnostics directory: {error}"))
+        .map_err(|error| format!("Failed to resolve diagnostics directory: {error}"))?;
+    migrate_legacy_diagnostic_logs(&directory);
+    Ok(directory)
+}
+
+/// 品牌更名后的一次性迁移：把旧的 `mde-N.jsonl` 诊断日志改名成 `moki-N.jsonl`。
+///
+/// 只在新文件名还不存在时改名（幂等），而且只是改名、从不删除内容；
+/// 任何失败都保持原样，下一次写诊断日志时会再试一次。
+fn migrate_legacy_diagnostic_logs(directory: &Path) {
+    if !directory.is_dir() {
+        return;
+    }
+    for index in 0..DIAGNOSTIC_LOG_FILES {
+        let legacy = directory.join(format!("mde-{index}.jsonl"));
+        let current = directory.join(format!("moki-{index}.jsonl"));
+        if current.exists() || !legacy.exists() {
+            continue;
+        }
+        let _ = fs::rename(&legacy, &current);
+    }
 }
 
 fn rotate_diagnostic_logs(directory: &Path) -> Result<(), String> {
-    let current = directory.join("mde-0.jsonl");
+    let current = directory.join("moki-0.jsonl");
     if fs::metadata(&current).map(|meta| meta.len()).unwrap_or(0) < DIAGNOSTIC_LOG_LIMIT {
         return Ok(());
     }
     for index in (1..DIAGNOSTIC_LOG_FILES).rev() {
-        let source = directory.join(format!("mde-{}.jsonl", index - 1));
-        let target = directory.join(format!("mde-{index}.jsonl"));
+        let source = directory.join(format!("moki-{}.jsonl", index - 1));
+        let target = directory.join(format!("moki-{index}.jsonl"));
         if target.exists() {
             let _ = fs::remove_file(&target);
         }
@@ -838,7 +887,7 @@ async fn record_diagnostic(
     let mut file = OpenOptions::new()
         .create(true)
         .append(true)
-        .open(directory.join("mde-0.jsonl"))
+        .open(directory.join("moki-0.jsonl"))
         .map_err(|error| error.to_string())?;
     writeln!(file, "{entry}").map_err(|error| error.to_string())?;
     Ok(())
@@ -849,7 +898,7 @@ async fn export_diagnostics(app_handle: AppHandle, destination: String) -> Resul
     let directory = diagnostic_directory(&app_handle)?;
     let mut logs = Vec::new();
     for index in 0..DIAGNOSTIC_LOG_FILES {
-        let path = directory.join(format!("mde-{index}.jsonl"));
+        let path = directory.join(format!("moki-{index}.jsonl"));
         if let Ok(content) = fs::read_to_string(path) {
             logs.push(content);
         }
@@ -1324,7 +1373,7 @@ async fn show_in_explorer(path: String) -> Result<String, String> {
 /// `Context.getFilesDir()`，也就是 `/data/data/<package>/files`：
 /// 该目录始终对当前应用可写，对其他应用不可见，并会在卸载时被清空。
 /// 在桌面平台上，它会解析到各平台约定的应用数据目录
-/// （例如 Windows 上的 `%APPDATA%\com.mde.app`），从而保持行为一致。
+/// （例如 Windows 上的 `%APPDATA%\com.mokidown.app`），从而保持行为一致。
 #[tauri::command]
 async fn get_app_documents_dir(app: AppHandle) -> Result<String, String> {
     let app_data_dir = app
@@ -1495,6 +1544,73 @@ fn style_window_frame(window: &tauri::WebviewWindow<tauri::Wry>) {
     }
 }
 
+/// 品牌更名前的 bundle identifier，用来定位旧的应用数据目录。
+///
+/// 旧目录只是从 `app_data_dir()` 的父目录推导出来的“迁移来源”，
+/// 新目录本身的解析方式保持不变。
+const LEGACY_APP_DATA_DIR_NAME: &str = "com.mde.app";
+
+/// 把旧目录下的子目录复制到新数据目录（只复制、不删除、不覆盖）。
+///
+/// 幂等性由调用方保证：只有“新目录里还没有这个子目录”时才会走到这里，
+/// 复制完成后新目录已经存在该子目录，后续启动自动跳过。
+fn copy_data_directory(source: &Path, target: &Path) -> Result<(), String> {
+    fs::create_dir_all(target).map_err(|error| error.to_string())?;
+    for entry in fs::read_dir(source)
+        .map_err(|error| error.to_string())?
+        .flatten()
+    {
+        let from = entry.path();
+        let to = target.join(entry.file_name());
+        if from.is_dir() {
+            copy_data_directory(&from, &to)?;
+        } else if !to.exists() {
+            fs::copy(&from, &to).map_err(|error| error.to_string())?;
+        }
+    }
+    Ok(())
+}
+
+/// 迁移 `app_data_dir()` 下的单个子目录；新旧目录都满足条件时才复制。
+fn migrate_data_directory(legacy: &Path, current: &Path, name: &str) {
+    let source = legacy.join(name);
+    let target = current.join(name);
+    // 新目录已有同名内容，或旧目录里本来就没有：什么都不做。
+    if target.exists() || !source.is_dir() {
+        return;
+    }
+    if let Err(error) = copy_data_directory(&source, &target) {
+        eprintln!("[migration] failed to copy legacy {name} directory: {error}");
+    }
+}
+
+/// 品牌更名（bundle identifier：`com.mde.app` → `com.mokidown.app`）后的一次性数据迁移。
+///
+/// Tauri 的 `app_data_dir()` 由 bundle identifier 推导，标识符一改，应用就会看向新目录；
+/// 旧目录里的本地历史快照（`history/`）、崩溃恢复草稿（`recovery/`）与默认文档目录
+/// （`Documents/`）必须复制过来，否则用户会以为数据丢了。
+///
+/// 幂等性：复制前逐个检查“新目录是否已有该子目录”，只要已有就跳过；
+/// 整个流程只读旧目录，从不删除或覆盖任何数据。任何失败都只打印日志，不阻塞启动。
+fn migrate_legacy_app_data(app: &AppHandle) {
+    let Ok(current) = app.path().app_data_dir() else {
+        return;
+    };
+    let Some(parent) = current.parent() else {
+        return;
+    };
+    let legacy = parent.join(LEGACY_APP_DATA_DIR_NAME);
+    if legacy == current || !legacy.is_dir() {
+        return;
+    }
+    // 历史快照与恢复草稿体量很小，同步复制，保证前端首帧就能读到。
+    migrate_data_directory(&legacy, &current, "history");
+    migrate_data_directory(&legacy, &current, "recovery");
+    // 默认文档目录可能装着用户自己的笔记，体积不可控：放到后台线程复制，
+    // 不占用启动路径。
+    std::thread::spawn(move || migrate_data_directory(&legacy, &current, "Documents"));
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 /// 桌面端 `main()` 与移动端入口共用的 Tauri 启动逻辑。
 ///
@@ -1512,6 +1628,8 @@ pub fn run() {
     // 启动期初始化：调试构建自动打开 devtools；Windows 下补回关闭阴影后
     // 失去的窗口圆角，并确保 DWM 不绘制强调色边框。
     builder = builder.setup(|app| {
+        // 品牌更名导致 app_data_dir() 指向新目录：先把旧目录里的本地历史与草稿搬过来。
+        migrate_legacy_app_data(app.handle());
         let main_window = app.get_webview_window("main");
         #[cfg(all(debug_assertions, not(target_os = "android")))]
         if let Some(window) = main_window.as_ref() {
@@ -1713,7 +1831,7 @@ mod tests {
     #[test]
     fn atomic_write_replaces_complete_file() {
         let root = std::env::temp_dir().join(format!(
-            "mde-atomic-write-{}-{}",
+            "moki-atomic-write-{}-{}",
             std::process::id(),
             SystemTime::now()
                 .duration_since(UNIX_EPOCH)
@@ -1736,7 +1854,7 @@ mod tests {
 
     #[test]
     fn collect_markdown_paths_filters_resolves_and_dedupes() {
-        let root = std::env::temp_dir().join(format!("mde-cli-args-{}", std::process::id()));
+        let root = std::env::temp_dir().join(format!("moki-cli-args-{}", std::process::id()));
         fs::create_dir_all(&root).unwrap();
         let md = root.join("note.md");
         let txt = root.join("plain.txt");

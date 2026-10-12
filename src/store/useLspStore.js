@@ -112,6 +112,6 @@ const useLspStore = create(persist((set, get) => ({
         statuses: { ...state.statuses, [id]: { status: 'idle', message: '' } }, revision: state.revision + 1 }));
     } catch (error) { set((state) => ({ operations: { ...state.operations, [id]: { phase: 'error', text: String(error?.message || error) } }, revision: state.revision + 1 })); }
   },
-}), { name: 'mde-language-plugins', partialize: ({ enabled, catalog, sources, preferred }) => ({ enabled, catalog, sources, preferred }) }));
+}), { name: 'mokidown-language-plugins', partialize: ({ enabled, catalog, sources, preferred }) => ({ enabled, catalog, sources, preferred }) }));
 export default useLspStore;
 if (import.meta.hot) import.meta.hot.dispose(() => { subscription?.then((stop) => stop()); });

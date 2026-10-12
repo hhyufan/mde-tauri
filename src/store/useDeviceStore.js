@@ -40,7 +40,7 @@ const useDeviceStore = create(
       },
     }),
     {
-      name: 'mde-device-id',
+      name: 'mokidown-device-id',
     },
   ),
 );

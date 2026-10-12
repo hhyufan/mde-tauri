@@ -37,7 +37,7 @@ export default function TreeEditor({ className = '', onAutoSave, onSourceChange 
   const source = useEditorBufferContent(tabId, tab?.content || '', 100);
   const nodes = useMemo(() => parseTreeText(source), [source]);
   const flat = useMemo(() => flattenTree(nodes), [nodes]);
-  const storageKey = `mde-tree-expanded:${tab?.path || tabId}`;
+  const storageKey = `mokidown-tree-expanded:${tab?.path || tabId}`;
   const [expanded, setExpanded] = useState(() => readExpanded(storageKey));
   const [editing, setEditing] = useState(null);
   const [value, setValue] = useState('');
@@ -125,12 +125,12 @@ export default function TreeEditor({ className = '', onAutoSave, onSourceChange 
       : node.jumpLanguage ? CodeOutlined : FileTextOutlined;
     return {
       key: node.key,
-      className: index === siblings.length - 1 ? 'mde-tree__last' : '',
+      className: index === siblings.length - 1 ? 'moki-tree__last' : '',
       title: (
-        <div className={`mde-tree__node ${node.jumpLanguage ? 'mde-tree__node--linked' : ''}`}>
-          <Icon className={`mde-tree__icon ${branch ? 'mde-tree__icon--folder' : ''}`} />
+        <div className={`moki-tree__node ${node.jumpLanguage ? 'moki-tree__node--linked' : ''}`}>
+          <Icon className={`moki-tree__icon ${branch ? 'moki-tree__icon--folder' : ''}`} />
           {editing === node.key ? (
-            <Input autoFocus className="mde-tree__input" size="small" value={value}
+            <Input autoFocus className="moki-tree__input" size="small" value={value}
               aria-label={t('tree.editNode')} placeholder={t('tree.inputHint')}
               onFocus={(event) => event.target.select()}
               onChange={(event) => { inputValueRef.current = event.target.value; setValue(event.target.value); }}
@@ -160,18 +160,18 @@ export default function TreeEditor({ className = '', onAutoSave, onSourceChange 
               }}
             />
           ) : (
-            <button type="button" className="mde-tree__title" onClick={(event) => { event.stopPropagation(); startEdit(node); }}
+            <button type="button" className="moki-tree__title" onClick={(event) => { event.stopPropagation(); startEdit(node); }}
               title={t('tree.editHint')}>
               <InlineTitle title={node.title || t('tree.newNode')} />
             </button>
           )}
           {node.jumpLanguage && editing !== node.key && (
-            <span className="mde-tree__reference" title={node.originalText}>
+            <span className="moki-tree__reference" title={node.originalText}>
               {node.jumpLanguage}<span>{node.jumpIndex}</span>
             </span>
           )}
           {editing !== node.key && (
-            <span className="mde-tree__actions" onClick={(event) => event.stopPropagation()}>
+            <span className="moki-tree__actions" onClick={(event) => event.stopPropagation()}>
               {action('addChild', <PlusOutlined />, () => addNode(node))}
               {action('deleteNode', <CloseCircleOutlined />, () => deleteNode(node), { danger: true })}
             </span>
@@ -183,36 +183,36 @@ export default function TreeEditor({ className = '', onAutoSave, onSourceChange 
   };
 
   return (
-    <section className={`mde-tree ${className}`} aria-label={t('tree.title')} style={{ '--tree-font-size': `${fontSize}px` }}>
-      <div className="mde-tree__toolbar">
-        <div className="mde-tree__tools">
-          {action('addRoot', <PlusOutlined />, () => addNode(null), { className: 'mde-tree__add' })}
+    <section className={`moki-tree ${className}`} aria-label={t('tree.title')} style={{ '--tree-font-size': `${fontSize}px` }}>
+      <div className="moki-tree__toolbar">
+        <div className="moki-tree__tools">
+          {action('addRoot', <PlusOutlined />, () => addNode(null), { className: 'moki-tree__add' })}
           {action('expandAll', <ExpandAltOutlined />, () => updateExpanded(flat.filter((node) => node.children.length).map((node) => node.key)))}
           {action('collapseAll', <ShrinkOutlined />, () => updateExpanded([]))}
-          <span className="mde-tree__separator" />
+          <span className="moki-tree__separator" />
           {action('zoomIn', <ZoomInOutlined />, () => setZoom((z) => Math.min(3, z + 0.2)), { disabled: zoom >= 3 })}
           {action('zoomOut', <ZoomOutOutlined />, () => setZoom((z) => Math.max(0.5, z - 0.2)), { disabled: zoom <= 0.5 })}
           {action('resetZoom', <OneToOneOutlined />, () => setZoom(1))}
-          <span className="mde-tree__zoom">{Math.round(zoom * 100)}%</span>
+          <span className="moki-tree__zoom">{Math.round(zoom * 100)}%</span>
         </div>
-        <span className="mde-tree__count"><ApartmentOutlined />{t('tree.nodeCount', { count: flat.length })}</span>
+        <span className="moki-tree__count"><ApartmentOutlined />{t('tree.nodeCount', { count: flat.length })}</span>
       </div>
-      <div className="mde-tree__scroll" ref={scrollRef} onScroll={(event) => setShowTop(event.currentTarget.scrollTop > 240)}>
+      <div className="moki-tree__scroll" ref={scrollRef} onScroll={(event) => setShowTop(event.currentTarget.scrollTop > 240)}>
         {nodes.length ? (
-          <div className="mde-tree__canvas" style={{ zoom }}>
+          <div className="moki-tree__canvas" style={{ zoom }}>
             <Tree treeData={nodes.map(renderNode)} expandedKeys={expanded} onExpand={updateExpanded}
               blockNode showIcon={false} showLine={{ showLeafIcon: false }}
-              switcherIcon={<span className="mde-tree__chevron"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="m6 3 5 5-5 5" /></svg></span>} />
+              switcherIcon={<span className="moki-tree__chevron"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="m6 3 5 5-5 5" /></svg></span>} />
           </div>
         ) : (
-          <div className="mde-tree__empty">
+          <div className="moki-tree__empty">
             <ApartmentOutlined /><strong>{t('tree.empty')}</strong><p>{t('tree.emptyHint')}</p>
             <Button onClick={() => addNode(null)} icon={<PlusOutlined />}>{t('tree.addRoot')}</Button>
           </div>
         )}
       </div>
-      <div className="mde-tree__hint">{t('tree.hint')}</div>
-      {showTop && <button className="mde-tree__top" type="button" aria-label={t('tree.backToTop')}
+      <div className="moki-tree__hint">{t('tree.hint')}</div>
+      {showTop && <button className="moki-tree__top" type="button" aria-label={t('tree.backToTop')}
         onClick={() => scrollRef.current?.scrollTo({ top: 0, behavior: 'smooth' })}><VerticalAlignTopOutlined /></button>}
     </section>
   );

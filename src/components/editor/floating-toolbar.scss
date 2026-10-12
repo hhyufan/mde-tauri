@@ -148,10 +148,10 @@
     left: 8px;
     right: 8px;
     // 当 IME 打开时，希望工具栏位于键盘上方；
-    // 否则它应悬浮在底部栏和系统导航栏之上。--mde-kb-inset
+    // 否则它应悬浮在底部栏和系统导航栏之上。--moki-kb-inset
     // 由 useViewportInsets() 提供，在没有可见 IME 时为 0。
     // max() 取两者中更大的插入值，避免重复计算。
-    bottom: calc(56px + max(env(safe-area-inset-bottom), var(--mde-kb-inset, 0px)));
+    bottom: calc(56px + max(env(safe-area-inset-bottom), var(--moki-kb-inset, 0px)));
     width: auto;
     max-width: none;
     transform: translateY(12px);

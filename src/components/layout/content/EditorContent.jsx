@@ -20,6 +20,7 @@ import { lazyWithRetry } from '@utils/lazyWithRetry';
 import { openExternal } from '@utils/tauriApi';
 import { externalLink } from '@utils/editorLinks';
 import './editor-content.scss';
+import WelcomeScreen from '@components/moki/WelcomeScreen';
 
 // Markdown 相关渲染器保持在懒加载边界之后，确保非 Markdown 文件仍然走
 // 轻量的 Monaco 路径；纯预览模式使用可编辑的所见即所得，分栏预览则只读。
@@ -505,11 +506,7 @@ function EditorContent() {
   if (!activeTabMeta) {
     return (
       <main className={`editor-content ${isMobileLayout ? 'editor-content--mobile' : ''}`}>
-        <div className="editor-content__empty">
-          <div className="editor-content__empty-logo">M</div>
-          <div className="editor-content__empty-title">{t('editor.empty.title')}</div>
-          <div className="editor-content__empty-hint">{t('editor.empty.hint')}</div>
-        </div>
+        <div className="editor-content__welcome"><WelcomeScreen /></div>
       </main>
     );
   }

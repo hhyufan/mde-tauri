@@ -168,7 +168,7 @@ export function attachMonacoLsp(monaco, model, tab) {
       filePath: tab.path || '', tabId: tab.id, fileName: tab.name, rootUri: document.rootUri });
     Object.assign(configuration, document.initializationOptions || {});
     const result = await connection.request('initialize', {
-      processId: null, clientInfo: { name: 'MDE', version: '0.1.0' },
+      processId: null, clientInfo: { name: 'MokiDown', version: '0.1.0' },
       rootUri: document.rootUri, workspaceFolders: [{ uri: document.rootUri, name: 'workspace' }],
       initializationOptions: configuration,
       capabilities: {

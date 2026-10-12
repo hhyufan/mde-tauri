@@ -1,4 +1,4 @@
-//! Data-driven language-service packages, installed privately under MDE's data directory.
+//! Data-driven language-service packages, installed privately under MokiDown's data directory.
 use crate::{
     atomic_write,
     script_runner::{command, ProcessTree},
@@ -976,7 +976,7 @@ mod tests {
     fn online_install_launch_and_uninstall() {
         let catalog: Vec<PluginManifest> =
             serde_json::from_str(include_str!("../../src/configs/language-plugins.json")).unwrap();
-        let selected = std::env::var("MDE_PLUGIN_SMOKE").unwrap_or(
+        let selected = std::env::var("MOKIDOWN_PLUGIN_SMOKE").unwrap_or(
             "mde.typescript,mde.html,mde.css,mde.pyright,mde.csharp,mde.kotlin,mde.java,mde.rust"
                 .into(),
         );

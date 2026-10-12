@@ -11,7 +11,7 @@ import useEditorStore from '@store/useEditorStore';
 import { cn } from '@utils/classNames';
 import './floating-toolbar.scss';
 
-const TOOLBAR_POSITION_KEY = 'mde:floating-toolbar-position';
+const TOOLBAR_POSITION_KEY = 'mokidown:floating-toolbar-position';
 
 const HEADING_OPTIONS = [
   { label: 'H1', prefix: '# ' },

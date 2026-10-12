@@ -3,15 +3,15 @@
 //
 // 变量同时挂在 body 上：antd 弹层（Select / Dropdown / Picker）会 portal 到
 // body，不在 .app--background 子树内，只有 body 级才能让它们继承同一套玻璃底色。
-body.mde-has-background,
+body.moki-has-background,
 .app--background {
-  --mde-glass-surface: color-mix(in srgb, var(--surface) 38%, transparent);
-  --mde-glass-code: color-mix(in srgb, var(--bg) 38%, transparent);
-  --mde-glass-hover: color-mix(in srgb, var(--text) 7%, transparent);
-  --mde-glass-selected: color-mix(in srgb, var(--accent) 14%, transparent);
+  --moki-glass-surface: color-mix(in srgb, var(--surface) 38%, transparent);
+  --moki-glass-code: color-mix(in srgb, var(--bg) 38%, transparent);
+  --moki-glass-hover: color-mix(in srgb, var(--text) 7%, transparent);
+  --moki-glass-selected: color-mix(in srgb, var(--accent) 14%, transparent);
   // 浮层（搜索下拉、antd 弹层）比正文表面略实一点，但仍要透出底图：
   // 之前 88% 几乎等于实色，看起来像没有适配背景模式。
-  --mde-glass-popup: color-mix(in srgb, var(--surface) 60%, transparent);
+  --moki-glass-popup: color-mix(in srgb, var(--surface) 60%, transparent);
 
   .titlebar__search,
   .sidebar__tab-slider,
@@ -19,36 +19,36 @@ body.mde-has-background,
   .editor-content__renderer-error,
   .editor-content__renderer-error button,
   .timeline__count,
-  .mde-tree__input,
-  .mde-tree__top,
-  .mde-tree .mde-tree__chevron,
+  .moki-tree__input,
+  .moki-tree__top,
+  .moki-tree .moki-tree__chevron,
   .ft {
-    background: var(--mde-glass-surface);
+    background: var(--moki-glass-surface);
   }
 
   .sidebar__tabs,
   .sidebar__version,
   .output-console__badge {
-    background: var(--mde-glass-hover);
+    background: var(--moki-glass-hover);
   }
 
   .tabbar__tab:hover {
-    background: var(--mde-glass-hover);
+    background: var(--moki-glass-hover);
   }
 
   .tabbar__tab--active,
   .tabbar__tab--active:hover {
-    background: var(--mde-glass-surface);
+    background: var(--moki-glass-surface);
   }
 
   .tabbar__tab--renaming {
-    background: var(--mde-glass-surface) !important;
+    background: var(--moki-glass-surface) !important;
   }
 
   // 旧样式用一条实色线遮住标签栏边框，背景模式下不要留下白色接缝。
   .tabbar__tab--active::after,
   .tabbar__tab--renaming::after {
-    background: var(--mde-glass-surface);
+    background: var(--moki-glass-surface);
   }
 
   .file-tree__item:hover,
@@ -68,7 +68,7 @@ body.mde-has-background,
   .output-console button:hover,
   .output-console button.is-active,
   .problems__row:hover {
-    background: var(--mde-glass-hover);
+    background: var(--moki-glass-hover);
   }
 
   .file-tree__item--active,
@@ -81,12 +81,12 @@ body.mde-has-background,
   .ft__btn--active:hover,
   .problems__row.is-selected,
   .problems__row.is-selected:hover {
-    background: var(--mde-glass-selected);
+    background: var(--moki-glass-selected);
   }
 
   .file-tree__breadcrumb-scroll-wrap::after,
   .footer__breadcrumb::after {
-    background: linear-gradient(to right, transparent, var(--mde-glass-surface));
+    background: linear-gradient(to right, transparent, var(--moki-glass-surface));
   }
 
   .output-console__body,
@@ -94,25 +94,25 @@ body.mde-has-background,
     background: color-mix(in srgb, var(--surface) 18%, transparent);
   }
 
-  .mde-tree { background: transparent; }
-  .mde-tree__toolbar { background: var(--mde-glass-surface); }
-  .mde-tree .ant-tree .ant-tree-node-content-wrapper:hover {
-    background: var(--mde-glass-hover);
+  .moki-tree { background: transparent; }
+  .moki-tree__toolbar { background: var(--moki-glass-surface); }
+  .moki-tree .ant-tree .ant-tree-node-content-wrapper:hover {
+    background: var(--moki-glass-hover);
   }
-  .mde-tree .ant-tree .ant-tree-switcher:hover .mde-tree__chevron {
-    background: var(--mde-glass-selected);
+  .moki-tree .ant-tree .ant-tree-switcher:hover .moki-tree__chevron {
+    background: var(--moki-glass-selected);
   }
 
   .output-console__settings input,
   .problems__toolbar input,
   .problems__toolbar select {
-    background: var(--mde-glass-surface);
+    background: var(--moki-glass-surface);
   }
 
   // 两种 Markdown 渲染器及可运行代码块共用底色；嵌套容器只绘制一层。
   //
   // 玻璃模式仍要保留 markdown 主题的淡蓝基调：原先这里把彩色层统一压成
-  // --mde-glass-hover / --mde-glass-code 的中性灰，结果整个 markdown 区域灰成一团。
+  // --moki-glass-hover / --moki-glass-code 的中性灰，结果整个 markdown 区域灰成一团。
   // 现在改为在玻璃底里掺 --md-tint（.md-preview 定义、可继承），既透出底图又不丢色相。
   .md-preview {
     code,
@@ -135,7 +135,7 @@ body.mde-has-background,
     .milkdown-code-block,
     .md-runnable-code {
       // 代码块：玻璃底里掺一点点蓝，整块偏灰但不失色相。
-      background: color-mix(in srgb, var(--md-tint) 6%, var(--mde-glass-code));
+      background: color-mix(in srgb, var(--md-tint) 6%, var(--moki-glass-code));
     }
 
     pre code,
@@ -151,7 +151,7 @@ body.mde-has-background,
     .lang-tag,
     .lang-tag:hover,
     .md-code-execution__result {
-      background: var(--mde-glass-surface);
+      background: var(--moki-glass-surface);
     }
   }
 }
@@ -160,45 +160,45 @@ body.mde-has-background,
  * 深色 + 背景图：同一浓度在暗色底图上几乎看不出蓝，需要再单独加一档。
  * 选择器写在顶层——html 不能作为 body 的后代，无法在上面那个块里嵌套。
  */
-html[data-theme='dark'] body.mde-has-background .md-preview code,
-html[data-theme='dark'] body.mde-has-background .md-preview code[class*='language-'],
+html[data-theme='dark'] body.moki-has-background .md-preview code,
+html[data-theme='dark'] body.moki-has-background .md-preview code[class*='language-'],
 html[data-theme='dark'] .app--background .md-preview code,
 html[data-theme='dark'] .app--background .md-preview code[class*='language-'] {
   background: color-mix(in srgb, var(--md-tint) 32%, transparent);
 }
 
-html[data-theme='dark'] body.mde-has-background .md-preview blockquote,
+html[data-theme='dark'] body.moki-has-background .md-preview blockquote,
 html[data-theme='dark'] .app--background .md-preview blockquote {
   background: color-mix(in srgb, var(--md-tint) 30%, transparent);
 }
 
-html[data-theme='dark'] body.mde-has-background .md-preview pre,
-html[data-theme='dark'] body.mde-has-background .md-preview pre[class*='language-'],
-html[data-theme='dark'] body.mde-has-background .md-preview .milkdown-code-block,
-html[data-theme='dark'] body.mde-has-background .md-preview .md-runnable-code,
+html[data-theme='dark'] body.moki-has-background .md-preview pre,
+html[data-theme='dark'] body.moki-has-background .md-preview pre[class*='language-'],
+html[data-theme='dark'] body.moki-has-background .md-preview .milkdown-code-block,
+html[data-theme='dark'] body.moki-has-background .md-preview .md-runnable-code,
 html[data-theme='dark'] .app--background .md-preview pre,
 html[data-theme='dark'] .app--background .md-preview pre[class*='language-'],
 html[data-theme='dark'] .app--background .md-preview .milkdown-code-block,
 html[data-theme='dark'] .app--background .md-preview .md-runnable-code {
-  background: color-mix(in srgb, var(--md-tint) 16%, var(--mde-glass-code));
+  background: color-mix(in srgb, var(--md-tint) 16%, var(--moki-glass-code));
 }
 
 // antd 浮层 portal 到 body：变量与底色都必须在 body 级适配，
 // 否则下拉/菜单会是一块与背景模式割裂的实色面板。
-body.mde-has-background {
+body.moki-has-background {
   .ant-select-dropdown,
   .ant-dropdown .ant-dropdown-menu,
   .ant-picker-dropdown .ant-picker-panel-container {
-    background: var(--mde-glass-popup);
+    background: var(--moki-glass-popup);
     backdrop-filter: blur(16px);
   }
 
   .ant-select-dropdown .ant-select-item-option-active:not(.ant-select-item-option-disabled),
   .ant-dropdown .ant-dropdown-menu-item:hover {
-    background: var(--mde-glass-hover);
+    background: var(--moki-glass-hover);
   }
 
   .ant-select-dropdown .ant-select-item-option-selected:not(.ant-select-item-option-disabled) {
-    background: var(--mde-glass-selected);
+    background: var(--moki-glass-selected);
   }
 }

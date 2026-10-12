@@ -11,6 +11,8 @@
   position: relative;
 }
 
+.editor-content__welcome { flex: 1; min-width: 0; overflow: auto; }
+
 .editor-content__empty {
   display: flex;
   flex-direction: column;

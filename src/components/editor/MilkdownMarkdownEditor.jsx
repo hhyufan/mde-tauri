@@ -194,8 +194,8 @@ const mathSourceInlineType = 'math_source_inline';
 const mathSourceBlockType = 'math_source_block';
 const imageSourceInlineType = 'image_source_inline';
 const tableSourceBlockType = 'table_source_block';
-const mathSourceEditMeta = 'mdeMathSourceEdit';
-const markdownSourceEditMeta = 'mdeMarkdownSourceEdit';
+const mathSourceEditMeta = 'mokidownMathSourceEdit';
+const markdownSourceEditMeta = 'mokidownMarkdownSourceEdit';
 const remarkMathPlugin = $remark('remarkMath', () => remarkMath);
 const katexOptionsCtx = $ctx({
   throwOnError: false,
@@ -1078,8 +1078,8 @@ function isNonEditablePreviewTarget(target) {
       '.md-preview__math',
       '.md-preview__html',
       '.preview-panel',
-      'img[data-mde-original-src]',
-      'img[data-mde-resolved-src]',
+      'img[data-moki-original-src]',
+      'img[data-moki-resolved-src]',
     ].join(', '))
     );
 }
@@ -1125,8 +1125,8 @@ function createNonEditablePreviewSelectionHandler(getEditor) {
         '.md-preview__math',
         '.md-preview__html',
         '.preview-panel',
-        'img[data-mde-original-src]',
-        'img[data-mde-resolved-src]',
+        'img[data-moki-original-src]',
+        'img[data-moki-resolved-src]',
       ].join(', '));
       if (!target) return;
 

@@ -10,6 +10,9 @@
 // 链里完成，详见 `src/components/editor/LazyMonacoEditor.jsx` 与
 // `src/utils/monacoRuntimeBoot.js`。
 
+// 必须放在最前面：品牌更名（MDE → MokiDown）的一次性本地存储迁移要在任何
+// persist store 创建并回填之前执行，否则首启会先读到空的新键。
+import '@utils/storageMigration';
 import React, { lazy, Suspense } from 'react';
 import ReactDOM from 'react-dom/client';
 import { StyleProvider } from '@ant-design/cssinjs';

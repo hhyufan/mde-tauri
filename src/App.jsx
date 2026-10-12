@@ -259,12 +259,12 @@ function App() {
 
   // 背景模式下把标记同步到 body：antd 弹层（Select / Dropdown / Picker）会
   // portal 到 body，不在 .app--background 子树内，只有 body 级才能让它们
-  // 继承 --mde-glass-* 变量并参与玻璃化适配。
+  // 继承 --moki-glass-* 变量并参与玻璃化适配。
   useEffect(() => {
     const root = document.body;
     if (!root) return undefined;
-    root.classList.toggle('mde-has-background', hasBackground);
-    return () => root.classList.remove('mde-has-background');
+    root.classList.toggle('moki-has-background', hasBackground);
+    return () => root.classList.remove('moki-has-background');
   }, [hasBackground]);
 
   useEffect(() => {
@@ -784,8 +784,8 @@ function App() {
           isPortrait && 'app--portrait',
         )}
         style={hasBackground ? {
-          '--mde-background-image': `url("${backgroundUrl}")`,
-          '--mde-background-opacity': (100 - getBackgroundTransparency(backgroundTransparency, theme)) / 100,
+          '--moki-background-image': `url("${backgroundUrl}")`,
+          '--moki-background-opacity': (100 - getBackgroundTransparency(backgroundTransparency, theme)) / 100,
         } : undefined}
       >
         <Sidebar

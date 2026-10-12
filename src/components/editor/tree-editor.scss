@@ -1,4 +1,4 @@
-.mde-tree {
+.moki-tree {
   display: flex;
   flex-direction: column;
   position: relative;
@@ -22,7 +22,7 @@
   &__tools .ant-btn { width: 28px; height: 28px; color: var(--text-sec); border-radius: var(--radius-sm); }
   &__tools .ant-btn:not(:disabled):hover { background: var(--accent-bg); color: var(--accent); }
   &__tools .ant-btn:disabled { opacity: 0.35; }
-  &__tools .mde-tree__add { color: var(--accent); background: var(--accent-bg); margin-right: 4px; }
+  &__tools .moki-tree__add { color: var(--accent); background: var(--accent-bg); margin-right: 4px; }
   &__separator { height: 16px; width: 1px; background: var(--border); margin: 0 6px; }
   &__zoom { font-size: 11px; color: var(--text-sec); min-width: 36px; font-variant-numeric: tabular-nums; margin-left: 4px; }
   &__count { display: flex; align-items: center; gap: 7px; white-space: nowrap; color: var(--text-sec); font-size: 11px; }
@@ -86,22 +86,22 @@
     &::after { content: ''; position: absolute; left: 12px; right: 0; top: 17px; border-top: 1px solid var(--border); }
     &:not(.ant-tree-switcher-noop):hover::before { background: none; }
   }
-  .ant-tree .mde-tree__last > .ant-tree-switcher::before { bottom: auto; height: 17px; }
+  .ant-tree .moki-tree__last > .ant-tree-switcher::before { bottom: auto; height: 17px; }
   // Root rows have no indent guides, so the branch line above them leads
   // nowhere. Keep the chevron and the horizontal connector to the children.
   .ant-tree .ant-tree-treenode:not(:has(.ant-tree-indent-unit)) > .ant-tree-switcher::before { display: none; }
   .ant-tree .ant-tree-switcher-leaf-line { display: none; }
-  .mde-tree__chevron { position: relative; z-index: 1; margin-top: 9px; width: 16px; height: 16px; line-height: 16px; background: var(--surface); border-radius: 4px; }
-  .mde-tree__chevron svg { display: block; width: 16px; height: 16px; transition: transform 150ms ease; }
-  .ant-tree .ant-tree-switcher_close .mde-tree__chevron svg { transform: rotate(0deg); }
-  .ant-tree .ant-tree-switcher_open .mde-tree__chevron svg { transform: rotate(90deg); }
-  .ant-tree .ant-tree-switcher:hover .mde-tree__chevron { color: var(--accent); background: var(--accent-light); }
+  .moki-tree__chevron { position: relative; z-index: 1; margin-top: 9px; width: 16px; height: 16px; line-height: 16px; background: var(--surface); border-radius: 4px; }
+  .moki-tree__chevron svg { display: block; width: 16px; height: 16px; transition: transform 150ms ease; }
+  .ant-tree .ant-tree-switcher_close .moki-tree__chevron svg { transform: rotate(0deg); }
+  .ant-tree .ant-tree-switcher_open .moki-tree__chevron svg { transform: rotate(90deg); }
+  .ant-tree .ant-tree-switcher:hover .moki-tree__chevron { color: var(--accent); background: var(--accent-light); }
 }
 
-@media (hover: none) { .mde-tree__actions { opacity: 1; } }
+@media (hover: none) { .moki-tree__actions { opacity: 1; } }
 @media (max-width: 640px) {
-  .mde-tree__toolbar { padding: 6px 10px; }
-  .mde-tree__canvas { padding: 16px 10px 48px; }
-  .mde-tree__count { display: none; }
-  .mde-tree__hint { padding: 8px 10px; }
+  .moki-tree__toolbar { padding: 6px 10px; }
+  .moki-tree__canvas { padding: 16px 10px 48px; }
+  .moki-tree__count { display: none; }
+  .moki-tree__hint { padding: 8px 10px; }
 }

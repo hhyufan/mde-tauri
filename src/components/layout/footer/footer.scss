@@ -240,8 +240,8 @@
     gap: 8px;
     // .app__main 已经预留了 env(safe-area-inset-bottom)；
     // 这里只需要在 IME 打开时额外补出空间
-    // （.app__main 会通过 App.scss 中的 html.mde--kb-open 去掉自身 padding）。
-    padding-bottom: calc(6px + var(--mde-kb-inset, 0px));
+    // （.app__main 会通过 App.scss 中的 html.moki--kb-open 去掉自身 padding）。
+    padding-bottom: calc(6px + var(--moki-kb-inset, 0px));
   }
 
   .footer__left {

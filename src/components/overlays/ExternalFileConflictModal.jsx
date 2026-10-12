@@ -23,7 +23,7 @@ function ExternalFileConflictModal({ conflict, onKeep, onUseDisk, onSaveAs, onCl
         type="warning"
         showIcon
         message={conflict.kind === 'removed' ? '原文件已被删除或移动' : '磁盘内容与本地编辑内容冲突'}
-        description="MDE 没有覆盖任何一方，请明确选择要保留的版本。"
+        description="MokiDown 没有覆盖任何一方，请明确选择要保留的版本。"
       />
       <Paragraph ellipsis={{ rows: 2 }} style={{ marginTop: 16 }}>
         <Text type="secondary">{conflict.path}</Text>

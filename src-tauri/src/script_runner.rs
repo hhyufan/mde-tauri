@@ -672,7 +672,7 @@ fn prepare_roslyn(
     // 用户 main/顶层语句随后仍可自行设置编码，编译阶段继续使用 -utf8output。
     let encoding = project.join("Run.Encoding.cs");
     let encoding_namespace = fingerprint(&project.to_string_lossy());
-    write_if_changed(&encoding, &format!("namespace Mde.Generated._{encoding_namespace} {{ internal static class Startup {{ [global::System.Runtime.CompilerServices.ModuleInitializer] internal static void Initialize() {{ global::System.Console.InputEncoding = new global::System.Text.UTF8Encoding(false); global::System.Console.OutputEncoding = new global::System.Text.UTF8Encoding(false); }} }} }}"))?;
+    write_if_changed(&encoding, &format!("namespace Moki.Generated._{encoding_namespace} {{ internal static class Startup {{ [global::System.Runtime.CompilerServices.ModuleInitializer] internal static void Initialize() {{ global::System.Console.InputEncoding = new global::System.Text.UTF8Encoding(false); global::System.Console.OutputEncoding = new global::System.Text.UTF8Encoding(false); }} }} }}"))?;
     let mut defines = vec![
         "DEBUG".into(),
         "TRACE".into(),
@@ -1131,7 +1131,7 @@ fn prepare(request: &ScriptRequest, cache: &Path) -> Result<PreparedRun, String>
         None
     } else {
         let mut snapshot = tempfile::Builder::new()
-            .prefix(".mde-run-")
+            .prefix(".moki-run-")
             .suffix(&format!(".{extension}"))
             .tempfile_in(&cwd)
             .map_err(|error| format!("无法创建运行快照：{error}"))?;
@@ -1191,7 +1191,7 @@ fn prepare(request: &ScriptRequest, cache: &Path) -> Result<PreparedRun, String>
                 #[cfg(windows)]
                 crate::msvc::configure(&mut compiler)?;
                 compiler
-                    .args(["--edition=2021", "--crate-name", "mde_script"])
+                    .args(["--edition=2021", "--crate-name", "moki_script"])
                     .arg(snapshot.as_ref().unwrap().path())
                     .arg("-o")
                     .arg(&binary)
@@ -1396,8 +1396,8 @@ fn prepare(request: &ScriptRequest, cache: &Path) -> Result<PreparedRun, String>
                     "kotlin-cache-v3:{is_kts}:{name}:{}",
                     request.source
                 ));
-                let launcher_package = format!("mde.generated.kts._{}", &digest[..16]);
-                let script_launcher = project_dir.join("MdeKtsLauncher.kt");
+                let launcher_package = format!("moki.generated.kts._{}", &digest[..16]);
+                let script_launcher = project_dir.join("MokiKtsLauncher.kt");
                 if is_kts {
                     // 脚本仍由 Kotlin 按 .kts 编译，不能包进 main（会改变声明和 args 作用域）。
                     // 一次编译同时产出轻量启动器；命中 jar 后不再拉起整个 Kotlin 编译器。
@@ -1405,7 +1405,7 @@ fn prepare(request: &ScriptRequest, cache: &Path) -> Result<PreparedRun, String>
                         &script_launcher,
                         &format!(
                             r#"package {launcher_package}
-object MdeKtsLauncher {{
+object MokiKtsLauncher {{
     @JvmStatic fun main(args: Array<String>) {{
         try {{
             // 使用编译器同样的 Java 字符分类，兼容中文、空格和标点文件名。
@@ -1413,8 +1413,8 @@ object MdeKtsLauncher {{
             val name = if (Character.isJavaIdentifierStart(stem[0]))
                 stem.take(1).uppercase(java.util.Locale.ROOT) + stem.drop(1) else "_" + stem
             // 从 jar 获取编译器生成的完整类名，包声明和反引号包名也无需改写源码。
-            val loader = MdeKtsLauncher::class.java.classLoader
-            val location = MdeKtsLauncher::class.java.protectionDomain.codeSource.location
+            val loader = MokiKtsLauncher::class.java.classLoader
+            val location = MokiKtsLauncher::class.java.protectionDomain.codeSource.location
             val script = java.util.jar.JarFile(java.io.File(location.toURI())).use {{ jar ->
                 jar.entries().asSequence().filter {{ it.name.substringAfterLast('/') == name + ".class" }}
                     .map {{ Class.forName(it.name.removeSuffix(".class").replace('/', '.'), false, loader) }}
@@ -1428,7 +1428,7 @@ object MdeKtsLauncher {{
                 !it.className.startsWith("jdk.internal.reflect.") &&
                 !it.className.startsWith("sun.reflect.") &&
                 it.className != "java.lang.reflect.Constructor" &&
-                it.className != "{launcher_package}.MdeKtsLauncher"
+                it.className != "{launcher_package}.MokiKtsLauncher"
             }}.toTypedArray()
             cause.printStackTrace()
             kotlin.system.exitProcess(1)
@@ -1469,7 +1469,7 @@ object MdeKtsLauncher {{
                     launcher
                         .arg("-cp")
                         .arg(classpath)
-                        .arg(format!("{launcher_package}.MdeKtsLauncher"))
+                        .arg(format!("{launcher_package}.MokiKtsLauncher"))
                         .arg(&name);
                 } else {
                     launcher.arg("-jar").arg(&jar);
@@ -1952,7 +1952,7 @@ mod tests {
             eprintln!("F5_PERF {row}");
             rows.push(row);
         }
-        if let Some(path) = std::env::var_os("MDE_F5_BENCH_REPORT") {
+        if let Some(path) = std::env::var_os("MOKIDOWN_F5_BENCH_REPORT") {
             fs::write(path, serde_json::to_string_pretty(&rows).unwrap()).unwrap();
         }
     }
@@ -2252,7 +2252,7 @@ mod tests {
         assert!(!fs::read_dir(root.path())
             .unwrap()
             .flatten()
-            .any(|entry| entry.file_name().to_string_lossy().starts_with(".mde-run-")));
+            .any(|entry| entry.file_name().to_string_lossy().starts_with(".moki-run-")));
     }
     #[test]
     #[ignore = "requires locally installed Node.js"]
@@ -2613,7 +2613,7 @@ Console.WriteLine(typeof(Program).Assembly.GetName().Version);
             "{text}"
         );
         assert!(!text.contains("InvocationTargetException"), "{text}");
-        assert!(!text.contains("MdeKtsLauncher"), "{text}");
+        assert!(!text.contains("MokiKtsLauncher"), "{text}");
         assert!(prepare(&req, &cache).unwrap().compile.is_some());
         req.source = "this is not valid Kotlin".into();
         let (code, text) = execute_source(&req);

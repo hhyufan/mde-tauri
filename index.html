@@ -4,7 +4,7 @@
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/vite.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1, user-scalable=no" />
-    <title>Markdown Editor</title>
+    <title>MokiDown</title>
 
     <!--
       Critical styles — inlined so the very first paint of the WebView is the
@@ -157,7 +157,11 @@
 
         // 1. Apply persisted theme to <html> so the inline CSS picks it up.
         try {
-          var raw = localStorage.getItem('mde-theme');
+          var raw = localStorage.getItem('mokidown-theme');
+          // 品牌更名（MDE → MokiDown）后的兼容读取：新键还没有值时回退到旧键，
+          // 避免首屏先按系统主题闪一下；真正的复制迁移在
+          // src/utils/storageMigration.js，由 src/main.jsx 最先执行。
+          if (raw === null) raw = localStorage.getItem('mde-theme');
           var theme = raw && JSON.parse(raw)?.state?.theme;
           if (!theme) {
             theme = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';

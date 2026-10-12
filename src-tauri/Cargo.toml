@@ -1,12 +1,12 @@
 [package]
-name = "mde"
+name = "mokidown"
 version = "0.1.0"
 description = "A cross-platform Markdown editor based on Tauri"
 authors = ["hhyufan"]
 edition = "2021"
 
 [lib]
-name = "mde_lib"
+name = "mokidown_lib"
 crate-type = ["staticlib", "cdylib", "rlib"]
 
 [build-dependencies]

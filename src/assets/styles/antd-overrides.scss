@@ -180,7 +180,7 @@
 // 让自定义 BEM 弹层在放入 antd Modal 时保持原有外观
 // （如 LoginModal、SettingsModal 等，它们的内容本就包在原始 BEM 根节点中，
 // 不需要 antd 默认的内边距和头部样式）。
-.mde-naked-modal {
+.moki-naked-modal {
   .ant-modal-content {
     background: transparent;
     box-shadow: none;
@@ -192,7 +192,7 @@
 }
 
 // 针对不同弹窗的内边距与间距辅助样式
-.mde-login-modal-root .ant-modal-content {
+.moki-login-modal-root .ant-modal-content {
   padding: 28px 32px 24px;
 }
 
@@ -200,7 +200,7 @@
   margin-bottom: 18px;
 }
 
-.mde-stats-modal-root {
+.moki-stats-modal-root {
   .ant-modal-content {
     padding: 0;
   }
@@ -214,14 +214,14 @@
   }
 }
 
-.mde-search-modal-root .ant-modal-content {
+.moki-search-modal-root .ant-modal-content {
   padding: 0;
   overflow: hidden;
 }
 
 // 竖屏移动端的全屏搜索层。铺满屏幕、兼容安全区，
 // 并为输入法键盘预留空间，确保键盘弹出时结果列表仍可滚动。
-.mde-search-modal-root--fullscreen {
+.moki-search-modal-root--fullscreen {
   .ant-modal {
     margin: 0;
     padding: 0;
@@ -233,7 +233,7 @@
     height: 100dvh;
     border-radius: 0;
     padding-top: env(safe-area-inset-top);
-    padding-bottom: max(env(safe-area-inset-bottom), var(--mde-kb-inset, 0px));
+    padding-bottom: max(env(safe-area-inset-bottom), var(--moki-kb-inset, 0px));
     display: flex;
     flex-direction: column;
   }
@@ -245,7 +245,7 @@
   }
 }
 
-.mde-settings-modal-root {
+.moki-settings-modal-root {
   .ant-modal-content {
     padding: 0;
     overflow: hidden;
@@ -301,7 +301,7 @@
 
 // 手机竖屏下的设置对话框全屏模式。Modal 会铺满屏幕并兼容安全区，
 // 同时将左侧栏式的分区导航切换为可横向滚动的标签行。
-.mde-settings-modal-root--fullscreen {
+.moki-settings-modal-root--fullscreen {
   .ant-modal {
     margin: 0;
     padding: 0;
@@ -313,7 +313,7 @@
     height: 100dvh;
     border-radius: 0;
     padding-top: env(safe-area-inset-top);
-    padding-bottom: max(env(safe-area-inset-bottom), var(--mde-kb-inset, 0px));
+    padding-bottom: max(env(safe-area-inset-bottom), var(--moki-kb-inset, 0px));
     display: flex;
     flex-direction: column;
   }
@@ -373,7 +373,7 @@
   }
 }
 
-.mde-conflict-modal-root .ant-modal-content {
+.moki-conflict-modal-root .ant-modal-content {
   padding: 0;
   overflow: hidden;
 }

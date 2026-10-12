@@ -101,7 +101,7 @@ function StatsPanel({ open, onClose }) {
       centered
       destroyOnHidden
       maskClosable
-      rootClassName="mde-stats-modal-root"
+      rootClassName="moki-stats-modal-root"
     >
       <div className="stats-panel__body">
         <div className="stats-panel__summary">

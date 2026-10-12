@@ -207,7 +207,7 @@ export async function loadMarkdownImageSrc(src, documentPath) {
 /**
  * 扫描容器内图片并异步水合真实可显示地址。
  *
- * 通过 `data-mde-*` 属性记录原始 src 与已生成的 object URL，既能避免重复
+ * 通过 `data-moki-*` 属性记录原始 src 与已生成的 object URL，既能避免重复
  * 解析，也能在组件卸载时统一释放浏览器资源。
  */
 export function hydrateMarkdownImages(container, documentPath) {
@@ -217,21 +217,21 @@ export function hydrateMarkdownImages(container, documentPath) {
 
   container.querySelectorAll('img[src]').forEach((img) => {
     const currentSrc = img.getAttribute('src');
-    const rawSrc = img.dataset.mdeOriginalSrc || currentSrc;
+    const rawSrc = img.dataset.mokiOriginalSrc || currentSrc;
     // 使用原始 src 作为去重键，避免同一张图反复创建 object URL。
-    if (!rawSrc || img.dataset.mdeResolvedSrc === rawSrc) return;
-    img.dataset.mdeOriginalSrc = rawSrc;
-    img.dataset.mdeResolvedSrc = rawSrc;
+    if (!rawSrc || img.dataset.mokiResolvedSrc === rawSrc) return;
+    img.dataset.mokiOriginalSrc = rawSrc;
+    img.dataset.mokiResolvedSrc = rawSrc;
 
     loadMarkdownImageSrc(rawSrc, documentPath).then(({ src, objectUrl }) => {
       if (cancelled || !src) {
         if (objectUrl) URL.revokeObjectURL(objectUrl);
         return;
       }
-      if (img.dataset.mdeObjectUrl) URL.revokeObjectURL(img.dataset.mdeObjectUrl);
+      if (img.dataset.mokiObjectUrl) URL.revokeObjectURL(img.dataset.mokiObjectUrl);
       if (objectUrl) objectUrls.push(objectUrl);
       img.src = src;
-      if (objectUrl) img.dataset.mdeObjectUrl = objectUrl;
+      if (objectUrl) img.dataset.mokiObjectUrl = objectUrl;
     });
   });
 
@@ -239,8 +239,8 @@ export function hydrateMarkdownImages(container, documentPath) {
     cancelled = true;
     objectUrls.forEach((url) => {
       URL.revokeObjectURL(url);
-      container.querySelectorAll(`img[data-mde-object-url="${url}"]`).forEach((img) => {
-        delete img.dataset.mdeObjectUrl;
+      container.querySelectorAll(`img[data-moki-object-url="${url}"]`).forEach((img) => {
+        delete img.dataset.mokiObjectUrl;
       });
     });
   };

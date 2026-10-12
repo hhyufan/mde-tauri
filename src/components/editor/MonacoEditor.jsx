@@ -334,7 +334,7 @@ const MonacoEditorComponent = forwardRef(function MonacoEditorComponent({ classN
         try {
           monaco.editor.setTheme(getMonacoThemeName(dark));
         } catch (error) {
-          console.error('[mde/highlight] failed to apply Monaco theme:', error);
+          console.error('[mokidown/highlight] failed to apply Monaco theme:', error);
           try {
             monaco.editor.setTheme(dark ? 'vs-dark' : 'vs');
           } catch (_) {
@@ -343,7 +343,7 @@ const MonacoEditorComponent = forwardRef(function MonacoEditorComponent({ classN
         }
       })
       .catch((error) => {
-        console.error('[mde/highlight] Monaco highlight bootstrap rejected:', error);
+        console.error('[mokidown/highlight] Monaco highlight bootstrap rejected:', error);
       });
 
     /**
@@ -447,7 +447,7 @@ const MonacoEditorComponent = forwardRef(function MonacoEditorComponent({ classN
     if (!monaco.languages.getLanguages().some((language) => language.id === lang)) monaco.languages.register({ id: lang });
     const uri = tab.path && /^(?:[a-z]:[\\/]|\/)/i.test(tab.path)
       ? monaco.Uri.file(tab.path)
-      : monaco.Uri.parse(`inmemory://mde/${encodeURIComponent(tab.id)}/${encodeURIComponent(tab.name)}`);
+      : monaco.Uri.parse(`inmemory://mokidown/${encodeURIComponent(tab.id)}/${encodeURIComponent(tab.name)}`);
     if (editor.getModel()?.uri.toString() !== uri.toString()) {
       const previous = editor.getModel();
       suppressModelChangeRef.current = true;

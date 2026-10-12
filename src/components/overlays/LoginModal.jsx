@@ -61,7 +61,7 @@ function LoginModal({ open, onClose, onLoggedIn }) {
       centered
       destroyOnHidden
       maskClosable
-      rootClassName="mde-login-modal-root"
+      rootClassName="moki-login-modal-root"
     >
       <div className="login-modal__inner">
         <div className="login-modal__header">
