@@ -7,9 +7,11 @@ import MokiSprite from './MokiSprite';
 /**
  * Moki 主题与人物设置。
  *
- * 主题切换改用「卡片即预览画布」：插画区就是 1:1 的方形画布，插画按画布高度铺满，
- * 缩幅只有约 3 倍。旧版把插画塞进 88px 的方框，等于把近 1000px 的原图缩 11 倍，必然发糊。
- * 人物由「显示人物」开关统一控制：关闭后仅留渐变画布，主题卡片与欢迎页都不再出现角色。
+ * 主题切换有两种形态，随「人物显示」开关切换：
+ * - 开启人物：大预览卡片。卡片就是画布，插画按单格比例等比缩小（约 3 倍），
+ *   旧版塞进 88px 方框等于缩了 10 倍，必然发糊。
+ * - 关闭人物：回到紧凑卡片（MDE 时期的设计）——两列横卡、各自底色、右侧勾选，
+ *   只是不再渲染插画。
  */
 export default function MokiSettings({ SettingGroup, SettingRow }) {
   const { t } = useTranslation();
@@ -21,30 +23,41 @@ export default function MokiSettings({ SettingGroup, SettingRow }) {
   return (
     <>
       <SettingGroup label={t('moki.settingsTitle')} />
-      <div className="moki-theme-cards">
+      <div className={`moki-theme-cards ${showCharacter ? '' : 'moki-theme-cards--compact'}`}>
         {['light', 'dark'].map((mode) => (
           <button
             key={mode}
             type="button"
-            className={`moki-theme-card moki-theme-card--${mode}`}
+            className={[
+              'moki-theme-card',
+              showCharacter ? 'moki-theme-card--preview' : 'moki-theme-card--compact',
+              `moki-theme-card--${mode}`,
+            ].join(' ')}
             aria-pressed={theme === mode}
             onClick={() => setTheme(mode)}
           >
-            <span className="moki-theme-card__art">
-              <span className="moki-theme-card__bar" aria-hidden="true">
-                <i />
-                <i />
-                <i />
+            {showCharacter && (
+              <span className="moki-theme-card__art">
+                <span className="moki-theme-card__bar" aria-hidden="true">
+                  <i />
+                  <i />
+                  <i />
+                </span>
+                <MokiSprite theme={mode} art="themes" />
+                <span className="moki-theme-card__badge" aria-hidden="true">
+                  {theme === mode ? '✓' : ''}
+                </span>
               </span>
-              {showCharacter && <MokiSprite theme={mode} art="themes" />}
-              <span className="moki-theme-card__badge" aria-hidden="true">
-                {theme === mode ? '✓' : ''}
-              </span>
-            </span>
+            )}
             <span className="moki-theme-card__meta">
               <strong>{t(`moki.theme.${mode}`)}</strong>
               <small>{t(`moki.theme.${mode}Desc`)}</small>
             </span>
+            {!showCharacter && (
+              <span className="moki-theme-card__check" aria-hidden="true">
+                {theme === mode ? '✓' : '○'}
+              </span>
+            )}
           </button>
         ))}
       </div>

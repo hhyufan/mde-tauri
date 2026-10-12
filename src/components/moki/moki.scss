@@ -259,136 +259,209 @@
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 14px;
   margin: 12px 0 20px;
+
+  /* 无人物时的紧凑形态，沿用 MDE 时期的两列排布 */
+  &--compact {
+    gap: 12px;
+    margin: 12px 0 18px;
+  }
 }
 
 .moki-theme-card {
-  display: flex;
-  flex-direction: column;
-  padding: 0;
-  overflow: hidden;
   cursor: pointer;
   text-align: left;
   font-family: var(--font-app);
-  border: 1px solid var(--border);
-  border-radius: 14px;
-  background: var(--surface);
   transition: transform 0.18s ease, box-shadow 0.18s ease, border-color 0.18s ease;
 
-  /* 预览画布 */
-  &__art {
-    position: relative;
-    display: block;
-    /* 与图集单格比例一致（1672×941 双格 ≈ 8:9）：既不拉伸也不裁切 */
-    aspect-ratio: 8 / 9;
+  /* 名称与说明：两种形态共用的网格排布 */
+  .moki-theme-card__meta {
+    display: grid;
+  }
+
+  /* ---------- 大预览卡：卡片本身就是画布（有人物时） ---------- */
+  &--preview {
+    display: flex;
+    flex-direction: column;
+    padding: 0;
     overflow: hidden;
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    background: var(--surface);
 
-    /* 顶部窗口条：让卡片读起来像一块界面，而不是一张插图 */
-    > .moki-theme-card__bar {
-      position: absolute;
-      top: 0;
-      left: 0;
-      right: 0;
-      height: 20px;
-      display: flex;
-      align-items: center;
-      gap: 4px;
-      padding: 0 9px;
-      z-index: 2;
+    /* 预览画布 */
+    .moki-theme-card__art {
+      position: relative;
+      display: block;
+      /* 与图集单格比例一致（1672×941 双格 ≈ 8:9）：既不拉伸也不裁切 */
+      aspect-ratio: 8 / 9;
+      overflow: hidden;
 
-      > i {
-        width: 5px;
-        height: 5px;
-        border-radius: 50%;
-        background: currentColor;
-        opacity: 0.26;
+      /* 顶部窗口条：让卡片读起来像一块界面，而不是一张插图 */
+      > .moki-theme-card__bar {
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        height: 20px;
+        display: flex;
+        align-items: center;
+        gap: 4px;
+        padding: 0 9px;
+        z-index: 2;
+
+        > i {
+          width: 5px;
+          height: 5px;
+          border-radius: 50%;
+          background: currentColor;
+          opacity: 0.26;
+        }
+      }
+
+      /* 插画铺满画布：画布比例已对齐图集单格，所以不拉伸、不裁切，只做等比缩小。
+         注意要显式 aspect-ratio: auto —— 基类的 1:1 是给方形单格的半身图集用的，
+         而 moki-themes.png 单格是 836×941（竖长），套 1:1 会被纵向压扁约 12%。 */
+      > .moki-sprite {
+        position: absolute;
+        inset: 0;
+        width: 100%;
+        height: 100%;
+        aspect-ratio: auto;
       }
     }
 
-    /* 插画铺满画布：画布比例已对齐图集单格，所以不拉伸、不裁切，只做等比缩小。
-       注意要显式 aspect-ratio: auto —— 基类的 1:1 是给方形单格的半身图集用的，
-       而 moki-themes.png 单格是 836×941（竖长），套 1:1 会被纵向压扁约 12%。 */
-    > .moki-sprite {
+    .moki-theme-card__badge {
       position: absolute;
-      inset: 0;
-      width: 100%;
-      height: 100%;
-      aspect-ratio: auto;
+      top: 9px;
+      right: 9px;
+      z-index: 2;
+      width: 20px;
+      height: 20px;
+      display: grid;
+      place-items: center;
+      border-radius: 50%;
+      font-size: 11px;
+      font-weight: 700;
+      color: #fff;
+      background: var(--accent);
+      opacity: 0;
+      transform: scale(0.8);
+      transition: opacity 0.16s ease, transform 0.16s ease;
+    }
+
+    .moki-theme-card__meta {
+      gap: 3px;
+      padding: 11px 13px 13px;
+
+      strong {
+        font-size: 12.5px;
+        font-weight: 600;
+      }
+
+      small {
+        font-size: 10.5px;
+        line-height: 1.55;
+        opacity: 0.68;
+      }
+    }
+
+    &.moki-theme-card--light {
+      color: #243653;
+
+      .moki-theme-card__art {
+        background: linear-gradient(180deg, #f2f7ff 0%, #dbe8ff 100%);
+      }
+
+      .moki-theme-card__meta {
+        background: #fbfdff;
+      }
+    }
+
+    &.moki-theme-card--dark {
+      color: #e7efff;
+
+      .moki-theme-card__art {
+        background: linear-gradient(180deg, #223148 0%, #16233a 100%);
+      }
+
+      .moki-theme-card__meta {
+        background: #1c293f;
+      }
+    }
+
+    &:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 10px 22px color-mix(in srgb, var(--accent) 14%, transparent);
+    }
+
+    &[aria-pressed='true'] {
+      border-color: var(--accent);
+      box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 26%, transparent);
+
+      .moki-theme-card__badge {
+        opacity: 1;
+        transform: scale(1);
+      }
     }
   }
 
-  &__badge {
-    position: absolute;
-    top: 9px;
-    right: 9px;
-    z-index: 2;
-    width: 20px;
-    height: 20px;
-    display: grid;
-    place-items: center;
-    border-radius: 50%;
-    font-size: 11px;
-    font-weight: 700;
-    color: #fff;
-    background: var(--accent);
-    opacity: 0;
-    transform: scale(0.8);
-    transition: opacity 0.16s ease, transform 0.16s ease;
-  }
-
-  &__meta {
-    display: grid;
-    gap: 3px;
-    padding: 11px 13px 13px;
-
-    strong {
-      font-size: 12.5px;
-      font-weight: 600;
-    }
-
-    small {
-      font-size: 10.5px;
-      line-height: 1.55;
-      opacity: 0.68;
-    }
-  }
-
-  &--light {
+  /* ---------- 紧凑卡：无人物时使用，沿用 MDE 时期的设计 ---------- */
+  &--compact {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 12px;
+    border: 1px solid #dce5f0;
+    border-radius: 12px;
+    background: #f5f8ff;
     color: #243653;
 
-    .moki-theme-card__art {
-      background: linear-gradient(180deg, #f2f7ff 0%, #dbe8ff 100%);
-    }
-
     .moki-theme-card__meta {
-      background: #fbfdff;
+      flex: 1;
+      gap: 4px;
+      padding: 0;
+
+      strong {
+        font-size: 13px;
+        font-weight: 500;
+      }
+
+      small {
+        font-size: 10px;
+        opacity: 0.7;
+      }
     }
-  }
 
-  &--dark {
-    color: #e7efff;
-
-    .moki-theme-card__art {
-      background: linear-gradient(180deg, #223148 0%, #16233a 100%);
+    .moki-theme-card__check {
+      font-size: 13px;
+      color: #4091ff;
     }
 
-    .moki-theme-card__meta {
+    &:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 8px 18px color-mix(in srgb, var(--accent) 12%, transparent);
+    }
+
+    &[aria-pressed='true'] {
+      outline: 2px solid var(--accent);
+      outline-offset: 2px;
+    }
+
+    &.moki-theme-card--dark {
       background: #1c293f;
+      color: #e7efff;
+      border-color: #304564;
     }
   }
+}
 
-  &:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 10px 22px color-mix(in srgb, var(--accent) 14%, transparent);
+@media (prefers-reduced-motion: reduce) {
+  .moki-theme-card {
+    transition: none;
   }
 
-  &[aria-pressed='true'] {
-    border-color: var(--accent);
-    box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 26%, transparent);
-
-    .moki-theme-card__badge {
-      opacity: 1;
-      transform: scale(1);
-    }
+  .moki-theme-card:hover {
+    transform: none;
   }
 }
 .moki-about {

@@ -164,3 +164,17 @@ it('uses one switch to control whether the character shows', async () => {
   // 「周边轻动效」开关已移除：动画改为遵从系统偏好，不再由应用内开关控制。
   expect(screen.queryByRole('switch', { name: '周边轻动效' })).not.toBeInTheDocument();
 });
+
+it('falls back to compact theme cards when the character is off', async () => {
+  useConfigStore.setState({ mokiDisplay: 'hidden' });
+  await act(async () => render(<SettingsModal open onClose={vi.fn()} />));
+  fireEvent.click(screen.getByText('外观'));
+  // 关闭人物后不再渲染大画布，回到 MDE 时期的紧凑卡片形态（两列横卡 + 右侧勾选）。
+  expect(document.querySelector('.moki-theme-card--preview')).not.toBeInTheDocument();
+  expect(document.querySelector('.moki-theme-cards--compact')).toBeInTheDocument();
+  expect(document.querySelectorAll('.moki-theme-card--compact')).toHaveLength(2);
+  fireEvent.click(screen.getByText('夜读 · 深色'));
+  expect(useThemeStore.getState().theme).toBe('dark');
+  fireEvent.click(screen.getByText('晴笺 · 浅色'));
+  expect(useThemeStore.getState().theme).toBe('light');
+});
