@@ -33,7 +33,6 @@ export default function WelcomeScreen() {
       <div className="moki-welcome__content">
         <span className="moki-eyebrow">MokiDown / YOUR IDEAS, AT HOME</span>
         <h1>{t('moki.welcomeTitle')}</h1>
-        <p className="moki-welcome__intro">{t('moki.welcomeIntro')}</p>
         <h2 className="moki-welcome__task-heading">{t('moki.startTask')}</h2>
         <div className="moki-welcome__actions">
           <button
@@ -83,10 +82,6 @@ export default function WelcomeScreen() {
           ) : (
             <p>{t('moki.noRecent')}</p>
           )}
-        </div>
-        <div className="moki-welcome__footnote">
-          <span />
-          {t('moki.localFirst')}
         </div>
       </div>
       {display !== 'hidden' && (
