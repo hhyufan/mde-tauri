@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { Select, Tooltip } from 'antd';
 import { SearchOutlined, CloseOutlined, LoadingOutlined, FontSizeOutlined, FolderOpenOutlined, EnterOutlined } from '@ant-design/icons';
 import FileTypeIcon from '@components/ui/FileTypeIcon';
+import MokiStatusEmpty from '@components/moki/MokiStatusEmpty';
 import ChevronIcon from '@components/ui/ChevronIcon';
 import useWorkspaceSearch from '@hooks/useWorkspaceSearch';
 import { useFileManager } from '@hooks/useFileManager';
@@ -100,7 +101,7 @@ export default function SearchDropdown({ open, onOpen, onClose }) {
       placeholder={mode === 'content' ? t('search.contentPlaceholder') : t('topbar.search.placeholder')}
       value={query} onChange={(event) => { setQuery(event.target.value); onOpen(); }} onFocus={onOpen} onKeyDown={keyDown} />
     {query ? <Tooltip title={t('search.clear')}><button className="search-dropdown__clear" type="button" aria-label={t('search.clear')}
-      onClick={() => { setQuery(''); inputRef.current?.focus(); }}><CloseOutlined /></button></Tooltip> : <kbd className="search-dropdown__shortcut">Ctrl P</kbd>}
+      onClick={() => { setQuery(''); inputRef.current?.focus(); }}><CloseOutlined /></button></Tooltip> : <kbd className="search-dropdown__shortcut">Ctrl + P</kbd>}
     {open && <div className="search-dropdown__panel" onKeyDown={(event) => { if (event.key === 'Escape') { event.stopPropagation(); closeWithFocus(); } }}>
       <div className="search-dropdown__toolbar">
         <div className="search-dropdown__modes" role="tablist" aria-label={t('search.mode')}>
@@ -133,7 +134,13 @@ export default function SearchDropdown({ open, onOpen, onClose }) {
       </div>
       {(search.error || openError) && <div className="search-dropdown__error" role="alert">{t('search.failed', { error: openError || search.error })}</div>}
       <div className="search-dropdown__results" role="listbox" aria-label={t('search.results')} id={listId} ref={listRef} aria-busy={search.loading}>
-        {!results.length && <div className="search-dropdown__empty" role="status">{search.loading ? t('search.searching') : query.trim() ? t('search.noResults') : t('search.emptySuggestions')}</div>}
+        {!results.length && (search.loading
+          ? <div className="search-dropdown__empty" role="status">{t('search.searching')}</div>
+          : <MokiStatusEmpty
+              compact
+              title={query.trim() ? t('empty.search.title') : t('search.emptySuggestions')}
+              hint={query.trim() ? t('empty.search.hint') : undefined}
+            />)}
         {results.map((item, index) => <div key={`${item.tabId || item.path}:${item.line_number || 0}`} id={`${listId}-${index}`} role="option"
           aria-selected={selected === index} data-index={index} className="search-dropdown__item" onMouseEnter={() => setSelectedIndex(index)}
           onMouseDown={(event) => event.preventDefault()} onClick={() => select(item)}>

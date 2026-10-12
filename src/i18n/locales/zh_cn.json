@@ -429,6 +429,7 @@
   "search.opened": "已打开",
   "search.unsaved": "未保存的修改",
   "search.failed": "搜索失败：{{error}}",
+  "search.skipped": "已跳过 {{count}} 个不可读、二进制或超大（超过 5 MB）的文件 / 文件夹。",
   "search.openFailed": "无法打开此文件。",
   "search.truncated": "已显示前 100 个结果，请细化关键词以查看更多。",
   "search.skipped": "已跳过 {{count}} 个不可读取、二进制或超过 5 MB 的文件／目录。",

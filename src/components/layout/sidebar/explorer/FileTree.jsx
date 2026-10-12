@@ -20,6 +20,7 @@ import useAuthStore from '@store/useAuthStore';
 import { syncEngine } from '@/services/syncEngine';
 import { getExplorerFileSyncState } from '@/services/sync/syncPresentation';
 import { cn } from '@utils/classNames';
+import MokiStatusEmpty from '@components/moki/MokiStatusEmpty';
 import { isImeComposing } from '@utils/keyboard';
 import FileTypeIcon from '@components/ui/FileTypeIcon';
 import ChevronIcon from '@components/ui/ChevronIcon';
@@ -366,12 +367,7 @@ function FileTree() {
   // 未打开目录时显示空状态占位。
   if (!currentDir) {
     return (
-      <div className="file-tree__empty">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" style={{ width: 32, height: 32, opacity: 0.3 }}>
-          <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z" />
-        </svg>
-        <p>{t('sidebar.explorer.openFolder')}</p>
-      </div>
+      <MokiStatusEmpty title={t('empty.files.title')} hint={t('empty.files.hint')} />
     );
   }
 
