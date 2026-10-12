@@ -10,7 +10,7 @@ Local-first and WYSIWYG: run code blocks right inside your documents, sketch not
 [▶ Try it live (no download)](https://www.miaogu.xyz/) · [⬇️ Download](https://github.com/hhyufan/mde-tauri/releases) · [中文](README.md)
 
 ![Tauri](https://img.shields.io/badge/Tauri-2.x-24C8DB?logo=tauri) ![React](https://img.shields.io/badge/React-18.3.1-61DAFB?logo=react) ![Monaco Editor](https://img.shields.io/badge/Monaco_Editor-0.52.2-007ACC?logo=visualstudiocode) ![Milkdown](https://img.shields.io/badge/Milkdown-7.x-3B82F6) ![NestJS](https://img.shields.io/badge/NestJS-10.x-E0234E?logo=nestjs) ![MongoDB](https://img.shields.io/badge/MongoDB-8.x-47A248?logo=mongodb) ![License](https://img.shields.io/badge/license-MIT-green)
-1
+
 <img src="screenshots/main.png" width="880" alt="MokiDown main window" />
 
 
@@ -22,20 +22,20 @@ Local-first and WYSIWYG: run code blocks right inside your documents, sketch not
 
 ### ⚡ Runnable Code Blocks
 
-Run Python / JavaScript / TypeScript code blocks directly inside your documents, with output streaming into a built-in console.
-Powered by a Rust execution engine: stdin interaction, cancellation, timeouts, and process-tree management on Windows / macOS / Linux.
-A **language-service package system** installs runtimes on demand (manifest + install recipe + SHA-256 verification) for Python, JS/TS, Java, Rust, Go, C#, Kotlin, Ruby, and more.
+Run code blocks directly inside your documents, with output streaming into a built-in console; C#, JavaScript, Python, Java, Kotlin and Rust are supported today.
+Powered by a Rust execution engine: stdin interaction, cancellation, timeouts, and process-tree management (Windows Job Objects) on Windows / macOS / Linux.
+
+### 🔌 Built-in LSP Language Services (8)
+
+Connects to local stdio language servers to bring diagnostics, hover info, and completions into the editor, with a unified problems panel.
+The built-in plugin catalog ships 8 language services: JavaScript & TypeScript, HTML, CSS, Python (Pyright), C# (Roslyn / csharp-ls), Kotlin, Java (Eclipse JDT), and Rust (rust-analyzer).
+They are managed as data-driven plugin packages that can be installed, removed, and configured on demand; downloaded packages are verified with SHA-256. You can also add an online plugin catalog or paste a custom JSON manifest — no external editor required.
 
 ### ✍️ Three Editing Modes, One Editor
 
-- **Source mode**: Monaco Editor (the VS Code engine)
-- **WYSIWYG mode**: Milkdown, with tables / images / math / code blocks switchable between rendered and source states
-- **Split mode**: draggable divider, editor-to-preview scroll sync, preview zoom following
-
-### 🔌 Built-in LSP Language Services
-
-Connects to local stdio language servers to bring diagnostics, hover info, and completions into the editor, with a unified problems panel.
-Language services are managed as data-driven plugin packages that can be installed, removed, and configured — no external editor required.
+- **Edit mode**: Monaco Editor (the VS Code engine) source editing, and the default for non-Markdown files
+- **Preview mode**: Milkdown WYSIWYG for Markdown, with tables / images / math / code blocks switchable between rendered and source states; the tree editor for `.mgtree`
+- **Split mode**: draggable divider, editor-to-preview scroll sync, preview zoom following; files without a preview fall back to Monaco
 
 ### ☁️ Self-Hosted Cloud Sync
 
@@ -44,13 +44,13 @@ Supports `cloud://` documents, settings sync, and side-by-side conflict resoluti
 
 ### 🌳 Tree Editor (mgtree)
 
-Sketch knowledge maps as indentation-based trees with drag-and-drop, folding, and node editing. `>language[index]` jump syntax links tree nodes **directly to code blocks in the document**, with the target block highlighted after jumping.
+Sketch knowledge maps as indentation-based trees with drag-and-drop, folding, and node editing. `.mgtree` files get their own multi-color tree icon in the file explorer. The `>language[index]` jump syntax links tree nodes **directly to code blocks in the document**, with the target block highlighted after jumping.
 
 ---
 
 ## 🧭 Design Principles
 
-MokiDown's capabilities come from four deliberate trade-offs — the four storylines of the [official site](https://www.miaogu.xyz/#why-mde):
+MokiDown's capabilities come from four deliberate trade-offs — the four storylines of the [official site](https://www.miaogu.xyz/):
 
 - **Local-first**: files live on your disk by default; your data stays yours, no format lock-in, no forced login
 - **Optional sync**: documents and settings join incremental sync only after you sign in; conflicts are shown explicitly — **MokiDown never overwrites your work behind your back**
@@ -61,15 +61,15 @@ MokiDown's capabilities come from four deliberate trade-offs — the four storyl
 
 ## 📸 Screenshots
 
-| Paper · Light welcome | Night · Dark welcome |
+| Sunny note · Light welcome | Night read · Dark welcome |
 | :---: | :---: |
 | ![Light welcome](screenshots/welcome-light.png) | ![Dark welcome](screenshots/welcome-dark.png) |
 
-| Three editing modes (source / WYSIWYG / split) | Runnable code blocks |
+| Three editing modes (edit / preview / split) | Runnable code blocks |
 | :---: | :---: |
 | ![Editing modes](screenshots/editor.png) | ![Code run](screenshots/code-run.png) |
 
-| Cloud sync conflict resolution | Tree editor (mgtree) |
+| Cloud sync conflict | Tree editor (.mgtree) |
 | :---: | :---: |
 | ![Sync conflict](screenshots/sync-conflict.png) | ![Tree editor](screenshots/tree.png) |
 
@@ -77,20 +77,21 @@ MokiDown's capabilities come from four deliberate trade-offs — the four storyl
 | :---: | :---: |
 | ![Dark editor](screenshots/editor-dark.png) | ![Character settings](screenshots/moki-settings.png) |
 
-| Bust portrait and clear starting tasks | Demo: switch modes |
+| WYSIWYG (Milkdown) | Mode-switch demo |
 | :---: | :---: |
-| ![Moki welcome page](screenshots/welcome-light.png) | ![Mode switch demo](screenshots/mode-switch.gif) |
+| ![WYSIWYG](screenshots/wysiwyg.png) | ![Mode switch demo](screenshots/mode-switch.gif) |
 
-Captured from the running application with sample documents. Code output and sync conflicts use demonstration data in the real components; these images do not indicate browser access to the desktop execution engine or a connected sync service. [WYSIWYG](screenshots/wysiwyg.png) · [Mobile welcome](screenshots/welcome-mobile.png) · [Design and capture notes](docs/character-design/moki-integration.md)
+Captured from the running application with sample documents. Code output and sync conflicts use demonstration data in the real components; these images do not indicate browser access to the desktop execution engine or a connected sync service. [Mobile welcome](screenshots/welcome-mobile.png) · [Design and capture notes](docs/character-design/moki-integration.md)
 
 ### Moki, the welcome-page mascot
 
 Moki carries MokiDown's identity through a blue bob, an M↓ hair clip, and a notebook. Bust portraits keep her face readable on the welcome page and compact theme cards. Light mode features a cheerful wave, paper-white clothing, and a sun clasp; dark mode features relaxed night reading with her cheek resting on her hand, navy clothing, and a crescent clasp.
 
-- Shows a static bust portrait with gently drifting Markdown symbols on the welcome page.
-- Explains the new document, open file, and open folder actions and offers recent documents.
-- Show or hide the welcome mascot and control ambient motion in Settings → Appearance, with reduced motion support.
-- The editor keeps its full editing and scrolling space, with no character overlay.
+- The welcome page stays minimal: a brand line, one title, a three-card "start with a small task" block (new document / open file / open folder), and recent documents below it.
+- Empty states (file tree / outline / recent / search) share one component: a character portrait, one short headline, and a plain one-line hint at the bottom.
+- Settings → Appearance is two theme cards (light "Sunny note · Light", dark "Night read · Dark") plus a "Character display" switch; with the character hidden, theme switching becomes compact cards without art, and the welcome page and about page hide her too.
+- The about page is a single card: character + brand + version + author + repository link + star hint, with the version shown only once.
+- The editor area never shows the character, keeping the full editing and scrolling space; portrait motion respects the system reduced-motion preference.
 
 ---
 
@@ -98,7 +99,7 @@ Moki carries MokiDown's identity through a blue bob, an M↓ hair clip, and a no
 
 ### Editing & Preview
 
-- Three modes: source / WYSIWYG / preview / split; automatic fallback for non-Markdown files
+- Three view modes: edit (Monaco source) / preview (Milkdown WYSIWYG for Markdown, tree editor for `.mgtree`) / split (Monaco + read-only preview); files without a preview fall back to Monaco
 - Floating toolbar: bold, italic, strikethrough, headings, quotes, tables, code blocks, links, images, task lists, dividers
 - Outline panel synced with headings and lists, click to jump into the editor or preview
 
@@ -119,8 +120,8 @@ Moki carries MokiDown's identity through a blue bob, an M↓ hair clip, and a no
 
 ### Search & Stats
 
-- `Ctrl+P` global search: filename search + Markdown content search with hit-line jumps
-- Stats panel: file count, recent files, word / character count, file-type distribution
+- `Ctrl + P` global search: filename search + Markdown content search with hit-line jumps
+- Stats panel: open files, recent files, word / character count, file-type distribution
 
 ### Cloud Sync (Documents + Settings)
 
@@ -134,6 +135,7 @@ By default, local files stay on your disk. After you sign in and bind them, docu
 
 ### Personalization & Experience
 
+- Settings groups: General / Appearance / Editor / Language Services / Cloud Sync / About
 - Light / dark themes with transition animations, bilingual UI (i18next)
 - Auto-save, unsaved-file protection on close, toast + notification feedback
 - Custom title bar, window controls, responsive desktop / mobile layouts
@@ -142,17 +144,17 @@ By default, local files stay on your disk. After you sign in and bind them, docu
 
 | Platform | Artifacts |
 | --- | --- |
-| Windows | EXE installer / MSI / portable |
+| Windows | EXE installer (NSIS) / MSI |
 | macOS | Apple Silicon / Intel DMG |
 | Linux | deb / rpm / AppImage |
 | Android | APK (SAF file access, drawer layout, mobile selection bar) |
 
 ### Engineering Quality
 
-- 40+ unit / component tests (Vitest + Testing Library), lint / test / build in CI
+- 48 unit / component test files (Vitest + Testing Library); CI covers frontend lint / test / format / build / bundle budget plus Rust fmt / clippy / test
 - Cold-start tuned: fat LTO + panic=abort + stripped symbols in release, heavy frontend modules lazy-loaded
 - Bundle size budget checks, version sync scripts, MSVC build environment detection
-- Release pipeline: code signing + auto-updates
+- Release pipeline: Windows NSIS + MSI artifacts with code-signing verification
 
 ---
 
@@ -160,12 +162,16 @@ By default, local files stay on your disk. After you sign in and bind them, docu
 
 | Shortcut | Action |
 | --- | --- |
-| `Ctrl+P` | File / content search |
-| `Ctrl+S` | Save current file |
-| `Ctrl+O` | Open file or folder |
-| `Ctrl+,` | Open settings |
-| `Ctrl+B` | Toggle sidebar |
-| `Ctrl+Shift+/` | Toggle edit / preview mode |
+| `Ctrl + P` | File / content search |
+| `Ctrl + S` | Save current file |
+| `Ctrl + O` | Open file or folder |
+| `Ctrl + J` | Show / hide the output console |
+| `Ctrl + Shift + M` | Open the problems panel |
+| `F5` | Run current file |
+| `Shift + F5` | Stop running |
+| `Ctrl + ,` | Open settings |
+| `Ctrl + B` | Toggle sidebar |
+| `Ctrl + Shift + /` | Toggle edit / preview mode |
 | `Esc` | Close search / settings / login modal |
 
 ---
@@ -174,7 +180,7 @@ By default, local files stay on your disk. After you sign in and bind them, docu
 
 Download the right build from [Releases](https://github.com/hhyufan/mde-tauri/releases).
 
-- **Windows**: EXE installer recommended; MSI for system integration
+- **Windows**: EXE installer (NSIS) recommended; MSI for system integration
 - **macOS**: pick Apple Silicon or Intel for your chip
 - **Linux**: `.deb` on Ubuntu/Debian, `.rpm` on Fedora, `.AppImage` elsewhere
 - **Android**: install the APK (see build notes below)
@@ -188,7 +194,7 @@ Download the right build from [Releases](https://github.com/hhyufan/mde-tauri/re
 | Desktop shell | Tauri 2 (Rust) |
 | Frontend | React 18 + Ant Design 5 + Zustand |
 | Editor | Monaco Editor + Milkdown |
-| Code execution / LSP | Rust execution engine + language-service packages + local stdio language servers |
+| Code execution / LSP | Rust execution engine + language-service plugin packages + local stdio language servers |
 | Markdown pipeline | react-markdown + remark-gfm + remark-math + rehype-katex + rehype-sanitize |
 | Charts / highlighting | Mermaid + Prism / Shiki |
 | i18n | i18next + react-i18next |
@@ -203,12 +209,18 @@ Download the right build from [Releases](https://github.com/hhyufan/mde-tauri/re
 mde-tauri/
 ├── src/                      # React frontend source
 │   ├── components/           # editor, layout, overlays, UI components
+│   │   ├── editor/           # Monaco / Milkdown / tree editor / console and problems panel
+│   │   ├── moki/             # character art, theme cards, welcome page, shared empty state
+│   │   └── overlays/         # settings, language services, login, conflict dialogs
+│   ├── configs/              # language-service catalog and extension → language map
 │   ├── hooks/                # file and buffer hooks
-│   ├── services/             # API client, sync engine, LSP client
+│   ├── services/             # API client, sync engine, LSP client, script runner
 │   ├── store/                # Zustand stores
+│   ├── showcase/             # browser-only showcase entry (showcase.html) for the live demo
 │   ├── utils/                # helpers and Tauri wrappers
 │   └── i18n/                 # locale resources
 ├── src-tauri/                # Rust side: commands, script runner, LSP, language plugins, bundling
+├── examples/                 # sample workspace for screenshots and manual checks
 ├── docs/                     # implementation notes (sync, language services, script runner, ...)
 ├── screenshots/              # README image assets (PNG / GIF)
 └── README.md
@@ -219,16 +231,54 @@ Official visual demo: [miaogu.xyz](https://www.miaogu.xyz/).
 
 ---
 
+## 🧪 Sample Workspace (examples/)
+
+`examples/` is the sample workspace used for screenshots and manual checks: every connected language service has one minimal source file, plus `notes/` and `web/` subdirectories that exercise expanding and collapsing the file tree.
+
+| Path | Language / capability | Language service |
+| --- | --- | --- |
+| `hello.ts` · `utils.js` | JavaScript / TypeScript (interface + class + generics; multiple suffixes) | mde.typescript |
+| `hello.py` | Python (dataclass + type hints) | mde.pyright |
+| `hello.rs` | Rust (struct + impl) | mde.rust |
+| `Hello.java` | Java (record + stream) | mde.java |
+| `Hello.cs` | C# (record + LINQ) | mde.csharp |
+| `Hello.kt` | Kotlin (data class + extension functions) | mde.kotlin |
+| `feature-tour.md` | Markdown rendering tour (headings / tables / task lists / quotes) | — |
+| `web/index.html` · `web/styles.css` | paired HTML / CSS sample | mde.html · mde.css |
+| `notes/code-lab.md` | runnable code blocks | built-in console |
+| `notes/knowledge-tree.mgtree` | tree file (indentation is hierarchy) | built-in tree view |
+| `notes/shortcuts.md` | shortcut cheat sheet | — |
+
+Language-service plugin IDs keep the remote service's existing identifiers (of the form `mde.*`) and are reproduced as-is.
+Maintenance rules: every sample stays directly runnable with no diagnostics; when a language service is added, drop a same-named sample in the top level and update the table above. Full notes live in [examples/README.md](examples/README.md).
+
+---
+
 ## 🧑‍💻 Development
 
 ### Requirements
 
 | Tool | Version | Notes |
 | --- | --- | --- |
-| Node.js | 18+ | frontend dependencies |
+| Node.js | 18+ | frontend dependencies (CI uses Node 22) |
 | Rust | 1.77+ | Tauri build |
 | JDK | 17–21 | Android builds |
 | WebView2 | bundled on Win10+ | Windows runtime |
+
+### Common Scripts
+
+| Command | Purpose |
+| --- | --- |
+| `npm run dev` | frontend dev server only (browser debugging) |
+| `npm run tauri:dev` | frontend + Rust desktop app |
+| `npm run build` | frontend build (both `index.html` and `showcase.html` entries) |
+| `npm run tauri:build` | package the desktop app (NSIS + MSI by default) |
+| `npm run tauri:build:nsis` | NSIS installer only |
+| `npm run test` / `npm run test:watch` | Vitest unit and component tests |
+| `npm run lint` / `npm run format:check` | ESLint / Prettier checks |
+| `npm run check:bundle` | bundle size budget check |
+| `npm run version:sync` | sync the version across package.json / Cargo.toml / tauri.conf.json |
+| `npm run check` | lint + test + build + bundle budget in one go |
 
 ### Run the Desktop App
 
@@ -258,9 +308,9 @@ Mobile builds use the narrow-screen layout automatically; file access goes throu
 
 ---
 
-## ☁️ Cloud Service (mde-server)
+## ☁️ Cloud Service (Self-Hosted Server)
 
-Cloud sync requires the standalone server [hhyufan/mde-server](https://github.com/hhyufan/mde-server) (NestJS + MongoDB):
+Cloud sync requires the standalone server repository [hhyufan/mde-server](https://github.com/hhyufan/mde-server) (NestJS + MongoDB):
 
 ```bash
 git clone https://github.com/hhyufan/mde-server.git
@@ -276,7 +326,7 @@ Deployment options:
 - **Docker**: Dockerfile provided
 - **Self-hosted**: any server running Node + MongoDB
 
-In the client, set the server URL under Settings → Cloud to enable sync.
+In the client, set the server URL under Settings → Cloud Sync to enable sync.
 
 ---
 
