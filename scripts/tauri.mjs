@@ -13,6 +13,6 @@ try {
   const cli = require('@tauri-apps/cli');
   await cli.run(args, 'npm run tauri');
 } catch (error) {
-  console.error(`[mde] ${error.message}`);
+  console.error(`[mokidown] ${error.message}`);
   process.exitCode = 1;
 }

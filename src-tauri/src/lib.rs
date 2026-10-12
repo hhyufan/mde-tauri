@@ -1616,7 +1616,62 @@ fn migrate_legacy_app_data(app: &AppHandle) {
 ///
 /// 这里统一挂载插件并注册所有可由前端 `invoke` 调用的桥接命令，
 /// 让启动配置集中维护在同一个位置。
+/// 与 bundle identifier 对应的 WebView 用户数据目录名（Tauri 在 Windows/Linux 上
+/// 用 identifier 推导 `<LocalData>/<identifier>`）。
+const CURRENT_APP_DATA_DIR_NAME: &str = "com.mokidown.app";
+
+/// 平台上的 `LocalData` 基准目录，取值来源与 tauri 的 `BaseDirectory::LocalData` 一致：
+/// Windows 是 `%LOCALAPPDATA%`，Linux 是 `$XDG_DATA_HOME` 或 `~/.local/share`。
+fn local_data_dir() -> Option<PathBuf> {
+    #[cfg(target_os = "windows")]
+    {
+        std::env::var_os("LOCALAPPDATA").map(PathBuf::from)
+    }
+    #[cfg(not(target_os = "windows"))]
+    {
+        std::env::var_os("XDG_DATA_HOME")
+            .map(PathBuf::from)
+            .or_else(|| std::env::var_os("HOME").map(|home| PathBuf::from(home).join(".local/share")))
+    }
+}
+
+/// 品牌更名（identifier：`com.mde.app` → `com.mokidown.app`）后的 WebView 配置迁移。
+///
+/// WebView 用户数据目录里放着 localStorage 与 IndexedDB，也就是用户的设置、主题、
+/// 最近文件、工作区、背景图与设备标识。目录会随 identifier 一起改名，新目录初始为空，
+/// 所以要把旧目录整体搬过来，否则老用户升级后等同于全新安装。
+///
+/// 调用点必须在创建任何窗口之前——窗口一旦建立，WebView 就会占用新目录，
+/// 放在 `setup` 钩子里已经太晚（tauri 会先按配置建窗口，再执行 setup）。
+fn migrate_legacy_webview_profile() {
+    let Some(local_data) = local_data_dir() else {
+        return;
+    };
+    let legacy = local_data.join(LEGACY_APP_DATA_DIR_NAME);
+    let current = local_data.join(CURRENT_APP_DATA_DIR_NAME);
+    if !legacy.is_dir() || current.exists() {
+        return;
+    }
+    // 先复制到临时目录再改名：中途失败或进程被杀都不会留下半成品新目录，
+    // 而"新目录不存在"就是下次启动重新尝试的条件，因此天然幂等。
+    let staging = local_data.join(format!("{CURRENT_APP_DATA_DIR_NAME}.migrating"));
+    let _ = fs::remove_dir_all(&staging);
+    let migrated = copy_data_directory(&legacy, &staging)
+        .and_then(|_| fs::rename(&staging, &current).map_err(|error| error.to_string()));
+    match migrated {
+        Ok(()) => eprintln!("[mokidown] 已迁移旧 WebView 配置目录: {current:?}"),
+        Err(error) => {
+            let _ = fs::remove_dir_all(&staging);
+            // 迁移失败不阻塞启动：最坏结果是用户看到一次性的默认设置。
+            eprintln!("[mokidown] 旧 WebView 配置目录迁移跳过: {error}");
+        }
+    }
+}
+
 pub fn run() {
+    // 必须在创建任何窗口之前执行，见 migrate_legacy_webview_profile 的说明。
+    migrate_legacy_webview_profile();
+
     #[allow(unused_mut)]
     let mut builder = tauri::Builder::default()
         .plugin(tauri_plugin_fs::init())

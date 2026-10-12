@@ -137,5 +137,5 @@ export function initializeMsvc(args, env = process.env) {
   env[`CC_${cargoTarget}`] = toolchain.compiler;
   env[`CXX_${cargoTarget}`] = toolchain.compiler;
   env[`CARGO_TARGET_${cargoTarget.toUpperCase()}_LINKER`] = toolchain.linker;
-  console.log(`[mde] MSVC ${toolchain.version} (${arch}): ${toolchain.installation}`);
+  console.log(`[mokidown] MSVC ${toolchain.version} (${arch}): ${toolchain.installation}`);
 }
