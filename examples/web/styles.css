@@ -1,0 +1,40 @@
+/* CSS 示例：自定义属性、嵌套与响应式。 */
+
+:root {
+  --note-accent: #4091ff;
+  --note-radius: 12px;
+}
+
+.note-card {
+  max-width: 32rem;
+  margin: 4rem auto;
+  padding: 2rem;
+  border: 1px solid color-mix(in srgb, var(--note-accent) 30%, transparent);
+  border-radius: var(--note-radius);
+  font-family: system-ui, sans-serif;
+
+  h1 {
+    margin: 0 0 0.75rem;
+    font-size: 1.5rem;
+  }
+
+  p {
+    color: #5b6572;
+    line-height: 1.7;
+  }
+
+  &__tags {
+    display: flex;
+    gap: 0.5rem;
+    padding: 0;
+    list-style: none;
+
+    li {
+      padding: 0.125rem 0.625rem;
+      border-radius: 999px;
+      background: color-mix(in srgb, var(--note-accent) 12%, transparent);
+      color: var(--note-accent);
+      font-size: 0.8125rem;
+    }
+  }
+}
