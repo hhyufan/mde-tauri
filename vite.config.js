@@ -169,6 +169,7 @@ export default defineConfig(async () => ({
   },
 
   optimizeDeps: {
+    entries: ['index.html', 'showcase.html'],
     // Shiki and its Monaco bridge are loaded lazily by the highlight bootstrap.
     // Pre-bundling them keeps a cold `vite dev` start from discovering them
     // mid-session and triggering an extra full reload.

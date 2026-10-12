@@ -19,6 +19,7 @@ export default [
       // 配置。不排除它们会让 `eslint .` 把别的工程算进来（并因此报出成百上千条
       // 与本应用无关的错误）。
       'outputs/**',
+      'sites/**',
       'miaogu-notepad/**',
       'releases/**',
       '.dbg/**',
