@@ -63,23 +63,21 @@ MokiDown 的能力来自四个明确的取舍——也是[官网](https://www.mi
 
 | 晴笺 · 浅色欢迎页 | 夜读 · 深色欢迎页 |
 | :---: | :---: |
+| 晴笺 · 浅色欢迎页 | 夜读 · 深色欢迎页 |
+| :---: | :---: |
 | ![浅色欢迎页](screenshots/welcome-light.png) | ![深色欢迎页](screenshots/welcome-dark.png) |
 
-| 三模式编辑（编辑 / 预览 / 分屏） | 代码块运行 |
+| 三模式编辑（源码 / WYSIWYG / 分屏） | 代码块运行 |
 | :---: | :---: |
 | ![三模式编辑](screenshots/editor.png) | ![代码块运行](screenshots/code-run.png) |
 
-| 云同步冲突 | 树编辑器（.mgtree） |
+| 云同步 | 树编辑器（mgtree） |
 | :---: | :---: |
-| ![同步冲突](screenshots/sync-conflict.png) | ![树编辑器](screenshots/tree.png) |
+| ![同步冲突](screenshots/sync-display.png) | ![树编辑器](screenshots/tree.png) |
 
 | 深色编辑 | 外观与角色设置 |
 | :---: | :---: |
 | ![深色编辑](screenshots/editor-dark.png) | ![角色设置](screenshots/moki-settings.png) |
-
-| 所见即所得（Milkdown） | 模式切换演示 |
-| :---: | :---: |
-| ![所见即所得](screenshots/wysiwyg.png) | ![模式切换演示](screenshots/mode-switch.gif) |
 
 截图来自运行中的实际界面，使用示例文档；代码输出和同步冲突使用演示数据展示真实组件，不代表浏览器可启动桌面执行引擎或已连接同步服务。[移动端欢迎页](screenshots/welcome-mobile.png) · [设计与截图说明](docs/character-design/moki-integration.md)
 

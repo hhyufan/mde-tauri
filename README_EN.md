@@ -63,23 +63,21 @@ MokiDown's capabilities come from four deliberate trade-offs — the four storyl
 
 | Sunny note · Light welcome | Night read · Dark welcome |
 | :---: | :---: |
+| Light theme welcome | Dark theme welcome |
+| :---: | :---: |
 | ![Light welcome](screenshots/welcome-light.png) | ![Dark welcome](screenshots/welcome-dark.png) |
 
-| Three editing modes (edit / preview / split) | Runnable code blocks |
+| Three editing modes (source / WYSIWYG / split) | Running code blocks |
 | :---: | :---: |
-| ![Editing modes](screenshots/editor.png) | ![Code run](screenshots/code-run.png) |
+| ![Three editing modes](screenshots/editor.png) | ![Running code blocks](screenshots/code-run.png) |
 
-| Cloud sync conflict | Tree editor (.mgtree) |
+| Cloud sync | Tree editor (mgtree) |
 | :---: | :---: |
-| ![Sync conflict](screenshots/sync-conflict.png) | ![Tree editor](screenshots/tree.png) |
+| ![Sync conflict](screenshots/sync-display.png) | ![Tree editor](screenshots/tree.png) |
 
-| Dark editor | Appearance and character settings |
+| Dark editing | Appearance and character settings |
 | :---: | :---: |
-| ![Dark editor](screenshots/editor-dark.png) | ![Character settings](screenshots/moki-settings.png) |
-
-| WYSIWYG (Milkdown) | Mode-switch demo |
-| :---: | :---: |
-| ![WYSIWYG](screenshots/wysiwyg.png) | ![Mode switch demo](screenshots/mode-switch.gif) |
+| ![Dark editing](screenshots/editor-dark.png) | ![Character settings](screenshots/moki-settings.png) |
 
 Captured from the running application with sample documents. Code output and sync conflicts use demonstration data in the real components; these images do not indicate browser access to the desktop execution engine or a connected sync service. [Mobile welcome](screenshots/welcome-mobile.png) · [Design and capture notes](docs/character-design/moki-integration.md)
 
