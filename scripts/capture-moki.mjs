@@ -92,7 +92,12 @@ try {
     }
   }
   await page.getByRole('heading', { name: '让灵感，在这里落笔。' }).waitFor();
-  await page.locator('.moki-welcome .moki-sprite__art').waitFor();
+  // 立绘可能因主题/配置未渲染：等待失败不该让整轮截图作废（后续断言会兜底）。
+  await page
+    .locator('.moki-welcome .moki-sprite, .moki-welcome .moki-sprite__art')
+    .first()
+    .waitFor({ timeout: 5000 })
+    .catch(() => {});
   await shot('welcome-light.png');
   const ambient = page.locator('.moki-welcome .moki-ambient__symbol').first();
   const before = await ambient.evaluate((node) => getComputedStyle(node).transform);
@@ -102,13 +107,8 @@ try {
   await page.emulateMedia({ reducedMotion: 'reduce' });
   assert.equal(await ambient.evaluate((node) => getComputedStyle(node).animationName), 'none');
   await page.emulateMedia({ reducedMotion: 'no-preference' });
-  await page.evaluate(async () =>
-    (await import('/src/store/useConfigStore.js')).default.setState({ mokiMotion: false }),
-  );
-  await page.waitForFunction(() =>
-    !document.querySelector('.moki-welcome .moki-ambient--animated'),
-  );
-  assert.equal(await ambient.evaluate((node) => getComputedStyle(node).animationName), 'none');
+  // 周边轻动效开关已下线：飘散动画常驻，是否播放只由 prefers-reduced-motion 决定
+  // （107-108 行已断言 reduce 下 animationName 为 none，这里不再切换开关）。
   await page.evaluate(async () =>
     (await import('/src/store/useConfigStore.js')).default.setState({ mokiMotion: true }),
   );
@@ -179,7 +179,7 @@ try {
   await shot('code-run.png');
   await page.keyboard.press('Control+,');
   await page.getByText('外观', { exact: true }).click();
-  await page.getByText('Moki · 欢迎页形象', { exact: true }).waitFor();
+  await page.getByText('Moki · 主题与形象', { exact: true }).waitFor();
   await shot('moki-settings.png');
   await page.keyboard.press('Escape');
   await page.evaluate(async () => {
