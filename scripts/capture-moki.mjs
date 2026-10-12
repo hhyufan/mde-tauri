@@ -27,22 +27,21 @@ const output = path.resolve('screenshots');
 await fs.mkdir(output, { recursive: true });
 await page.addInitScript(() => {
   localStorage.setItem(
-    'mde-config',
+    'mokidown-config',
     JSON.stringify({
       state: {
         language: 'zh',
         autoSave: false,
         syncEnabled: false,
         mokiDisplay: 'welcome',
-        mokiMotion: true,
       },
       version: 0,
     }),
   );
-  localStorage.setItem('mde-theme', JSON.stringify({ state: { theme: 'light' }, version: 0 }));
+  localStorage.setItem('mokidown-theme', JSON.stringify({ state: { theme: 'light' }, version: 0 }));
 });
 const md =
-  '# 让灵感，在这里落笔。\n\n> MDE · 写文档，跑代码，连接自己的知识。\n\n## 今天的灵感\n\n- [x] 写下一个小小的想法\n- [x] 用代码验证它\n- [ ] 整理成自己的知识树\n\n## 从笔记到实践\n\n```javascript\nconst ideas = ["记录", "尝试", "连接"];\nideas.forEach((idea, i) => {\n  console.log(`${i + 1}. ${idea}`);\n});\n```\n\n## 我的工作台\n\n| 能力 | 使用方式 |\n| --- | --- |\n| 自由书写 | Markdown 与所见即所得 |\n| 随手验证 | 可执行代码块 |\n| 知识连接 | 拖拽、折叠知识树 |\n\n**本地优先**，让每一页笔记都有自己的归处。\n';
+  '# 让灵感，在这里落笔。\n\n> MokiDown · 写文档，跑代码，连接自己的知识。\n\n## 今天的灵感\n\n- [x] 写下一个小小的想法\n- [x] 用代码验证它\n- [ ] 整理成自己的知识树\n\n## 从笔记到实践\n\n```javascript\nconst ideas = ["记录", "尝试", "连接"];\nideas.forEach((idea, i) => {\n  console.log(`${i + 1}. ${idea}`);\n});\n```\n\n## 我的工作台\n\n| 能力 | 使用方式 |\n| --- | --- |\n| 自由书写 | Markdown 与所见即所得 |\n| 随手验证 | 可执行代码块 |\n| 知识连接 | 拖拽、折叠知识树 |\n\n**本地优先**，让每一页笔记都有自己的归处。\n';
 const runMd =
   '# 在笔记里，验证想法\n\n代码与解释留在同一页，结果紧跟思路。\n\n```javascript\nconst ideas = ["记录", "尝试", "连接"];\nideas.forEach((idea, i) => {\n  console.log(`${i + 1}. ${idea}`);\n});\n```\n\n> 下方输出展示来自示例脚本的运行结果。\n';
 async function theme(value) {
@@ -56,10 +55,10 @@ async function openFile(name, content, mode = 'split') {
   await page.evaluate(
     async ({ name, content, mode }) => {
       const editor = (await import('/src/store/useEditorStore.js')).default;
-      editor.getState().openFile({ path: `/MDE Notes/${name}`, name, content });
+      editor.getState().openFile({ path: `/MokiDown Notes/${name}`, name, content });
       editor.setState({ viewMode: mode, sidebarView: 'recent' });
       const files = (await import('/src/store/useFileStore.js')).default;
-      files.getState().addRecentFile({ path: `/MDE Notes/${name}`, name });
+      files.getState().addRecentFile({ path: `/MokiDown Notes/${name}`, name });
     },
     { name, content, mode },
   );
@@ -151,7 +150,7 @@ try {
     '我的知识工作台\n  写作\n    Markdown 笔记\n    所见即所得\n  实践\n    代码块运行\n    记录输出与结论\n  连接\n    关联知识节点\n    构建自己的知识树\n',
     'split',
   );
-  await page.locator('.mde-tree').waitFor();
+  await page.locator('.moki-tree').waitFor();
   await page.getByRole('button', { name: '展开全部' }).click();
   await page.waitForTimeout(400);
   await shot('tree.png');
