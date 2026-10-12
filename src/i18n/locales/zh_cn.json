@@ -463,6 +463,8 @@
   "empty.files.hint": "打开一个文件夹吧，Moki 会帮你把它们排得整整齐齐。",
   "empty.outline.title": "还没有章节呢～",
   "empty.outline.hint": "给标题加上 #，目录就会自己长出来。",
+  "empty.outlineNoFile.title": "还没打开文档呢",
+  "empty.outlineNoFile.hint": "打开一份 Markdown，目录会跟着长出来。",
   "empty.recent.title": "最近还没有翻开过哪一页",
   "empty.recent.hint": "打开一份文档，这里会记住你们的相遇。",
   "empty.search.title": "翻遍了也没找到…",

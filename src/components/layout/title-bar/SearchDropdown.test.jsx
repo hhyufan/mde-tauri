@@ -58,7 +58,8 @@ it('does not steal IME Enter and handles clearing an empty result then Escape', 
   expect(screen.getByRole('listbox')).toBeTruthy();
   fireEvent.change(input, { target: { value: 'nothing' } });
   fireEvent.keyDown(input, { key: 'ArrowDown' }); fireEvent.keyDown(input, { key: 'Enter' });
-  expect(screen.getByText('未找到结果。')).toBeTruthy();
+  // 空结果文案已随 MokiStatusEmpty 换成 ACG 口吻
+  expect(screen.getByText('翻遍了也没找到…')).toBeTruthy();
   fireEvent.click(screen.getByRole('button', { name: '清空搜索' }));
   expect(within(screen.getByRole('listbox')).getAllByRole('option')).toHaveLength(2);
   fireEvent.keyDown(input, { key: 'Escape' });

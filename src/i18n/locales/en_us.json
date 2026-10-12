@@ -462,6 +462,8 @@
   "empty.files.hint": "Open a folder and Moki will line everything up for you.",
   "empty.outline.title": "No chapters yet",
   "empty.outline.hint": "Add a # to a heading and the outline grows itself.",
+  "empty.outlineNoFile.title": "No document open yet",
+  "empty.outlineNoFile.hint": "Open a Markdown file and the outline grows with it.",
   "empty.recent.title": "No pages opened yet",
   "empty.recent.hint": "Open a document and this list will remember it.",
   "empty.search.title": "Nothing matched…",

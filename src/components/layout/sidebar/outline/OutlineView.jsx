@@ -188,7 +188,7 @@ function OutlineView() {
   }
 
   if (!activeTabId) {
-    return <div className="outline__empty">{t('sidebar.outline.noFile')}</div>;
+    return <MokiStatusEmpty title={t('empty.outlineNoFile.title')} hint={t('empty.outlineNoFile.hint')} />;
   }
   if (items.length === 0) {
     return <MokiStatusEmpty title={t('empty.outline.title')} hint={t('empty.outline.hint')} />;

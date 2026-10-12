@@ -16,10 +16,11 @@
   min-height: 160px;
 
   &__art {
-    /* 立绘尽量小：空状态是配角，不抢正文 */
-    width: 108px;
-    margin-bottom: 6px;
-    opacity: 0.92;
+    /* 立绘是这一块的主角，给足尺寸：108px 时单格(887px)要缩 8 倍，明显发糊；
+       168px 后缩幅约 5 倍，和主题卡（约 3 倍）在同一观感区间。 */
+    width: 168px;
+    margin-bottom: 8px;
+    opacity: 0.95;
     /* 极轻的呼吸感，几乎察觉不到，只让静止画面不显得死 */
     animation: moki-status-breathe 6s ease-in-out infinite;
   }
@@ -41,15 +42,15 @@
     color: var(--text-dim);
   }
 
-  /* 紧凑模式：搜索下拉这类高度受限的容器，去掉立绘外边距并收紧留白 */
+  /* 紧凑模式：搜索下拉这类高度受限的容器，收紧留白但仍保留可辨认的立绘尺寸 */
   &--compact {
     min-height: 0;
     padding: 14px 12px 16px;
     gap: 1px;
 
     .moki-status-empty__art {
-      width: 76px;
-      margin-bottom: 2px;
+      width: 118px;
+      margin-bottom: 4px;
     }
   }
 
