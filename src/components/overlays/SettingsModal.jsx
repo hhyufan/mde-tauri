@@ -516,43 +516,37 @@ function SettingsModal({ open: openProp, onClose }) {
                 <div
                   className={`settings-about__hero ${config.mokiDisplay === 'hidden' ? 'settings-about__hero--plain' : ''}`}
                 >
-                  {/* 人物与品牌信息并排成一张卡片：比原先竖直堆叠的一串元素更像"关于页"，
-                      画布比例与主题卡一致（8:9），人物不会被缩到看不清。 */}
+                  {/* 两栏共用一条基线网格：左栏是人物画布（贴底 + 底部柔光），
+                      右栏是品牌、简介与一条 dl 清单，避免原先七八个元素各自对齐的杂乱。 */}
                   {config.mokiDisplay !== 'hidden' && (
-                    <div className="settings-about__mascot" aria-hidden="true">
+                    <div className="settings-about__portrait">
                       <MokiSprite art="themes" />
+                      <div className="settings-about__caption">{t('moki.caption')}</div>
                     </div>
                   )}
-                  <div className="settings-about__brand">
+                  <div className="settings-about__body">
                     <div className="settings-about__identity">
-                      <AppMark size={44} className="settings-about__logo" />
+                      <AppMark size={46} className="settings-about__logo" />
                       <div className="settings-about__identity-text">
                         <div className="settings-about__name">{t('app.name')}</div>
                         {appVersion && (
-                          <div className="settings-about__version">v{appVersion}</div>
+                          <span className="settings-about__version">v{appVersion}</span>
                         )}
                       </div>
                     </div>
-                    <div className="settings-about__tagline">{t('settings.about.tagline')}</div>
-                    {/* 作者与仓库直接作为卡片内的两行说明；版本已在上面出现过一次，
-                        不再重复一行；自动更新与本地诊断按需求暂不放入。 */}
-                    <div className="settings-about__facts">
-                      <div className="settings-about__fact">
-                        <span className="settings-about__fact-label">{t('settings.about.author')}</span>
-                        <span className="settings-about__fact-desc">{t('settings.about.authorDesc')}</span>
-                      </div>
-                      <div className="settings-about__fact">
-                        <span className="settings-about__fact-label">{t('settings.about.repository')}</span>
-                        <span className="settings-about__fact-desc">{t('settings.about.repositoryDesc')}</span>
-                        <Button size="small" icon={<GithubOutlined />} onClick={handleOpenRepo}>
-                          {t('settings.about.openRepo')}
-                        </Button>
-                      </div>
-                    </div>
-                    {config.mokiDisplay !== 'hidden' && (
-                      <div className="settings-about__caption">{t('moki.caption')}</div>
-                    )}
-                    <div className="settings-about__star">
+                    <p className="settings-about__tagline">{t('settings.about.tagline')}</p>
+                    <dl className="settings-about__meta">
+                      <dt>{t('settings.about.author')}</dt>
+                      <dd>{t('settings.about.authorDesc')}</dd>
+                      <dt>{t('settings.about.repository')}</dt>
+                      <dd>
+                        <button type="button" className="settings-about__link" onClick={handleOpenRepo}>
+                          <GithubOutlined />
+                          <span>{t('settings.about.repositoryDesc')}</span>
+                        </button>
+                      </dd>
+                    </dl>
+                    <div className="settings-about__footer">
                       <StarFilled className="settings-about__star-icon" />
                       <span>{t('settings.about.starHint')}</span>
                     </div>

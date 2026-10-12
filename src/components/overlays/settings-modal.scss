@@ -505,6 +505,156 @@ html[data-theme='dark'] .settings-about__mascot {
   flex-shrink: 0;
 }
 
+/* ===== 关于页第二版：两栏共用一条网格，信息用 dl 对齐 ===== */
+
+/* 卡片本身不再用大面积渐变，只留一层极淡的强调色；上沿对齐而非垂直居中 */
+.settings-about__hero {
+  align-items: flex-start;
+  gap: 22px;
+  padding: 20px;
+  background: var(--surface);
+}
+
+/* 左栏：人物竖版画布 + 角色独白。人物贴底，底部一圈柔光，避免"插图塞在空框里" */
+.settings-about__portrait {
+  flex: 0 0 auto;
+  width: 168px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+
+  > .moki-sprite {
+    position: relative;
+    width: 100%;
+    aspect-ratio: 8 / 9;
+    overflow: hidden;
+    border-radius: 12px;
+    background: linear-gradient(180deg, #eef5ff 0%, #dbe8ff 100%);
+
+    &::after {
+      content: '';
+      position: absolute;
+      left: 10%;
+      right: 10%;
+      bottom: 0;
+      height: 26%;
+      background: radial-gradient(60% 100% at 50% 100%, rgba(64, 145, 255, 0.22), transparent 70%);
+      pointer-events: none;
+    }
+  }
+}
+
+html[data-theme='dark'] .settings-about__portrait > .moki-sprite {
+  background: linear-gradient(180deg, #223148 0%, #16233a 100%);
+}
+
+.settings-about__caption {
+  font-size: 11.5px;
+  line-height: 1.6;
+  color: var(--text-dim);
+  text-align: center;
+}
+
+/* 右栏：品牌 → 简介 → 清单 → 结尾邀请，逐段拉开固定间距 */
+.settings-about__body {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.settings-about__identity-text {
+  flex-direction: row;
+  align-items: center;
+  gap: 10px;
+}
+
+.settings-about__name {
+  font-size: 19px;
+  letter-spacing: -0.01em;
+}
+
+.settings-about__tagline {
+  margin: 0;
+  font-size: 12.5px;
+  line-height: 1.7;
+  color: var(--text-sec);
+  max-width: 46ch;
+}
+
+/* 元信息：定宽标签列 + 自适应值列，读起来是一条整齐的清单 */
+.settings-about__meta {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 8px 16px;
+  margin: 0;
+  padding-top: 14px;
+  border-top: 1px solid var(--border-light);
+  font-size: 12.5px;
+
+  dt {
+    color: var(--text);
+    font-weight: 500;
+    white-space: nowrap;
+  }
+
+  dd {
+    margin: 0;
+    min-width: 0;
+    color: var(--text-sec);
+  }
+}
+
+/* 仓库整行可点，不再让按钮悬在行尾 */
+.settings-about__link {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0;
+  border: none;
+  background: none;
+  cursor: pointer;
+  font: inherit;
+  color: var(--accent);
+  text-align: left;
+
+  &:hover {
+    text-decoration: underline;
+  }
+}
+
+/* 结尾邀请压成一条细行，去掉原先的整块色块 */
+.settings-about__footer {
+  display: flex;
+  gap: 8px;
+  padding-top: 12px;
+  border-top: 1px solid var(--border-light);
+  font-size: 12px;
+  line-height: 1.6;
+  color: var(--text-sec);
+}
+
+@media (max-width: 720px) {
+  .settings-about__portrait {
+    width: 140px;
+  }
+
+  .settings-about__hero {
+    flex-direction: column;
+    align-items: center;
+  }
+
+  .settings-about__body {
+    align-items: center;
+    text-align: center;
+  }
+
+  .settings-about__meta {
+    text-align: left;
+  }
+}
+
 .setting-theme-picker {
   display: flex;
   gap: 6px;
