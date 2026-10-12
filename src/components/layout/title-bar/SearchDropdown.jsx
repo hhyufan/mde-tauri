@@ -139,7 +139,7 @@ export default function SearchDropdown({ open, onOpen, onClose }) {
           : <MokiStatusEmpty
               compact
               title={query.trim() ? t('empty.search.title') : t('search.emptySuggestions')}
-              hint={query.trim() ? t('empty.search.hint') : undefined}
+              hint={query.trim() ? t('empty.search.hint') : t('empty.searchIdle.hint')}
             />)}
         {results.map((item, index) => <div key={`${item.tabId || item.path}:${item.line_number || 0}`} id={`${listId}-${index}`} role="option"
           aria-selected={selected === index} data-index={index} className="search-dropdown__item" onMouseEnter={() => setSelectedIndex(index)}

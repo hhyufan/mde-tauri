@@ -457,15 +457,15 @@
   "moki.theme.dark": "Night reading · Dark",
   "moki.theme.lightDesc": "A cheerful wave in daylight",
   "moki.theme.darkDesc": "A relaxed moment of night reading",
-  "empty.a11y": "{{title}}",
   "empty.files.title": "Nothing here yet",
-  "empty.files.hint": "Open a folder and Moki will line everything up for you.",
+  "empty.files.hint": "Open a folder to show its files here.",
   "empty.outline.title": "No chapters yet",
-  "empty.outline.hint": "Add a # to a heading and the outline grows itself.",
+  "empty.outline.hint": "Headings (lines starting with #) show up here as an outline.",
   "empty.outlineNoFile.title": "No document open yet",
-  "empty.outlineNoFile.hint": "Open a Markdown file and the outline grows with it.",
+  "empty.outlineNoFile.hint": "Open a Markdown file to see its heading structure here.",
   "empty.recent.title": "No pages opened yet",
-  "empty.recent.hint": "Open a document and this list will remember it.",
+  "empty.recent.hint": "Files you open are listed here by time.",
   "empty.search.title": "Nothing matched…",
-  "empty.search.hint": "Try another keyword and I'll look again."
+  "empty.search.hint": "Try a different keyword or narrow the search scope.",
+  "empty.searchIdle.hint": "Type a keyword and press Enter to open a result; Alt + 1 / 2 switches search mode."
 }

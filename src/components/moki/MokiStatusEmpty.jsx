@@ -1,4 +1,3 @@
-import { useTranslation } from 'react-i18next';
 import useConfigStore from '@store/useConfigStore';
 import MokiSprite from './MokiSprite';
 import './moki-status-empty.scss';
@@ -21,7 +20,6 @@ import './moki-status-empty.scss';
 export default function MokiStatusEmpty({ title, hint, art = 'status', compact = false }) {
   // 直接订阅布尔值，避免空状态因为无关配置变化而重渲染。
   const showCharacter = useConfigStore((state) => state.mokiDisplay !== 'hidden');
-  const { t } = useTranslation();
   const withArt = showCharacter && Boolean(art);
   return (
     <div
@@ -36,9 +34,6 @@ export default function MokiStatusEmpty({ title, hint, art = 'status', compact =
       )}
       <p className="moki-status-empty__title">{title}</p>
       {hint && <p className="moki-status-empty__hint">{hint}</p>}
-      <span className="moki-status-empty__sr" role="status">
-        {t('empty.a11y', { title })}
-      </span>
     </div>
   );
 }
