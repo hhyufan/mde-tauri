@@ -42,6 +42,7 @@ export function getLocalSettingsSnapshot({ includeDeviceLocal = false } = {}) {
     lineNumbers: config.lineNumbers,
     minimap: sanitizeMinimap(config.minimap),
     autoSave: config.autoSave,
+    mokiDisplay: config.mokiDisplay,
     editorState: {
       sidebarVisible: editor.sidebarVisible,
       sidebarView: editor.sidebarView,
@@ -79,6 +80,10 @@ export function applySettingsSnapshot(snapshot = {}, { includeDeviceLocal = true
     lineNumbers: snapshot.lineNumbers ?? true,
     minimap: sanitizeMinimap(snapshot.minimap),
     autoSave: snapshot.autoSave ?? true,
+    mokiDisplay: snapshot.mokiDisplay === 'companion' ? 'welcome'
+      : ['welcome', 'hidden'].includes(snapshot.mokiDisplay)
+        ? snapshot.mokiDisplay : useConfigStore.getState().mokiDisplay,
+    // 周边轻动效开关已下线（动画常驻并遵从系统偏好），云端快照里的旧字段直接忽略。
     workspacePath: includeDeviceLocal
       ? snapshot.workspacePath ?? useConfigStore.getState().workspacePath ?? ''
       : useConfigStore.getState().workspacePath ?? '',
@@ -92,7 +97,7 @@ export function applySettingsSnapshot(snapshot = {}, { includeDeviceLocal = true
  */
 export function buildSettingsExportPayload() {
   return {
-    type: 'mde-settings',
+    type: 'mokidown-settings',
     version: 1,
     exportedAt: new Date().toISOString(),
     settings: getLocalSettingsSnapshot({ includeDeviceLocal: true }),

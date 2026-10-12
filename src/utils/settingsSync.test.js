@@ -2,10 +2,7 @@ import { afterAll, beforeEach, describe, expect, it } from 'vitest';
 import useConfigStore from '@store/useConfigStore';
 import useEditorStore from '@store/useEditorStore';
 import useThemeStore from '@store/useThemeStore';
-import {
-  applySettingsSnapshot,
-  getLocalSettingsSnapshot,
-} from './settingsSync';
+import { applySettingsSnapshot, getLocalSettingsSnapshot } from './settingsSync';
 
 const DEVICE_LOCAL_STATE = {
   workspacePath: 'C:\\workspaces\\local-notes',
@@ -27,6 +24,8 @@ function resetSettingsStores() {
     lineNumbers: true,
     minimap: { enabled: false },
     autoSave: true,
+    mokiDisplay: 'welcome',
+    mokiMotion: true,
     ...DEVICE_LOCAL_STATE,
     configUpdatedAt: 100,
     syncableConfigUpdatedAt: 100,
@@ -65,11 +64,14 @@ describe('device-local settings isolation', () => {
   });
 
   it('keeps the cloud clock stable when a batch contains only device-local keys', () => {
-    useConfigStore.getState().loadConfig({
-      workspacePath: 'E:\\batch-workspace',
-      serverUrl: 'https://batch-device.example.test',
-      syncEnabled: false,
-    }, { updatedAt: 8_000 });
+    useConfigStore.getState().loadConfig(
+      {
+        workspacePath: 'E:\\batch-workspace',
+        serverUrl: 'https://batch-device.example.test',
+        syncEnabled: false,
+      },
+      { updatedAt: 8_000 },
+    );
 
     const config = useConfigStore.getState();
     expect(config.configUpdatedAt).toBe(8_000);
@@ -83,6 +85,7 @@ describe('device-local settings isolation', () => {
     expect(snapshot).not.toHaveProperty('workspacePath');
     expect(snapshot).not.toHaveProperty('serverUrl');
     expect(snapshot).not.toHaveProperty('syncEnabled');
+    expect(snapshot).not.toHaveProperty('mokiCollapsed');
     expect(snapshot).toMatchObject({
       language: 'en',
       fontSize: 14,
@@ -90,15 +93,36 @@ describe('device-local settings isolation', () => {
     });
   });
 
-  it('does not overwrite device-local values when applying a cloud snapshot', () => {
+  it('preserves welcome preferences and retires legacy companion settings', () => {
     applySettingsSnapshot({
-      language: 'en',
-      fontSize: 18,
-      workspacePath: '/remote/workspace',
-      serverUrl: 'https://remote-server.example.test',
-      syncEnabled: false,
-      updatedAt: 9_000,
-    }, { includeDeviceLocal: false });
+      mokiDisplay: 'invalid',
+      mokiSize: 'large',
+      mokiMotion: 'false',
+      mokiCollapsed: true,
+    });
+    expect(useConfigStore.getState()).toMatchObject({ mokiDisplay: 'welcome' });
+    applySettingsSnapshot({ mokiDisplay: 'companion', mokiSize: 999, mokiMotion: false });
+    expect(getLocalSettingsSnapshot()).toMatchObject({ mokiDisplay: 'welcome' });
+    expect(getLocalSettingsSnapshot()).not.toHaveProperty('mokiSize');
+    // 周边轻动效开关已下线：旧快照里的字段既不下发也不再进入新快照。
+    expect(getLocalSettingsSnapshot()).not.toHaveProperty('mokiMotion');
+    applySettingsSnapshot({});
+    expect(useConfigStore.getState()).toMatchObject({ mokiDisplay: 'welcome' });
+    expect(useConfigStore.getState()).not.toHaveProperty('mokiCollapsed');
+  });
+
+  it('does not overwrite device-local values when applying a cloud snapshot', () => {
+    applySettingsSnapshot(
+      {
+        language: 'en',
+        fontSize: 18,
+        workspacePath: '/remote/workspace',
+        serverUrl: 'https://remote-server.example.test',
+        syncEnabled: false,
+        updatedAt: 9_000,
+      },
+      { includeDeviceLocal: false },
+    );
 
     expect(useConfigStore.getState()).toMatchObject({
       fontSize: 18,

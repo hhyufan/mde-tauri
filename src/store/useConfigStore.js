@@ -37,6 +37,7 @@ const useConfigStore = create(
       backgroundImageName: '',
       backgroundEnabled: false,
       backgroundTransparency: { dark: 80, light: 80 },
+      mokiDisplay: 'welcome',
       autoSave: true,
       workspacePath: '',
       serverUrl: 'https://www.miaogu.xyz',
@@ -71,7 +72,17 @@ const useConfigStore = create(
       })),
     }),
     {
-      name: 'mde-config',
+      name: 'mokidown-config',
+      // Retire the editor companion without restoring it from older local preferences.
+      merge: (persisted, current) => {
+        const merged = { ...current, ...persisted };
+        if (merged.mokiDisplay === 'companion') merged.mokiDisplay = 'welcome';
+        delete merged.mokiSize;
+        delete merged.mokiCollapsed;
+        // 周边轻动效开关已下线：飘散动画改为常驻并遵从系统偏好，旧配置里的键直接清掉。
+        delete merged.mokiMotion;
+        return merged;
+      },
     }
   )
 );
