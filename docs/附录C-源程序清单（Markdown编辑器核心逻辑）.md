@@ -13,7 +13,7 @@
 本附录不是把全部源码逐行完整展开，而是围绕 Markdown 编辑器最关键的实现环节进行说明，并在每一部分说明之后附上能够支撑相关说明的代表性源代码。这样处理，既能保持内容紧凑，也能让实际实现位置清晰可查。
 
 本附录只覆盖 Markdown 编辑器核心逻辑，不展开登录、云同步后端和普通设置表单等外围模块。
-
+444大撒大撒
 ## C.2 总体结构
 
 当前项目中的 Markdown 编辑器并不是单一组件，而是由多个相互协作的程序共同构成。`EditorContent` 负责总调度，决定当前文档以源码编辑、所见即所得编辑还是分屏预览方式呈现；`editorBuffer` 与 `useEditorBufferContent` 负责承接高频正文输入，并将其以较低成本分发给预览区与大纲视图；`MonacoEditor`、`MilkdownMarkdownEditor` 与 `MarkdownPreview` 分别承担源码编辑、结构化编辑和只读预览三类任务；`FloatingToolbar`、`OutlineView` 与 `markdownAssets` 负责语法插入、结构导航、链接解析、图片处理和代码增强；`useFileManager` 则负责把自动保存、首次保存、手动保存与外部同步统一收敛到文件管理流程。因而，Markdown 编辑器的核心逻辑应理解为一条连续的协作链，而不是若干互不关联的页面组件。
