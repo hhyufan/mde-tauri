@@ -26,7 +26,7 @@ function normalizeExtension(extension = '', fileName = '') {
 }
 
 const COLORS = {
-  md: '#519aba', mdx: '#519aba', js: '#f1e05a', jsx: '#61dafb', ts: '#3178c6',
+  md: '#519aba', mdx: '#519aba', mgtree: '#3fae7a', js: '#f1e05a', jsx: '#61dafb', ts: '#3178c6',
   tsx: '#61dafb', json: '#cbcb41', html: '#e34c26', css: '#563d7c', scss: '#c6538c',
   yaml: '#cb171e', toml: '#9c4221', rs: '#dea584', py: '#3572a5', java: '#b07219', kt: '#a97bff', kts: '#a97bff', cs: '#178600', txt: '#8b949e',
 };
@@ -64,6 +64,8 @@ function LightweightFallback({
 function FileTypeIcon(props) {
   const { extension = '', fileName = '', size = 16, className = '', isFolder = false, isExpanded = false } = props;
   const [FullIcon, setFullIcon] = useState(() => getMaterialIcons()?.FileIcon);
+  // .mgtree 是本应用自定义的树格式：用图标集里的多色树形图标，而不是通用文档图标。
+  const [TreeIcon, setTreeIcon] = useState(() => getMaterialIcons()?.Tree);
   const normalizedFileName = String(fileName || '').trim();
   const ext = normalizeExtension(extension, fileName);
   const resolvedFileName = normalizedFileName || (ext ? `file.${ext}` : 'file.txt');
@@ -72,15 +74,27 @@ function FileTypeIcon(props) {
     const cached = getMaterialIcons();
     if (cached) {
       setFullIcon(() => cached.FileIcon);
+      setTreeIcon(() => cached.Tree);
       return undefined;
     }
 
     let active = true;
     const load = () => {
       loadMaterialIcons().then((module) => {
-        if (active) setFullIcon(() => module.FileIcon);
+        if (active) {
+          setFullIcon(() => module.FileIcon);
+          setTreeIcon(() => module.Tree);
+        }
       });
     };
+    // 单个图标组件位于包的 ./icons 子路径；根入口不一定导出它们，
+    // 所以额外单独取一次树图标（取不到就继续用下面的通用图标，不影响其它扩展名）。
+    import('react-material-vscode-icons/icons')
+      .then((icons) => {
+        if (active && icons.Tree) setTreeIcon(() => icons.Tree);
+      })
+      .catch(() => {});
+
     const idleId = window.requestIdleCallback?.(load, { timeout: 1500 });
     const timeoutId = idleId == null ? window.setTimeout(load, 250) : null;
 
@@ -90,6 +104,11 @@ function FileTypeIcon(props) {
       if (timeoutId != null) window.clearTimeout(timeoutId);
     };
   }, []);
+
+  // 树文件优先用多色树形图标；图标模块尚未加载时回落到下面带颜色的占位图。
+  if (ext === 'mgtree' && TreeIcon) {
+    return <TreeIcon width={size} height={size} className={className} aria-hidden="true" />;
+  }
 
   if (!FullIcon) return <LightweightFallback {...props} />;
 
