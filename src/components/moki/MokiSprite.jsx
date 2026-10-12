@@ -14,16 +14,24 @@ import './moki.scss';
  * 服装明暗由传入的 theme 决定，未传时跟随界面主题。
  */
 const ATLASES = {
-  bust: { src: bustAtlas, offset: { light: '-3.4%', dark: '3.2%' } },
-  // 偏移量按素材实测：浅色人物中心在单格 57.66%，深色在 48.09%，
-  // 所以分别往左/往右挪，才能把人物摆到画布正中。
-  themes: { src: themeAtlas, offset: { light: '-7.66%', dark: '1.91%' } },
+  bust: { src: bustAtlas, offset: { light: { left: '-3.4%', top: '0%' }, dark: { left: '3.2%', top: '0%' } } },
+  // 偏移按素材实测的“不透明像素重心”换算（重心对挥手这类细长手臂不敏感，
+  // 比包围盒中心更接近人眼判断）：浅色格重心 X=55.75%/Y=40.58%，深色格 X=46.94%/Y=50.28%。
+  // 纵向只补一半——浅色人物内容高度占到 92.7%，整量下移会让脚被裁掉。
+  themes: {
+    src: themeAtlas,
+    offset: {
+      light: { left: '-5.75%', top: '5%' },
+      dark: { left: '3.06%', top: '0%' },
+    },
+  },
 };
 
 export default function MokiSprite({ theme: explicitTheme, art = 'bust' }) {
   const theme = useThemeStore((state) => state.theme);
   const mode = (explicitTheme || theme) === 'dark' ? 'dark' : 'light';
   const atlas = ATLASES[art] || ATLASES.bust;
+  const offset = atlas.offset[mode] || atlas.offset.light;
   return (
     <span aria-hidden="true" className={`moki-sprite moki-sprite--${mode}`}>
       <span
@@ -31,7 +39,8 @@ export default function MokiSprite({ theme: explicitTheme, art = 'bust' }) {
         style={{
           backgroundImage: `url(${atlas.src})`,
           backgroundPosition: `${mode === 'dark' ? 100 : 0}% 0%`,
-          left: atlas.offset[mode],
+          left: offset.left,
+          top: offset.top,
         }}
       />
     </span>
