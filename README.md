@@ -63,8 +63,6 @@ MokiDown 的能力来自四个明确的取舍——也是[官网](https://www.mi
 
 | 晴笺 · 浅色欢迎页 | 夜读 · 深色欢迎页 |
 | :---: | :---: |
-| 晴笺 · 浅色欢迎页 | 夜读 · 深色欢迎页 |
-| :---: | :---: |
 | ![浅色欢迎页](screenshots/welcome-light.png) | ![深色欢迎页](screenshots/welcome-dark.png) |
 
 | 三模式编辑（源码 / WYSIWYG / 分屏） | 代码块运行 |

@@ -61,8 +61,6 @@ MokiDown's capabilities come from four deliberate trade-offs — the four storyl
 
 ## 📸 Screenshots
 
-| Sunny note · Light welcome | Night read · Dark welcome |
-| :---: | :---: |
 | Light theme welcome | Dark theme welcome |
 | :---: | :---: |
 | ![Light welcome](screenshots/welcome-light.png) | ![Dark welcome](screenshots/welcome-dark.png) |
