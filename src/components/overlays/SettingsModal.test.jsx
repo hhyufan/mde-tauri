@@ -5,38 +5,80 @@ import useConfigStore from '@store/useConfigStore';
 import useThemeStore from '@store/useThemeStore';
 import { open } from '@tauri-apps/plugin-dialog';
 import { readFile } from '@tauri-apps/plugin-fs';
-import { readBackgroundImage, saveBackgroundImage, deleteBackgroundImage, validateBackgroundImage } from '@utils/backgroundImage';
+import {
+  readBackgroundImage,
+  saveBackgroundImage,
+  deleteBackgroundImage,
+  validateBackgroundImage,
+} from '@utils/backgroundImage';
 import i18n from '@/i18n';
 
 globalThis.React = React;
 const { default: SettingsModal } = await import('./SettingsModal');
-vi.mock('@hooks/useResponsiveLayout', () => ({ useResponsiveLayout: () => ({ isMobileLayout: false, isPortrait: false }) }));
+vi.mock('@hooks/useResponsiveLayout', () => ({
+  useResponsiveLayout: () => ({ isMobileLayout: false, isPortrait: false }),
+}));
 vi.mock('@tauri-apps/api/app', () => ({ getVersion: vi.fn(async () => 'test') }));
 vi.mock('./LanguageServices', () => ({ default: () => null }));
 vi.mock('../../services/syncEngine', () => ({ default: {} }));
 vi.mock('@tauri-apps/plugin-dialog', () => ({ open: vi.fn(), save: vi.fn() }));
-vi.mock('@tauri-apps/plugin-fs', () => ({ readFile: vi.fn(), readTextFile: vi.fn(), writeTextFile: vi.fn() }));
-vi.mock('@utils/backgroundImage', async (original) => ({ ...(await original()),
+vi.mock('@tauri-apps/plugin-fs', () => ({
+  readFile: vi.fn(),
+  readTextFile: vi.fn(),
+  writeTextFile: vi.fn(),
+}));
+vi.mock('@utils/backgroundImage', async (original) => ({
+  ...(await original()),
   readBackgroundImage: vi.fn(async () => new Blob(['image'])),
-  saveBackgroundImage: vi.fn(async () => 'new-image'), deleteBackgroundImage: vi.fn(async () => {}),
+  saveBackgroundImage: vi.fn(async () => 'new-image'),
+  deleteBackgroundImage: vi.fn(async () => {}),
   validateBackgroundImage: vi.fn(async () => {}),
 }));
 beforeEach(() => {
   i18n.changeLanguage('zh');
   useConfigStore.setState({ fontSize: 14, previewFontSize: 14, previewZoomSync: false });
-  useConfigStore.setState({ backgroundImage: '', backgroundImageName: '', backgroundEnabled: false,
-    backgroundTransparency: { light: 80, dark: 80 } });
+  useConfigStore.setState({
+    backgroundImage: '',
+    backgroundImageName: '',
+    backgroundEnabled: false,
+    backgroundTransparency: { light: 80, dark: 80 },
+  });
   vi.stubGlobal('URL', { createObjectURL: vi.fn(() => 'blob:preview'), revokeObjectURL: vi.fn() });
-  vi.stubGlobal('matchMedia', () => ({ matches: false, addListener() {}, removeListener() {}, addEventListener() {}, removeEventListener() {} }));
-  vi.stubGlobal('ResizeObserver', class { observe() {} unobserve() {} disconnect() {} });
+  vi.stubGlobal('matchMedia', () => ({
+    matches: false,
+    addListener() {},
+    removeListener() {},
+    addEventListener() {},
+    removeEventListener() {},
+  }));
+  vi.stubGlobal(
+    'ResizeObserver',
+    class {
+      observe() {}
+      unobserve() {}
+      disconnect() {}
+    },
+  );
   const computedStyle = window.getComputedStyle;
   vi.spyOn(window, 'getComputedStyle').mockImplementation((element) => computedStyle(element));
 });
-afterEach(() => { cleanup(); vi.restoreAllMocks(); vi.unstubAllGlobals(); vi.clearAllMocks(); delete window.__TAURI_INTERNALS__; });
+afterEach(() => {
+  cleanup();
+  vi.restoreAllMocks();
+  vi.unstubAllGlobals();
+  vi.clearAllMocks();
+  delete window.__TAURI_INTERNALS__;
+});
 
 it('adjusts both font sizes with compact controls without deprecated InputNumber addons', async () => {
   const errors = vi.spyOn(console, 'error').mockImplementation(() => {});
-  await act(async () => render(<React.StrictMode><SettingsModal open onClose={vi.fn()} /></React.StrictMode>));
+  await act(async () =>
+    render(
+      <React.StrictMode>
+        <SettingsModal open onClose={vi.fn()} />
+      </React.StrictMode>,
+    ),
+  );
   fireEvent.click(screen.getByText('外观'));
   expect(screen.getByRole('spinbutton', { name: '预览字号' })).toHaveValue('14');
   fireEvent.click(screen.getByRole('button', { name: '预览字号 +' }));
@@ -50,7 +92,9 @@ it('adjusts both font sizes with compact controls without deprecated InputNumber
   act(() => useConfigStore.setState({ fontSize: 24 }));
   fireEvent.click(screen.getByRole('button', { name: '编辑区字号 +' }));
   expect(useConfigStore.getState().fontSize).toBe(24);
-  expect(errors.mock.calls.flat().join(' ')).not.toMatch(/addonAfter|addonBefore|findDOMNode|Maximum update depth/);
+  expect(errors.mock.calls.flat().join(' ')).not.toMatch(
+    /addonAfter|addonBefore|findDOMNode|Maximum update depth/,
+  );
 });
 
 it('imports a native image, persists its reference, previews theme-specific opacity, and removes the stored asset', async () => {
@@ -86,7 +130,11 @@ it('imports a native image, persists its reference, previews theme-specific opac
 });
 
 it('keeps the previous background if an image cannot be decoded', async () => {
-  useConfigStore.setState({ backgroundImage: 'previous', backgroundImageName: 'previous.png', backgroundEnabled: true });
+  useConfigStore.setState({
+    backgroundImage: 'previous',
+    backgroundImageName: 'previous.png',
+    backgroundEnabled: true,
+  });
   window.__TAURI_INTERNALS__ = {};
   open.mockResolvedValue('C:\\bad.png');
   readFile.mockResolvedValue(new Uint8Array([0]));
@@ -95,8 +143,24 @@ it('keeps the previous background if an image cannot be decoded', async () => {
   fireEvent.click(screen.getByText('外观'));
   fireEvent.click(screen.getByRole('button', { name: '选择图片' }));
   await waitFor(() => expect(validateBackgroundImage).toHaveBeenCalled());
-  await waitFor(() => expect(screen.getByRole('button', { name: '选择图片' })).not.toHaveClass('ant-btn-loading'));
+  await waitFor(() =>
+    expect(screen.getByRole('button', { name: '选择图片' })).not.toHaveClass('ant-btn-loading'),
+  );
   expect(useConfigStore.getState().backgroundImage).toBe('previous');
   expect(saveBackgroundImage).not.toHaveBeenCalled();
   expect(deleteBackgroundImage).not.toHaveBeenCalled();
+});
+
+it('uses one switch to control whether the character shows', async () => {
+  useConfigStore.setState({ mokiDisplay: 'welcome' });
+  await act(async () => render(<SettingsModal open onClose={vi.fn()} />));
+  fireEvent.click(screen.getByText('外观'));
+  const toggle = screen.getByRole('switch', { name: '人物显示' });
+  expect(screen.queryByRole('slider', { name: '人物大小' })).not.toBeInTheDocument();
+  expect(screen.queryByText('欢迎页与写作伙伴')).not.toBeInTheDocument();
+  expect(toggle).toBeChecked();
+  fireEvent.click(toggle);
+  expect(useConfigStore.getState().mokiDisplay).toBe('hidden');
+  // 「周边轻动效」开关已移除：动画改为遵从系统偏好，不再由应用内开关控制。
+  expect(screen.queryByRole('switch', { name: '周边轻动效' })).not.toBeInTheDocument();
 });

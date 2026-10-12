@@ -26,6 +26,20 @@ afterEach(cleanup);
 function open(name, mode = 'edit') {
   act(() => useEditorStore.setState({ activeTabId: name, tabs: [{ id: name, name }], tabRenderList: [{ id: name, name }], viewMode: mode }));
 }
+it('drifts the welcome ornaments while keeping the character static', () => {
+  useConfigStore.setState({ mokiDisplay: 'welcome' });
+  const { container } = render(<EditorContent />);
+  // 飘散动画常驻，是否真正播放由系统 prefers-reduced-motion 决定（CSS 层处理）。
+  expect(container.querySelector('.moki-ambient--animated')).toBeInTheDocument();
+  // 人物保持静止：动画只在周边符号上。
+  expect(container.querySelector('.moki-sprite')).toBeInTheDocument();
+});
+it('drops the character from the welcome page when the switch is off', () => {
+  useConfigStore.setState({ mokiDisplay: 'hidden' });
+  const { container } = render(<EditorContent />);
+  expect(container.querySelector('.moki-sprite')).not.toBeInTheDocument();
+  expect(container.querySelector('.moki-welcome--plain')).toBeInTheDocument();
+});
 it('binds Ctrl+wheel after an empty workspace opens its first source file', async () => {
   render(<EditorContent />);
   open('first.js');
@@ -56,3 +70,4 @@ it('keeps split preview zoom independent and only intercepts external modifier c
   fireEvent.click(local, { ctrlKey: true });
   expect(openExternal).toHaveBeenCalledOnce();
 });
+
