@@ -15,7 +15,9 @@ import './moki.scss';
  */
 const ATLASES = {
   bust: { src: bustAtlas, offset: { light: '-3.4%', dark: '3.2%' } },
-  themes: { src: themeAtlas, offset: { light: '0%', dark: '0%' } },
+  // 偏移量按素材实测：浅色人物中心在单格 57.66%，深色在 48.09%，
+  // 所以分别往左/往右挪，才能把人物摆到画布正中。
+  themes: { src: themeAtlas, offset: { light: '-7.66%', dark: '1.91%' } },
 };
 
 export default function MokiSprite({ theme: explicitTheme, art = 'bust' }) {

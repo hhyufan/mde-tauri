@@ -305,12 +305,14 @@
     }
 
     /* 插画铺满画布：画布比例已对齐图集单格，所以不拉伸、不裁切，只做等比缩小。
-       这是清晰度的关键——旧版固定 88px 方框，等于把约 840px 的单格缩了 10 倍。 */
+       注意要显式 aspect-ratio: auto —— 基类的 1:1 是给方形单格的半身图集用的，
+       而 moki-themes.png 单格是 836×941（竖长），套 1:1 会被纵向压扁约 12%。 */
     > .moki-sprite {
       position: absolute;
       inset: 0;
       width: 100%;
       height: 100%;
+      aspect-ratio: auto;
     }
   }
 
