@@ -1,20 +1,39 @@
 # 截图演示工作区
 
-这个文件夹是**给截图演示用的示例工作区**：每个目录对应一个已接入的语言服务，
-里面放一个能正常解析的最简源码文件，用来展示悬停、补全、跳转、诊断等能力。
+这个目录是**给截图演示用的示例工作区**：已接入的语言服务各有一个最简源码文件，
+用来展示悬停、补全、跳转定义与诊断能力。
 
-| 目录 | 语言 | 语言服务 |
+```
+examples/
+├── hello.ts        TypeScript · 接口 + 类 + 泛型函数
+├── utils.js        JavaScript · 与 hello.ts 同一服务，验证多后缀
+├── hello.py        Python · dataclass + 类型标注
+├── hello.rs        Rust · struct + impl
+├── Hello.java      Java · record + stream
+├── Hello.cs        C# · record + LINQ
+├── Hello.kt        Kotlin · data class + 扩展函数
+├── notes/          Markdown 示例（编辑器自身的渲染能力）
+└── web/            HTML / CSS 配对
+```
+
+| 路径 | 语言 | 语言服务 |
 | --- | --- | --- |
-| `typescript/` | JavaScript / TypeScript | mde.typescript |
-| `python/` | Python | mde.pyright |
-| `rust/` | Rust | mde.rust |
-| `java/` | Java | mde.java |
-| `csharp/` | C# | mde.csharp |
-| `kotlin/` | Kotlin | mde.kotlin |
+| `hello.ts` `utils.js` | JavaScript / TypeScript | mde.typescript |
+| `hello.py` | Python | mde.pyright |
+| `hello.rs` | Rust | mde.rust |
+| `Hello.java` | Java | mde.java |
+| `Hello.cs` | C# | mde.csharp |
+| `Hello.kt` | Kotlin | mde.kotlin |
 | `web/` | HTML / CSS | mde.html · mde.css |
 
-约定：
+## 为什么是扁平的
 
-- 文件都保持**可直接运行/无诊断错误**，截图时不会出现错误提示；
-- 每个文件顶部写一句中文说明，方便在截图里辨认用途；
-- 新增语言服务时，在这里补一个同名目录与最简示例。
+源码文件全部放在最外层，只保留 `notes/` 与 `web/` 两个子目录——
+它们的作用是**展示目录树能力**（展开、折叠、层级），不是为了按语言分类。
+按语言分目录会让目录树变得又深又碎，截图里反而看不出层级关系。
+
+## 维护约定
+
+- 所有文件保持**可直接运行、无诊断错误**，截图时不会出现波浪线；
+- 每个文件顶部一句中文说明，方便在截图里辨认用途；
+- 新增语言服务时，在最外层补一个同名示例文件，并同步更新上面的表格。
