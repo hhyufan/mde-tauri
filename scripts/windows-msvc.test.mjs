@@ -6,7 +6,7 @@ import path from 'node:path';
 import { findCompleteToolchain, parseDeveloperEnvironment } from './windows-msvc.mjs';
 
 test('skip an incomplete newer Community compiler and use complete Build Tools', () => {
-  const root = mkdtempSync(path.join(tmpdir(), 'mde-msvc-test-'));
+  const root = mkdtempSync(path.join(tmpdir(), 'mokidown-msvc-test-'));
   try {
     const community = path.join(root, 'Community');
     const buildTools = path.join(root, 'BuildTools');
@@ -33,7 +33,7 @@ test('skip an incomplete newer Community compiler and use complete Build Tools',
     assert.equal(selected.version, '14.51.36231');
   } finally {
     assert.equal(path.dirname(path.resolve(root)), path.resolve(tmpdir()));
-    assert.ok(path.basename(root).startsWith('mde-msvc-test-'));
+    assert.ok(path.basename(root).startsWith('mokidown-msvc-test-'));
     rmSync(root, { recursive: true, force: true });
   }
 });

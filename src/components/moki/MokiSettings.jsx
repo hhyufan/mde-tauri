@@ -10,7 +10,7 @@ import MokiSprite from './MokiSprite';
  * 主题切换有两种形态，随「人物显示」开关切换：
  * - 开启人物：大预览卡片。卡片就是画布，插画按单格比例等比缩小（约 3 倍），
  *   旧版塞进 88px 方框等于缩了 10 倍，必然发糊。
- * - 关闭人物：回到紧凑卡片（MDE 时期的设计）——两列横卡、各自底色、右侧勾选，
+ * - 关闭人物：回到紧凑卡片（更名前的设计）——两列横卡、各自底色、右侧勾选，
  *   只是不再渲染插画。
  */
 export default function MokiSettings({ SettingGroup, SettingRow }) {

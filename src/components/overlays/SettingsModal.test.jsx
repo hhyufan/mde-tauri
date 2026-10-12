@@ -171,7 +171,7 @@ it('falls back to compact theme cards when the character is off', async () => {
   useConfigStore.setState({ mokiDisplay: 'hidden' });
   await act(async () => render(<SettingsModal open onClose={vi.fn()} />));
   fireEvent.click(screen.getByText('外观'));
-  // 关闭人物后不再渲染大画布，回到 MDE 时期的紧凑卡片形态（两列横卡 + 右侧勾选）。
+  // 关闭人物后不再渲染大画布，回到更名前的紧凑卡片形态（两列横卡 + 右侧勾选）。
   expect(document.querySelector('.moki-theme-card--preview')).not.toBeInTheDocument();
   expect(document.querySelector('.moki-theme-cards--compact')).toBeInTheDocument();
   expect(document.querySelectorAll('.moki-theme-card--compact')).toHaveLength(2);
