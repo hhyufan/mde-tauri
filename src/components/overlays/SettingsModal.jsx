@@ -32,7 +32,6 @@ import { getVersion } from '@tauri-apps/api/app';
 import { exportDiagnostics, openExternal } from '@utils/tauriApi';
 import { useTranslation } from 'react-i18next';
 import useConfigStore from '@store/useConfigStore';
-import useThemeStore from '@store/useThemeStore';
 import useAuthStore from '@store/useAuthStore';
 import useNotificationStore from '@store/useNotificationStore';
 import useUpdaterStore from '@store/useUpdaterStore';
@@ -75,7 +74,6 @@ function SettingsModal({ open: openProp, onClose }) {
   const [cloudBusy, setCloudBusy] = useState(false);
   const [appVersion, setAppVersion] = useState('');
   const config = useConfigStore();
-  const { theme, setTheme } = useThemeStore();
   const { isLoggedIn, user, logout } = useAuthStore();
   const notify = useNotificationStore((s) => s.notify);
   const { isMobileLayout, isPortrait } = useResponsiveLayout();
@@ -323,30 +321,8 @@ function SettingsModal({ open: openProp, onClose }) {
               <div className="settings-section">
                 <MokiSettings SettingGroup={SettingGroup} SettingRow={SettingRow} />
                 <BackgroundSettings SettingGroup={SettingGroup} SettingRow={SettingRow} />
-                <SettingGroup label={t('settings.group.theme')} />
-                <SettingRow
-                  label={t('settings.appearance.colorTheme')}
-                  desc={t('settings.appearance.colorThemeDesc')}
-                >
-                  <div className="setting-theme-picker">
-                    <button
-                      className={`setting-theme-btn ${theme === 'light' ? 'setting-theme-btn--active' : ''}`}
-                      onClick={() => setTheme('light')}
-                      type="button"
-                    >
-                      <span className="setting-theme-btn__swatch setting-theme-btn__swatch--light" />
-                      Light
-                    </button>
-                    <button
-                      className={`setting-theme-btn ${theme === 'dark' ? 'setting-theme-btn--active' : ''}`}
-                      onClick={() => setTheme('dark')}
-                      type="button"
-                    >
-                      <span className="setting-theme-btn__swatch setting-theme-btn__swatch--dark" />
-                      Dark
-                    </button>
-                  </div>
-                </SettingRow>
+                {/* 主题切换统一由上面的 Moki 卡片区承担；这里曾有一份 Light/Dark 单选，
+                    两处改的是同一个 store，属于重复入口，已移除。 */}
                 <SettingGroup label={t('settings.group.typography')} />
                 <SettingRow
                   label={t('settings.appearance.previewZoomSync')}

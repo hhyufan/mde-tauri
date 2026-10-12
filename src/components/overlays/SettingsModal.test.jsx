@@ -114,9 +114,11 @@ it('imports a native image, persists its reference, previews theme-specific opac
   fireEvent.keyDown(light, { key: 'ArrowRight', code: 'ArrowRight', keyCode: 39, which: 39 });
   expect(useConfigStore.getState().backgroundTransparency).toEqual({ light: 81, dark: 80 });
   act(() => useConfigStore.getState().setConfig('backgroundTransparency', { light: 100, dark: 0 }));
-  fireEvent.click(screen.getByRole('button', { name: 'Light' }));
+  // 主题切换入口已统一到 Moki 卡片区；这里只验证背景预览随主题变化的透明度，
+  // 所以直接操作 store，避免把用例绑死在某个具体的切换控件上。
+  act(() => useThemeStore.getState().setTheme('light'));
   expect(screen.getByRole('img', { name: '背景预览' })).toHaveStyle({ opacity: '0' });
-  fireEvent.click(screen.getByRole('button', { name: 'Dark' }));
+  act(() => useThemeStore.getState().setTheme('dark'));
   expect(screen.getByRole('img', { name: '背景预览' })).toHaveStyle({ opacity: '1' });
   fireEvent.click(screen.getByRole('switch', { name: '启用背景图片' }));
   expect(useConfigStore.getState().backgroundImage).toBe('new-image');
