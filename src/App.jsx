@@ -202,15 +202,6 @@ function App() {
     });
   }, []);
 
-  useEffect(() => {
-    if (!window.__TAURI_INTERNALS__) return undefined;
-    const timer = setTimeout(() => {
-      import('@store/useUpdaterStore')
-        .then(({ default: store }) => store.getState().checkForUpdates({ silent: true }))
-        .catch(() => {});
-    }, 10_000);
-    return () => clearTimeout(timer);
-  }, []);
 
   useEffect(() => {
     if (isAndroid) return undefined;
