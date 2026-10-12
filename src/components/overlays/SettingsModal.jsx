@@ -29,12 +29,11 @@ import { REPO_URL } from '@/configs/repository';
 import { open, save } from '@tauri-apps/plugin-dialog';
 import { readTextFile, writeTextFile } from '@tauri-apps/plugin-fs';
 import { getVersion } from '@tauri-apps/api/app';
-import { exportDiagnostics, openExternal } from '@utils/tauriApi';
+import { openExternal } from '@utils/tauriApi';
 import { useTranslation } from 'react-i18next';
 import useConfigStore from '@store/useConfigStore';
 import useAuthStore from '@store/useAuthStore';
 import useNotificationStore from '@store/useNotificationStore';
-import useUpdaterStore from '@store/useUpdaterStore';
 import syncEngine from '../../services/syncEngine';
 import {
   applySettingsSnapshot,
@@ -77,7 +76,6 @@ function SettingsModal({ open: openProp, onClose }) {
   const { isLoggedIn, user, logout } = useAuthStore();
   const notify = useNotificationStore((s) => s.notify);
   const { isMobileLayout, isPortrait } = useResponsiveLayout();
-  const updater = useUpdaterStore();
   // 手机竖屏下把设置面板当作全屏抽屉处理，给内部双栏布局留出纵向堆叠空间；
   // 横屏移动端横向空间更充足，因此仍保留左右并排布局。
   const fullScreen = isMobileLayout && isPortrait;
@@ -106,16 +104,6 @@ function SettingsModal({ open: openProp, onClose }) {
     } catch (err) {
       notify('error', t('notification.error'), err?.message || String(err));
     }
-  }
-
-  async function handleExportDiagnostics() {
-    const destination = await save({
-      defaultPath: `mokidown-diagnostics-${new Date().toISOString().slice(0, 10)}.json`,
-      filters: [{ name: 'JSON', extensions: ['json'] }],
-    });
-    if (!destination) return;
-    await exportDiagnostics(destination);
-    notify('success', t('notification.success', 'Success'), '诊断包已导出');
   }
 
   /**
@@ -525,64 +513,50 @@ function SettingsModal({ open: openProp, onClose }) {
 
             {activeNav === 'about' && (
               <div className="settings-section">
-                <div className="settings-about__hero">
-                  <div className="moki-about"><MokiSprite /><span>{t('moki.caption')}</span></div>
-                  <AppMark size={56} className="settings-about__logo" />
-                  <div className="settings-about__name">{t('app.name')}</div>
-                  {appVersion && (
-                    <div className="settings-about__version">v{appVersion}</div>
+                <div
+                  className={`settings-about__hero ${config.mokiDisplay === 'hidden' ? 'settings-about__hero--plain' : ''}`}
+                >
+                  {/* 人物与品牌信息并排成一张卡片：比原先竖直堆叠的一串元素更像"关于页"，
+                      画布比例与主题卡一致（8:9），人物不会被缩到看不清。 */}
+                  {config.mokiDisplay !== 'hidden' && (
+                    <div className="settings-about__mascot" aria-hidden="true">
+                      <MokiSprite art="themes" />
+                    </div>
                   )}
-                  <div className="settings-about__tagline">{t('settings.about.tagline')}</div>
-                </div>
-
-                <SettingGroup label={t('settings.group.about')} />
-                <SettingRow
-                  label={t('settings.about.version')}
-                  desc={t('settings.about.versionDesc')}
-                >
-                  <span className="setting-row__value">
-                    {appVersion ? `v${appVersion}` : '—'}
-                  </span>
-                </SettingRow>
-                <SettingRow
-                  label={t('settings.about.author')}
-                  desc={t('settings.about.authorDesc')}
-                >
-                  <span className="setting-row__value">hhyufan</span>
-                </SettingRow>
-                <SettingRow
-                  label={t('settings.about.repository')}
-                  desc={t('settings.about.repositoryDesc')}
-                >
-                  <Button icon={<GithubOutlined />} onClick={handleOpenRepo}>
-                    {t('settings.about.openRepo')}
-                  </Button>
-                </SettingRow>
-                <SettingRow
-                  label="自动更新"
-                  desc={updater.status === 'available'
-                    ? `发现新版本 v${updater.version}`
-                    : updater.status === 'error' ? updater.error : 'stable 通道，更新包会校验签名'}
-                >
-                  {updater.status === 'available' ? (
-                    <Button type="primary" onClick={updater.downloadAndInstall}>下载并安装</Button>
-                  ) : (
-                    <Button
-                      icon={<CloudDownloadOutlined />}
-                      loading={updater.status === 'checking' || updater.status === 'downloading'}
-                      onClick={() => updater.checkForUpdates()}
-                    >
-                      检查更新
-                    </Button>
-                  )}
-                </SettingRow>
-                <SettingRow label="本地诊断" desc="仅导出版本、平台、耗时和错误分类，不含正文、令牌或完整路径">
-                  <Button icon={<ExportOutlined />} onClick={handleExportDiagnostics}>导出诊断包</Button>
-                </SettingRow>
-
-                <div className="settings-about__star">
-                  <StarFilled className="settings-about__star-icon" />
-                  <span>{t('settings.about.starHint')}</span>
+                  <div className="settings-about__brand">
+                    <div className="settings-about__identity">
+                      <AppMark size={44} className="settings-about__logo" />
+                      <div className="settings-about__identity-text">
+                        <div className="settings-about__name">{t('app.name')}</div>
+                        {appVersion && (
+                          <div className="settings-about__version">v{appVersion}</div>
+                        )}
+                      </div>
+                    </div>
+                    <div className="settings-about__tagline">{t('settings.about.tagline')}</div>
+                    {/* 作者与仓库直接作为卡片内的两行说明；版本已在上面出现过一次，
+                        不再重复一行；自动更新与本地诊断按需求暂不放入。 */}
+                    <div className="settings-about__facts">
+                      <div className="settings-about__fact">
+                        <span className="settings-about__fact-label">{t('settings.about.author')}</span>
+                        <span className="settings-about__fact-desc">{t('settings.about.authorDesc')}</span>
+                      </div>
+                      <div className="settings-about__fact">
+                        <span className="settings-about__fact-label">{t('settings.about.repository')}</span>
+                        <span className="settings-about__fact-desc">{t('settings.about.repositoryDesc')}</span>
+                        <Button size="small" icon={<GithubOutlined />} onClick={handleOpenRepo}>
+                          {t('settings.about.openRepo')}
+                        </Button>
+                      </div>
+                    </div>
+                    {config.mokiDisplay !== 'hidden' && (
+                      <div className="settings-about__caption">{t('moki.caption')}</div>
+                    )}
+                    <div className="settings-about__star">
+                      <StarFilled className="settings-about__star-icon" />
+                      <span>{t('settings.about.starHint')}</span>
+                    </div>
+                  </div>
                 </div>
               </div>
             )}

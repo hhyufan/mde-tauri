@@ -347,17 +347,120 @@
   color: var(--text);
 }
 
+/* 关于页主视觉：人物与品牌信息并排成一张卡片。
+   原先是一串竖直居中堆叠的元素，人物孤零零浮在上面、还被缩到发糊。 */
 .settings-about__hero {
   display: flex;
-  flex-direction: column;
   align-items: center;
-  text-align: center;
+  gap: 18px;
+  padding: 18px;
+  border: 1px solid var(--border-light);
+  border-radius: 16px;
+  background: linear-gradient(135deg, var(--accent-bg), transparent 62%);
+
+  /* 关闭人物后只剩品牌区，居中呈现 */
+  &--plain {
+    justify-content: center;
+  }
+}
+
+/* 人物画布：与主题卡同一套 8:9 比例，按图集单格等比缩放。
+   显示宽 190px、单格约 836px ⇒ 缩放比约 4 倍，而不是旧版 88px 方框的约 10 倍。 */
+.settings-about__mascot {
+  flex: 0 0 auto;
+  width: 190px;
+  aspect-ratio: 8 / 9;
+  overflow: hidden;
+  border-radius: 12px;
+  background: linear-gradient(180deg, #f2f7ff 0%, #dbe8ff 100%);
+
+  > .moki-sprite {
+    width: 100%;
+    height: 100%;
+    aspect-ratio: auto;
+  }
+}
+
+html[data-theme='dark'] .settings-about__mascot {
+  background: linear-gradient(180deg, #223148 0%, #16233a 100%);
+}
+
+.settings-about__brand {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
   gap: 6px;
+  text-align: left;
+}
+
+.settings-about__caption {
+  font-size: 12px;
+  color: var(--text-sec);
+}
+
+/* 卡片内第一块：标识 + 名称 + 版本 */
+.settings-about__identity {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.settings-about__identity-text {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+}
+
+/* 作者 / 仓库：作为卡片内的说明行，而不是另起一组设置项 */
+.settings-about__facts {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 2px;
+}
+
+.settings-about__fact {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  font-size: 12px;
+}
+
+.settings-about__fact-label {
+  flex: 0 0 auto;
+  font-weight: 500;
+  color: var(--text);
+}
+
+.settings-about__fact-desc {
+  flex: 1 1 auto;
+  min-width: 0;
+  color: var(--text-sec);
+}
+
+@media (max-width: 720px) {
+  .settings-about__hero {
+    flex-direction: column;
+    text-align: center;
+  }
+
+  .settings-about__mascot {
+    width: 150px;
+  }
+
+  .settings-about__brand {
+    align-items: center;
+    text-align: center;
+  }
 }
 
 // 标识本体由 AppMark 自带样式，这里只补与标题的间距。
 .settings-about__logo {
-  margin-bottom: 4px;
+  margin-bottom: 2px;
 }
 
 .settings-about__name {
@@ -386,7 +489,7 @@
   display: flex;
   align-items: center;
   gap: 10px;
-  margin-top: 18px;
+  margin-top: 10px;
   padding: 12px 14px;
   border-radius: var(--radius-sm);
   background: var(--accent-bg);

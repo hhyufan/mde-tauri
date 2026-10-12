@@ -487,21 +487,6 @@
     transform: none;
   }
 }
-.moki-about {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 16px;
-  margin: 12px 0;
-  .moki-sprite {
-    width: 88px;
-    flex-shrink: 0;
-  }
-  span {
-    font-size: 12px;
-    color: var(--text-sec);
-  }
-}
 @media (prefers-reduced-motion: reduce) {
   .moki-ambient--animated > .moki-ambient__symbol {
     animation: none !important;
