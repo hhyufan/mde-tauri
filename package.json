@@ -26,7 +26,8 @@
     "tauri:android:dev": "tauri android dev",
     "tauri:android:build": "tauri android build",
     "tauri:android:build:debug": "tauri android build --debug --apk",
-    "test:e2e": "playwright test --config tests/playwright.config.mjs"
+    "test:e2e": "playwright test --config tests/playwright.config.mjs",
+    "test:e2e:production": "playwright test --config tests/playwright.production.config.mjs"
   },
   "dependencies": {
     "@ant-design/icons": "^5.2.6",

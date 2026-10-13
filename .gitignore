@@ -80,6 +80,8 @@ screenshots/capture-debug.png
 # ===========================
 *.local
 .cache/
+/test-results/
+/playwright-report/
 毕业设计AI稿.md
 baka.md3
 *.md3
