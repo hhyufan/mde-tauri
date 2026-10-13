@@ -17,7 +17,8 @@
 .titlebar__drag {
   flex: 1;
   height: 100%;
-  -webkit-app-region: drag;
+  // Keep right-clicks in the WebView; left-button dragging is handled by Tauri.
+  -webkit-app-region: no-drag;
 }
 
 .titlebar__btn {
