@@ -13,6 +13,8 @@ ideas.forEach((idea, index) => {
 
 ## 第二段：再验证一个想法
 
+<br />
+
 ```javascript
 // 把零散的想法连接起来，看看它们能不能拼成一条线
 const notes = [
