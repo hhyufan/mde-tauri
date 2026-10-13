@@ -213,12 +213,17 @@
   height: 6px; // 增大可点击区域高度
   border-radius: 3px;
   overflow: visible;
-  opacity: 0;
-  transition: opacity 0.2s;
+  opacity: 1;
+  transition: opacity var(--moki-scrollbar-fade-out) linear;
   pointer-events: none;
 
-  .file-tree__breadcrumb:hover & {
-    opacity: 1;
+  @media (hover: hover) {
+    opacity: 0;
+
+    .file-tree__breadcrumb:hover & {
+      opacity: 1;
+      transition-duration: var(--moki-scrollbar-fade-in);
+    }
   }
 }
 
@@ -227,13 +232,25 @@
   bottom: 0;
   height: 3px;
   border-radius: 2px;
-  background: var(--text-dim, rgba(128,128,128,0.5));
+  background: var(--moki-scrollbar-thumb);
   transition: left 0.05s linear;
   display: none;
   cursor: grab;
-  pointer-events: all;
+  pointer-events: none;
 
-  &:active { cursor: grabbing; }
+  .file-tree__breadcrumb:hover & {
+    pointer-events: auto;
+  }
+
+  @media (hover: none) {
+    pointer-events: auto;
+  }
+
+  &:hover { background: var(--moki-scrollbar-thumb-hover); }
+  &:active {
+    cursor: grabbing;
+    background: var(--moki-scrollbar-thumb-active);
+  }
 }
 
 .file-tree__list {
@@ -244,10 +261,6 @@
 
   &::-webkit-scrollbar {
     width: 4px;
-  }
-  &::-webkit-scrollbar-thumb {
-    background: rgba(64, 145, 255, 0.2);
-    border-radius: 2px;
   }
   &::-webkit-scrollbar-track {
     background: transparent;

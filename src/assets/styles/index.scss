@@ -169,16 +169,113 @@ body {
   background: var(--selection-bg);
 }
 
+// Animate the registered color, since scrollbar-color itself is discrete.
+@property --moki-scrollbar-color {
+  syntax: '<color>';
+  inherits: true;
+  initial-value: transparent;
+}
+
+:root {
+  --moki-scrollbar-thumb: rgba(64, 145, 255, 0.25);
+  --moki-scrollbar-thumb-hover: rgba(64, 145, 255, 0.42);
+  --moki-scrollbar-thumb-active: rgba(64, 145, 255, 0.55);
+  --moki-scrollbar-track: transparent;
+  --moki-scrollbar-fade-in: 100ms;
+  --moki-scrollbar-fade-out: 800ms;
+}
+
+html[data-theme='dark'] {
+  // 深色底上同样的透明度偏淡，蓝要更实一点才立得住。
+  --moki-scrollbar-thumb: rgba(64, 145, 255, 0.42);
+  --moki-scrollbar-thumb-hover: rgba(64, 145, 255, 0.6);
+  --moki-scrollbar-thumb-active: rgba(64, 145, 255, 0.72);
+}
+
+@media (hover: hover) {
+  * {
+    --moki-scrollbar-color: transparent;
+    transition: --moki-scrollbar-color var(--moki-scrollbar-fade-out) linear;
+  }
+
+  *:hover {
+    --moki-scrollbar-color: var(--moki-scrollbar-thumb);
+    transition-duration: var(--moki-scrollbar-fade-in);
+  }
+}
+
+* {
+  // Reset on every element so nested scroll containers do not inherit hover.
+  --moki-scrollbar-color: transparent;
+  scrollbar-width: thin;
+  scrollbar-color: var(--moki-scrollbar-color) var(--moki-scrollbar-track);
+}
+
+@media (hover: none) {
+  * {
+    --moki-scrollbar-color: var(--moki-scrollbar-thumb);
+  }
+}
+
+// Standard scrollbar styling takes precedence over WebKit button rules.
+// Use the custom native skin in Chromium/WebView2 so arrows can be removed.
+@supports selector(::-webkit-scrollbar) {
+  * {
+    scrollbar-width: auto;
+    scrollbar-color: auto;
+  }
+}
+
 ::-webkit-scrollbar {
   width: 6px;
   height: 6px;
 }
 
 ::-webkit-scrollbar-thumb {
-  background: rgba(64, 145, 255, 0.25);
+  background: var(--moki-scrollbar-color);
   border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--moki-scrollbar-thumb-hover);
+}
+
+::-webkit-scrollbar-thumb:active {
+  background: var(--moki-scrollbar-thumb-active);
 }
 
 ::-webkit-scrollbar-track {
   background: transparent;
+}
+
+::-webkit-scrollbar-button {
+  display: none;
+  width: 0;
+  height: 0;
+}
+
+::-webkit-scrollbar-corner {
+  background: transparent;
+}
+
+// Monaco owns scroll geometry; visibility follows its own scroll container.
+@media (hover: hover) {
+  .monaco-scrollable-element > .scrollbar {
+    opacity: 0 !important;
+    pointer-events: none !important;
+    transition: opacity var(--moki-scrollbar-fade-out) linear !important;
+  }
+
+  .monaco-scrollable-element:hover > .scrollbar {
+    opacity: 1 !important;
+    pointer-events: auto !important;
+    transition-duration: var(--moki-scrollbar-fade-in) !important;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --moki-scrollbar-fade-in: 0ms;
+    --moki-scrollbar-fade-out: 0ms;
+  }
 }

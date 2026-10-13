@@ -127,12 +127,17 @@
   height: 6px; // 增大命中区域，让滑块更容易拖拽
   border-radius: 3px;
   overflow: visible; // 不裁剪滑块事件区域
-  opacity: 0;
-  transition: opacity 0.2s;
+  opacity: 1;
+  transition: opacity var(--moki-scrollbar-fade-out) linear;
   pointer-events: none; // 轨道本身不需要接收事件
 
-  .footer__breadcrumb:hover & {
-    opacity: 1;
+  @media (hover: hover) {
+    opacity: 0;
+
+    .footer__breadcrumb:hover & {
+      opacity: 1;
+      transition-duration: var(--moki-scrollbar-fade-in);
+    }
   }
 }
 
@@ -141,13 +146,25 @@
   bottom: 0;
   height: 3px;
   border-radius: 2px;
-  background: var(--text-dim, rgba(128,128,128,0.5));
+  background: var(--moki-scrollbar-thumb);
   transition: left 0.05s linear;
   display: none;
   cursor: grab;
-  pointer-events: all; // 滑块必须接收鼠标事件
+  pointer-events: none;
 
-  &:active { cursor: grabbing; }
+  .footer__breadcrumb:hover & {
+    pointer-events: auto;
+  }
+
+  @media (hover: none) {
+    pointer-events: auto;
+  }
+
+  &:hover { background: var(--moki-scrollbar-thumb-hover); }
+  &:active {
+    cursor: grabbing;
+    background: var(--moki-scrollbar-thumb-active);
+  }
 }
 
 .footer__breadcrumb-item {
