@@ -68,7 +68,7 @@ test('each scroll container independently fades its own scrollbar in both themes
 
     await page.mouse.move(60, 140);
     await expect.poll(() => nativeThumbAlpha(page)).toBe(visibleAlpha);
-    const colors = await page.locator('#scrollbar-probe').evaluate((el) => {
+    const colors = await page.locator('#scrollbar-probe').evaluate(() => {
       const root = getComputedStyle(document.documentElement);
       return {
         // 期望值从变量推导：硬编码 rgba 会把“各处同款”这条断言绑死在
