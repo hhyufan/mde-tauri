@@ -1,0 +1,17 @@
+// Recreate the workspace image over an opaque base. Backdrop filters sample
+// editor text as well as the image, so they cannot isolate the image itself.
+@mixin image-surface {
+  background-color: var(--moki-background-base);
+  background-clip: border-box;
+  background-origin: border-box;
+  background-image:
+    linear-gradient(var(--moki-background-wash), var(--moki-background-wash)),
+    var(--moki-background-image, none);
+  background-size: auto, var(--moki-background-size, cover);
+  background-position: center,
+    calc(var(--moki-background-x, 0px) - var(--moki-popup-x, 0px))
+    calc(var(--moki-background-y, 0px) - var(--moki-popup-y, 0px));
+  background-repeat: no-repeat;
+  background-attachment: scroll;
+  backdrop-filter: none;
+}

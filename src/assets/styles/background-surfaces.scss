@@ -1,3 +1,5 @@
+@use './background-popup';
+
 // 背景模式只混合底色，不降低文字、图标或整棵组件树的透明度。
 // 明确覆盖内层表面，避免修改 --surface 后影响弹窗及 Monaco 的主题解析。
 //
@@ -9,9 +11,8 @@ body.moki-has-background,
   --moki-glass-code: color-mix(in srgb, var(--bg) 38%, transparent);
   --moki-glass-hover: color-mix(in srgb, var(--text) 7%, transparent);
   --moki-glass-selected: color-mix(in srgb, var(--accent) 14%, transparent);
-  // 浮层（搜索下拉、antd 弹层）比正文表面略实一点，但仍要透出底图：
-  // 之前 88% 几乎等于实色，看起来像没有适配背景模式。
-  --moki-glass-popup: color-mix(in srgb, var(--surface) 60%, transparent);
+  // 雾化过渡使用半透明底色；下拉浮层独立绘制底图，不能透出正文。
+  --moki-glass-popup: color-mix(in srgb, var(--surface) 12%, transparent);
 
   .titlebar__search,
   .sidebar__tab-slider,
@@ -21,8 +22,7 @@ body.moki-has-background,
   .timeline__count,
   .moki-tree__input,
   .moki-tree__top,
-  .moki-tree .moki-tree__chevron,
-  .ft {
+  .moki-tree .moki-tree__chevron {
     background: var(--moki-glass-surface);
   }
 
@@ -65,6 +65,7 @@ body.moki-has-background,
   .footer__mode-toggle:hover,
   .footer__breadcrumb-segment:hover,
   .footer__dropdown-item:hover,
+  .monaco-context-menu__item:hover:not(:disabled),
   .timeline__item:hover,
   .ft__btn:hover,
   .output-console button:hover,
@@ -81,6 +82,7 @@ body.moki-has-background,
   .editor-content__renderer-error button:hover,
   .ft__btn--active,
   .ft__btn--active:hover,
+  .monaco-context-menu__item:active:not(:disabled),
   .problems__row.is-selected,
   .problems__row.is-selected:hover {
     background: var(--moki-glass-selected);
@@ -183,12 +185,38 @@ html[data-theme='dark'] .app--background .md-preview {
 // antd 浮层 portal 到 body：变量与底色都必须在 body 级适配，
 // 否则下拉/菜单会是一块与背景模式割裂的实色面板。
 body.moki-has-background {
+  .ft { transition: none; }
+  .monaco-context-menu { animation: none; }
+  // Scaling the popup during entry also scales its wallpaper and exposes the
+  // editor during the opacity fade. Show image-backed popups at final geometry.
+  .ant-dropdown,
+  .ant-select-dropdown,
+  .ant-picker-dropdown {
+    &[class*='-enter'],
+    &[class*='-appear'] {
+      animation: none !important;
+      transform: none !important;
+      opacity: 1 !important;
+    }
+  }
+
+  // 背景色完全遮住下层组件，图片及透明度与工作区一致。
+  // 不改定位、滚动容器或子元素层级，保留 antd 的布局与虚拟列表行为。
   .ant-select-dropdown,
   .footer__dropdown,
+  .ft,
+  .ft__heading-panel,
+  .monaco-context-menu,
   .ant-dropdown .ant-dropdown-menu,
   .ant-picker-dropdown .ant-picker-panel-container {
-    background: var(--moki-glass-popup);
-    backdrop-filter: blur(16px);
+    @include background-popup.image-surface;
+  }
+
+  // 轮廓沿用轻边框与阴影。
+  .ant-select-dropdown,
+  .footer__dropdown {
+    border: 1px solid color-mix(in srgb, var(--text) 12%, transparent);
+    box-shadow: 0 8px 32px color-mix(in srgb, #000 22%, transparent);
   }
 
   .ant-select-dropdown .ant-select-item-option-active:not(.ant-select-item-option-disabled),
@@ -199,4 +227,10 @@ body.moki-has-background {
   .ant-select-dropdown .ant-select-item-option-selected:not(.ant-select-item-option-disabled) {
     background: var(--moki-glass-selected);
   }
+}
+
+// 暗色下 --surface 本身很暗，同样的实色占比叠出来会偏黑，单独再压一档。
+html[data-theme='dark'] body.moki-has-background,
+html[data-theme='dark'] .app--background {
+  --moki-glass-popup: color-mix(in srgb, var(--surface) 8%, transparent);
 }

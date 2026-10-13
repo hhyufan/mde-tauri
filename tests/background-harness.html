@@ -1,6 +1,6 @@
 <!doctype html>
 <html lang="zh">
-  <head><meta charset="UTF-8" /><title>Background surfaces</title></head>
+  <head><meta charset="UTF-8" /><title>Background surfaces</title><style>.ant-app { height: 100%; }</style></head>
   <body>
     <div id="root"></div>
     <script type="module">
@@ -11,30 +11,59 @@
       import '/src/monaco-worker.js';
       import { initMonacoShiki, getMonacoThemeName } from '/src/utils/monacoShiki.js';
       import Footer from '/src/components/layout/footer/Footer.jsx';
+      import SearchDropdown from '/src/components/layout/title-bar/SearchDropdown.jsx';
+      import FloatingToolbar from '/src/components/editor/FloatingToolbar.jsx';
+      import MonacoContextMenu from '/src/components/editor/MonacoContextMenu.jsx';
+      import ThemedConfigProvider from '/src/antd/ThemedConfigProvider.jsx';
+      import themeStore from '/src/store/useThemeStore.js';
+      import { useBackgroundSurfaces } from '/src/hooks/useBackgroundSurfaces.js';
+      import { disableNativeContextMenu } from '/src/utils/nativeContextMenu.js';
       import editorStore from '/src/store/useEditorStore.js';
       import '/src/i18n/index.js';
       import '/src/assets/styles/index.scss';
       import '/src/assets/styles/App.scss';
+      import '/src/assets/styles/antd-overrides.scss';
+      import '/src/components/layout/title-bar/titlebar.scss';
       import '/src/components/editor/monaco-editor.scss';
 
       mockIPC((command) => {
         if (command === 'get_directory_contents') return [
           { name: 'surface.md', path: '/tmp/surface.md', ext: 'md', is_dir: false },
           { name: 'notes', path: '/tmp/notes', is_dir: true },
+          ...Array.from({ length: 28 }, (_, i) => ({ name: `note-${i}.md`, path: `/tmp/note-${i}.md`, ext: 'md', is_dir: false })),
         ];
         return null;
       });
+      disableNativeContextMenu();
       editorStore.setState({
         activeTabId: 'surface.md', viewMode: 'split',
         tabs: [{ id: 'surface.md', name: 'surface.md', path: '/tmp/surface.md' }],
         tabRenderList: [{ id: 'surface.md', name: 'surface.md', ext: 'md', path: '/tmp/surface.md' }],
       });
-      createRoot(document.getElementById('root')).render(
-        React.createElement('div', {
+      // A non-square image with translucent areas exercises cover alignment and
+      // the opaque base underneath transparent source-image pixels.
+      const svg = '<svg xmlns="http://www.w3.org/2000/svg" width="600" height="300"><defs><linearGradient id="g"><stop stop-color="#8b657a"/><stop offset="1" stop-color="#274c68"/></linearGradient></defs><rect width="600" height="300" fill="url(#g)" fill-opacity=".7"/><circle cx="350" cy="130" r="85" fill="#daa755" fill-opacity=".5"/></svg>';
+      const imageUrl = `data:image/svg+xml,${encodeURIComponent(svg)}`;
+      function SearchProbe() {
+        const [open, setOpen] = React.useState(false);
+        return React.createElement('div', { style: { position: 'absolute', top: 20, left: '20%', width: '60%', zIndex: 30 } },
+          React.createElement(SearchDropdown, { open, onOpen: () => setOpen(true), onClose: () => setOpen(false) }));
+      }
+      let setBackground;
+      let showContextMenu;
+      function Harness() {
+        const [background, set] = React.useState({ enabled: false, imageUrl, opacity: 0.7 });
+        setBackground = set;
+        const [menu, setMenu] = React.useState(null);
+        showContextMenu = setMenu;
+        useBackgroundSurfaces(background);
+        return React.createElement(ThemedConfigProvider, null, React.createElement('div', {
           className: 'app',
-          style: { flexDirection: 'column', '--moki-background-image': 'linear-gradient(120deg, #8b657a, #274c68)', '--moki-background-opacity': '0.7' },
-        }, React.createElement('div', { id: 'editor', style: { flex: 1, minHeight: 0 } }), React.createElement(Footer)),
-      );
+          style: { flexDirection: 'column' },
+        }, React.createElement(SearchProbe), React.createElement('div', { id: 'editor', style: { flex: 1, minHeight: 0 } }), React.createElement(Footer), React.createElement(FloatingToolbar),
+          React.createElement(MonacoContextMenu, { visible: Boolean(menu), x: menu?.x || 0, y: menu?.y || 0, onClose: () => setMenu(null), editorRef: { current: window.trial?.editor } })));
+      }
+      createRoot(document.getElementById('root')).render(React.createElement(Harness));
       await initMonacoShiki();
       while (!document.getElementById('editor')) await new Promise(requestAnimationFrame);
       const editor = monaco.editor.create(document.getElementById('editor'), {
@@ -42,13 +71,22 @@
         language: 'javascript', theme: getMonacoThemeName(false),
         minimap: { enabled: true }, automaticLayout: true, scrollBeyondLastLine: false,
       });
+      editor.onContextMenu((event) => {
+        event.event.preventDefault();
+        showContextMenu({ x: event.event.posx, y: event.event.posy });
+      });
       window.trial = {
         apply({ theme, background }) {
           document.documentElement.dataset.theme = theme;
+          themeStore.setState({ theme });
+          setBackground((value) => ({ ...value, enabled: background }));
           document.body.classList.toggle('moki-has-background', background);
           document.querySelector('.app').classList.toggle('app--background', background);
           monaco.editor.setTheme(getMonacoThemeName(theme === 'dark'));
         },
+        setOpacity(opacity) { setBackground((value) => ({ ...value, opacity })); },
+        showToolbar() { editorStore.setState({ toolbarVisible: true }); },
+        showContextMenu() { showContextMenu({ x: 390, y: 130 }); },
         editor,
       };
     </script>
