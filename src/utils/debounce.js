@@ -23,3 +23,17 @@ export function debounce(fn, delay) {
   };
   return debounced;
 }
+
+/** Independent timers prevent edits in one document from canceling another. */
+export function debounceByKey(fn, delay) {
+  const timers = new Map();
+  const debounced = (key, ...args) => {
+    clearTimeout(timers.get(key));
+    timers.set(key, setTimeout(() => {
+      timers.delete(key);
+      fn(key, ...args);
+    }, delay));
+  };
+  debounced.cancel = () => { for (const timer of timers.values()) clearTimeout(timer); timers.clear(); };
+  return debounced;
+}

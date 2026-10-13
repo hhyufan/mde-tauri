@@ -17,6 +17,7 @@ import {
   useImperativeHandle,
 } from 'react';
 import { useEditorBufferContent } from '@hooks/useEditorBufferContent';
+import { useMarkdownAnalysis } from '@hooks/useMarkdownAnalysis';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import remarkMath from 'remark-math';
@@ -64,7 +65,7 @@ import useToastStore from '@store/useToastStore';
 import { useEditorContextMenu } from '@hooks/useEditorContextMenu';
 import EditorContextMenu from './EditorContextMenu';
 import { MENU_MOD } from '@utils/contextMenuShortcuts';
-import { parseFootnotes, addFootnoteJumpHandlers } from '@utils/footnoteParser';
+import { addFootnoteJumpHandlers } from '@utils/footnoteParser';
 import { loadMarkdownImageSrc, parseMarkdownLineHint, resolveMarkdownLinkPath } from '@utils/markdownAssets';
 import MermaidRenderer from './MermaidRenderer';
 import MarkdownCodePre from './MarkdownCodePre';
@@ -303,23 +304,7 @@ const MarkdownPreview = forwardRef(function MarkdownPreview({ className }, ref) 
     ], 'preview');
   };
 
-  const [workerProcessedContent, setWorkerProcessedContent] = useState('');
-  const processedContent = useMemo(() => {
-    if (rawContent.length > 200_000) return workerProcessedContent || rawContent;
-    return parseFootnotes(rawContent).content;
-  }, [rawContent, workerProcessedContent]);
-
-  useEffect(() => {
-    if (rawContent.length <= 200_000) return undefined;
-    const worker = new Worker(new URL('../../workers/markdownAnalysis.worker.js', import.meta.url), { type: 'module' });
-    const id = `${activeTabId}-${Date.now()}`;
-    worker.onmessage = (event) => {
-      if (event.data?.id === id) setWorkerProcessedContent(event.data.result || '');
-      worker.terminate();
-    };
-    worker.postMessage({ id, type: 'footnotes', content: rawContent });
-    return () => worker.terminate();
-  }, [activeTabId, rawContent]);
+  const { value: processedContent, pending: isAnalyzing } = useMarkdownAnalysis(activeTabId, rawContent, 'footnotes');
 
   // `useDeferredValue` 会把较重的 Markdown 树渲染降到较低优先级处理。新的
   // 预览树尚在构建时，旧树仍然保持可交互，从而降低长文档下编辑器、滚动条
@@ -561,7 +546,7 @@ const MarkdownPreview = forwardRef(function MarkdownPreview({ className }, ref) 
     ),
   }), [activeTabId, activeTab?.name, documentPath, handleLinkClick]);
 
-  const isStale = content !== processedContent;
+  const isStale = isAnalyzing || content !== processedContent;
   const fontSize = previewZoomSync ? editorFontSize : (previewFontSize || editorFontSize);
   const lineHeight = previewZoomSync ? editorLineHeight : (previewLineHeight || editorLineHeight);
 

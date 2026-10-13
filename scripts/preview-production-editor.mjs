@@ -23,7 +23,6 @@ window.addEventListener('unhandledrejection', e => log('REJECTION: ' + e.reason)
 const originalError = console.error;
 console.error = (...args) => { log(args.map(String).join(' ')); originalError(...args); };
 try {
-  const boot = await import('${asset('monacoRuntimeBoot')}');
   const exports = await import('${asset('monaco-vendor')}');
   const monaco = Object.values(exports).find(v => v?.editor && v?.languages);
   const highlighterExports = await import('${asset('monacoShiki')}');
@@ -35,7 +34,9 @@ try {
   });
   fallback.dispose();
   log('fallbackDiffCreated: true');
-  await boot.prepareMonacoRuntime();
+  // The application now imports its boot coordinator in the entry chunk. This
+  // standalone check only needs the independently testable highlight runtime.
+  await highlighter.initMonacoShiki();
   log('highlighterReady: ' + highlighter.isMonacoShikiReady());
   log('editorFrozen: ' + Object.isFrozen(monaco.editor));
   const editor = monaco.editor.create(document.querySelector('#editor'), {
