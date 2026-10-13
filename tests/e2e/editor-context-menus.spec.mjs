@@ -36,7 +36,10 @@ test('Milkdown menu formats the selected text, supports undo/redo and pastes thr
   const divider = await menu(page).getByRole('separator').first().evaluate((el) => ({
     line: el.getBoundingClientRect().width, panel: el.parentElement.clientWidth,
   }));
-  expect(divider.line).toBe(divider.panel);
+  // 分隔线应撑满面板宽度。这里必须留容差：clientWidth 取整，而
+  // getBoundingClientRect().width 是亚像素小数，两者直接比较必然差不到 1px。
+  expect(Math.abs(divider.line - divider.panel)).toBeLessThanOrEqual(1);
+  expect(divider.line).toBeGreaterThan(100);
   await page.keyboard.press('Control+b');
   await expect.poll(() => page.evaluate(() => window.trial.markdown())).toContain('**Alpha**');
   await paragraph.click({ button: 'right' }); await action(page, 'Undo').click();
