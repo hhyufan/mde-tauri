@@ -26,34 +26,34 @@ function pickDelay(baseDelay, contentLength) {
  * ????????????????? React state ????????
  */
 export function useEditorBufferContent(tabId, fallback = '', delay = 220) {
-  const [content, setContent] = useState(() => getBuffer(tabId, fallback));
-  const tabIdRef = useRef(tabId);
+  const [snapshot, setSnapshot] = useState(() => ({ tabId, content: getBuffer(tabId, fallback) }));
   const fallbackRef = useRef(fallback);
-  tabIdRef.current = tabId;
   fallbackRef.current = fallback;
 
   useEffect(() => {
-    setContent(getBuffer(tabId, fallback));
+    const content = getBuffer(tabId, fallback);
+    setSnapshot((previous) => previous.tabId === tabId && previous.content === content ? previous : { tabId, content });
   }, [tabId, fallback]);
 
   useEffect(() => {
     let timer = null;
     const unsub = subscribe((ids) => {
-      if (!ids.has(tabIdRef.current)) return;
+      if (!ids.has(tabId)) return;
       if (timer) clearTimeout(timer);
-      const next = getBuffer(tabIdRef.current, fallbackRef.current);
+      const next = getBuffer(tabId, fallbackRef.current);
       const actualDelay = pickDelay(delay, next?.length || 0);
       timer = setTimeout(() => {
-        setContent(getBuffer(tabIdRef.current, fallbackRef.current));
+        const content = getBuffer(tabId, fallbackRef.current);
+        setSnapshot((previous) => previous.tabId === tabId && previous.content === content ? previous : { tabId, content });
       }, actualDelay);
     });
     return () => {
       unsub();
       if (timer) clearTimeout(timer);
     };
-  }, [delay]);
+  }, [delay, tabId]);
 
-  return content;
+  return snapshot.tabId === tabId ? snapshot.content : getBuffer(tabId, fallback);
 }
 
 export default useEditorBufferContent;
