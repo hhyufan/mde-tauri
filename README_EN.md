@@ -45,11 +45,11 @@ MokiDown is an open-source Markdown editor built with Tauri 2, React, Monaco, an
 | :---: | :---: |
 | ![Light welcome](screenshots/welcome-light.png) | ![Dark welcome](screenshots/welcome-dark.png) |
 
-| Three editing modes (source / WYSIWYG / split) | Running code blocks |
+| Three editing modes (source / WYSIWYG / split) | Tree editor (mgtree) |
 | :---: | :---: |
 | ![Three editing modes](screenshots/editor.png) | ![Running code blocks](screenshots/code-run.png) |
 
-| Cloud sync | Tree editor (mgtree) |
+| Cloud sync | Running code blocks |
 | :---: | :---: |
 | ![Sync conflict](screenshots/sync-display.png) | ![Tree editor](screenshots/tree.png) |
 
