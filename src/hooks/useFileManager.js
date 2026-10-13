@@ -18,9 +18,6 @@ import {
   renameFile,
   startFileWatching,
   stopFileWatching,
-  startDirectoryWatching,
-  stopDirectoryWatching,
-  onDirectoryChanged,
   historyCapture,
   showInExplorer,
   getAppDocumentsDir,
@@ -40,7 +37,8 @@ import useConfigStore from '@store/useConfigStore';
 import useNotificationStore from '@store/useNotificationStore';
 import { syncEngine, isCloudPath, fileIdFromCloudPath } from '@/services/syncEngine';
 import { getBuffer } from '@utils/editorBuffer';
-import { debounce } from '@utils/debounce';
+import { debounceByKey } from '@utils/debounce';
+import { sortDirectoryContents } from '@utils/directoryContents';
 import { isAndroidRuntime } from '@utils/platform';
 import { rememberDiskBaseline } from '@/services/localFileGuard';
 import { saveExistingFile } from '@/services/localFileOperations';
@@ -177,9 +175,8 @@ export function useFileManager() {
     replaceBookmarkPath,
   } = useFileStore.getState();
   const notify = useNotificationStore.getState().notify;
-  const t = i18n.t.bind(i18n);
+  const t = useMemo(() => i18n.t.bind(i18n), []);
   const isAndroid = isAndroidRuntime();
-  const currentDir = useFileStore((s) => s.currentDir);
   const pendingUntitledSaveRef = useRef(new Set());
   const dismissedAutoSavePromptRef = useRef(new Set());
   const androidDocsDirRef = useRef(null);
@@ -251,7 +248,7 @@ export function useFileManager() {
    * @returns {(filePath: string, content: string, encoding: string, meta?: object) => void} 防抖后的保存函数。
    */
   const debouncedAutoSave = useMemo(
-    () => debounce(async (filePath, content, encoding, meta = {}) => {
+    () => debounceByKey(async (filePath, content, encoding, meta = {}) => {
       if (!filePath) return;
       try {
         const tabId = useEditorStore.getState().getTabByPath(filePath)?.id || filePath;
@@ -282,7 +279,7 @@ export function useFileManager() {
    * @returns {(tabId: string, fileId: string, content: string, encoding: string, meta?: object) => void} 防抖后的同步函数。
    */
   const debouncedExternalSync = useMemo(
-    () => debounce(async (tabId, fileId, content, encoding, meta = {}) => {
+    () => debounceByKey(async (tabId, fileId, content, encoding, meta = {}) => {
       if (!fileId) return;
       try {
         const result = await syncEngine.queueExternalUpsert(fileId, content, encoding, {
@@ -302,14 +299,14 @@ export function useFileManager() {
   );
 
   /**
-   * 触发当前活动标签的自动保存或自动同步。
+   * 保存指定标签；不传 id 时保存当前活动标签。延迟任务必须携带原文档 id。
    *
    * @returns {void}
    */
-  const triggerAutoSave = useCallback(() => {
+  const triggerAutoSave = useCallback((tabId) => {
     const autoSave = useConfigStore.getState().autoSave;
     if (!autoSave) return;
-    const tab = useEditorStore.getState().getActiveTab();
+    const tab = typeof tabId === 'string' ? getLiveTabById(tabId) : useEditorStore.getState().getActiveTab();
     if (!tab) return;
     const content = getBuffer(tab.id, tab.content);
     if (!tab.path && tab.externalFileId) {
@@ -333,35 +330,6 @@ export function useFileManager() {
   }, [debouncedAutoSave, debouncedExternalSync]);
 
   /**
-   * 按当前 Explorer 排序配置整理目录项列表。
-   *
-   * @param {Array<object>} contents 原始目录项列表。
-   * @returns {Array<object>} 排序后的新数组。
-   */
-  const sortDirectoryContents = useCallback((contents) => {
-    const { sortBy, sortOrder } = useFileStore.getState();
-    const direction = sortOrder === 'desc' ? -1 : 1;
-    return [...contents].sort((a, b) => {
-      if (a.is_dir && !b.is_dir) return -1;
-      if (!a.is_dir && b.is_dir) return 1;
-
-      let compareValue = 0;
-      if (sortBy === 'size') {
-        compareValue = (a.size || 0) - (b.size || 0);
-      } else if (sortBy === 'time') {
-        compareValue = (a.modified || 0) - (b.modified || 0);
-      } else {
-        compareValue = a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: 'base' });
-      }
-
-      if (compareValue === 0) {
-        compareValue = a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: 'base' });
-      }
-      return compareValue * direction;
-    });
-  }, []);
-
-  /**
    * 加载指定目录，并同步更新当前目录与文件列表。
    *
    * @param {string} dirPath 目标目录路径或 SAF tree URI。
@@ -370,12 +338,12 @@ export function useFileManager() {
   const loadDirectory = useCallback(async (dirPath) => {
     try {
       const contents = await getDirectoryContents(dirPath);
-      setFiles(sortDirectoryContents(contents));
+      setFiles(sortDirectoryContents(contents, useFileStore.getState()));
       setCurrentDir(dirPath);
     } catch (err) {
       notify('error', t('notification.error'), String(err));
     }
-  }, [sortDirectoryContents]);
+  }, [notify, setCurrentDir, setFiles, t]);
 
   /**
    * 仅刷新目录内容，不推进目录导航历史。
@@ -392,37 +360,11 @@ export function useFileManager() {
   const loadFilesOnly = useCallback(async (dirPath) => {
     try {
       const contents = await getDirectoryContents(dirPath);
-      setFiles(sortDirectoryContents(contents));
+      setFiles(sortDirectoryContents(contents, useFileStore.getState()));
     } catch (err) {
       notify('error', t('notification.error'), String(err));
     }
-  }, [sortDirectoryContents]);
-
-  // 目录切换时同步监听目标：停止旧目录监听，启动新目录监听。
-  // 仅桌面端本地路径生效；SAF URI 与 Android 由各自桥接处理。
-  useEffect(() => {
-    if (isAndroid || !currentDir || isSafUri(currentDir)) return undefined;
-    startDirectoryWatching(currentDir).catch(() => {});
-    return () => {
-      stopDirectoryWatching(currentDir).catch(() => {});
-    };
-  }, [currentDir, isAndroid]);
-
-  // 外部增删/重命名后自动刷新当前目录，避免资源管理器停留在旧快照。
-  useEffect(() => {
-    if (isAndroid) return undefined;
-    let timer = null;
-    const unlisten = onDirectoryChanged(({ dir }) => {
-      const active = useFileStore.getState().currentDir;
-      if (!active || dir !== active) return;
-      if (timer) clearTimeout(timer);
-      timer = setTimeout(() => loadFilesOnly(active), 300);
-    });
-    return () => {
-      if (timer) clearTimeout(timer);
-      unlisten.then((fn) => fn()).catch(() => {});
-    };
-  }, [isAndroid, loadFilesOnly]);
+  }, [notify, setFiles, t]);
 
   // 供 TabBar 的 “+” 和资源管理器工具栏的 “+” 复用：
   // 若当前已打开目录，则触发资源管理器内联新建文件；

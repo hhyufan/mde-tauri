@@ -19,6 +19,7 @@ import useFileStore from '@store/useFileStore';
 import useConfigStore from '@store/useConfigStore';
 import useLspStore from '@store/useLspStore';
 import { useFileManager } from '@hooks/useFileManager';
+import { useWorkspaceDirectory } from '@hooks/useWorkspaceDirectory';
 import { useResponsiveLayout } from '@hooks/useResponsiveLayout';
 import { useViewportInsets } from '@hooks/useViewportInsets';
 import { useBackgroundImage } from '@hooks/useBackgroundImage';
@@ -139,6 +140,7 @@ function App() {
   const allowWindowCloseRef = useRef(false);
   const cliArgsOpenedRef = useRef(false);
   const { isMobileLayout, isAndroid, isPortrait } = useResponsiveLayout();
+  useWorkspaceDirectory(isAndroid);
   const isDesktopWindow = !isMobileLayout && !isAndroid;
   useViewportInsets();
   const {
