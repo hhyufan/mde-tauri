@@ -106,6 +106,50 @@
   background-color: var(--editor-bg, transparent) !important;
 }
 
+/**
+ * Monaco 滚动条：与项目其它滚动区域同款。
+ *
+ * 项目里全局 `::-webkit-scrollbar`（index.scss）与 file-tree 都是同一观感：
+ * 细条、半透明蓝滑块、透明轨道、圆角。但 Monaco 用的是自绘滚动条
+ * （`.scrollbar > .slider`），吃不到 `::-webkit-scrollbar`，只认
+ * `--vscode-scrollbarSlider-*` 变量，所以这里显式对齐同一组取值。
+ *
+ * 另外必须去掉 `canvas.decorationsOverviewRuler`：它是贯穿整个高度的
+ * 概览标尺，会整条盖住底图，看起来就像“轨道不透明”。
+ */
+.monaco-editor {
+  .decorationsOverviewRuler {
+    display: none !important;
+  }
+
+  // 轨道保持透明，避免在它上面压出一层灰。
+  .scrollbar {
+    background-color: transparent !important;
+    box-shadow: none !important;
+  }
+
+  // 滑块：半透明蓝（同全局 rgba(64,145,255,.25)），圆角同 3px。
+  .scrollbar > .slider {
+    background-color: var(--moki-scrollbar-thumb);
+    border-radius: 3px;
+    transition: none !important;
+  }
+
+  .scrollbar > .slider:hover {
+    background-color: var(--moki-scrollbar-thumb-hover);
+  }
+
+  .scrollbar > .slider.active {
+    background-color: var(--moki-scrollbar-thumb-active);
+  }
+
+  // minimap 上的可视区域框只是两团灰雾，去掉以免盖住底图。
+  .minimap-slider,
+  .minimap-slider-horizontal {
+    display: none !important;
+  }
+}
+
 [data-theme="dark"] {
   .monaco-editor {
     .inline-completion-text-to-insert {
