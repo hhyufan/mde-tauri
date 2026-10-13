@@ -34,10 +34,16 @@ test('minimap pixels and the actual breadcrumb popup follow background and theme
       const ctx = canvas.getContext('2d');
       ctx.fillStyle = style.backgroundColor;
       ctx.fillRect(0, 0, 1, 1);
-      return { alpha: ctx.getImageData(0, 0, 1, 1).data[3], blur: style.backdropFilter };
+      return { alpha: ctx.getImageData(0, 0, 1, 1).data[3], image: style.backgroundImage, blur: style.backdropFilter };
     });
-    expect(surface.alpha).toBe(options.background ? 153 : 255);
-    expect(surface.blur).toBe(options.background ? 'blur(16px)' : 'none');
+    if (options.background) {
+      expect(surface.image).toContain('data:image/svg+xml');
+    } else {
+      // 非背景模式保持不透明，避免底下的内容透上来。
+      expect(surface.image).toBe('none');
+    }
+    expect(surface.alpha).toBe(255);
+    expect(surface.blur).toBe('none');
     if (options.theme === 'dark' && options.background) {
       await page.screenshot({ path: testInfo.outputPath('dark-background.png') });
     }

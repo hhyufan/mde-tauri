@@ -28,7 +28,7 @@
 // 图片只绘制一层，透明度不影响文字与控件。
 .app--background {
   isolation: isolate;
-  background: #fff;
+  background: var(--moki-background-base);
   &::before {
     content: '';
     position: absolute;
@@ -64,7 +64,6 @@
     background: linear-gradient(to bottom, transparent, var(--moki-glass-popup));
   }
 }
-html[data-theme='dark'] .app--background { background: #181818; }
 @media (max-width: 768px) {
   // 抽屉覆盖正文时保留实色，避免两层内容重叠。
   .app--background .sidebar { background: var(--sidebar); }

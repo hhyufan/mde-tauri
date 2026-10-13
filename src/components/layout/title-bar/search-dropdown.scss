@@ -1,3 +1,5 @@
+@use '../../../assets/styles/background-popup';
+
 .titlebar__search.search-dropdown {
   position: relative;
   cursor: text;
@@ -46,7 +48,7 @@
 // 背景（玻璃）模式：面板与其内部控件改用玻璃底色，避免出现实色方块。
 // 浮层变量 --moki-glass-popup 定义在 body 级，这里同时覆盖面板内的 antd 控件。
 .app--background {
-  .search-dropdown__panel { background: var(--moki-glass-popup); backdrop-filter: blur(16px); }
+  .search-dropdown__panel { @include background-popup.image-surface; }
   .search-dropdown__clear:hover,
   .search-dropdown__toolbar button:hover { background: var(--moki-glass-hover); }
   .search-dropdown__toolbar button[aria-pressed='true'],

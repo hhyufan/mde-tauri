@@ -22,6 +22,7 @@ import { useFileManager } from '@hooks/useFileManager';
 import { useResponsiveLayout } from '@hooks/useResponsiveLayout';
 import { useViewportInsets } from '@hooks/useViewportInsets';
 import { useBackgroundImage } from '@hooks/useBackgroundImage';
+import { useBackgroundSurfaces } from '@hooks/useBackgroundSurfaces';
 import { getBackgroundTransparency } from '@utils/backgroundImage';
 import { disableNativeContextMenu } from '@utils/nativeContextMenu';
 import { syncEngine } from '@/services/syncEngine';
@@ -107,6 +108,8 @@ function App() {
   const theme = useThemeStore((s) => s.theme);
   const { url: backgroundUrl } = useBackgroundImage();
   const hasBackground = backgroundEnabled && Boolean(backgroundUrl);
+  useBackgroundSurfaces({ enabled: hasBackground, imageUrl: backgroundUrl,
+    opacity: (100 - getBackgroundTransparency(backgroundTransparency, theme)) / 100 });
   const conflictEntries = useSyncStore((s) => s.conflicts);
   const conflicts = useMemo(
     () => conflictEntries.filter((item) => isOwnedByUser(item?.ownerUserId, userId)),
