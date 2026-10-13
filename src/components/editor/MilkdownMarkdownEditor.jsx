@@ -176,8 +176,9 @@ const codeMirrorTheme = CodeMirrorView.theme({
   '&.cm-focused': {
     outline: 'none',
   },
-  '.cm-selectionBackground, &.cm-focused .cm-selectionBackground': {
-    // 与 Monaco 主题的选区色保持一致（共用同一套 --selection-bg 变量）。
+  '.cm-selectionBackground, &.cm-focused > .cm-scroller > .cm-selectionLayer .cm-selectionBackground': {
+    // Match CodeMirror's focused selector specificity, otherwise its opaque
+    // light-theme default (#d7d4f0) overrides the shared selection colour.
     backgroundColor: 'var(--selection-bg)',
   },
 });

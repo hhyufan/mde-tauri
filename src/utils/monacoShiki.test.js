@@ -20,8 +20,8 @@ beforeEach(() => {
   mock.nativeSetTheme = mock.editor.setTheme = vi.fn();
   document.documentElement.dataset.theme = 'light';
   const themes = {
-    'one-light': { type: 'light', rules: [], colors: {} },
-    'one-dark-pro': { type: 'dark', rules: [], colors: {} },
+    'one-light': { type: 'light', rules: [], colors: { 'minimap.background': '#ffffff' } },
+    'one-dark-pro': { type: 'dark', rules: [], colors: { 'minimap.background': '#282c34' } },
   };
   mock.highlighter = {
     getLoadedThemes: () => Object.keys(themes), getLoadedLanguages: () => [],
@@ -57,6 +57,19 @@ it('registers complete fallback theme data before asynchronous initialization or
     // Monaco's tokenTheme getter reads colors directly even with inherit enabled.
     expect(theme.colors['editor.foreground']).toBeUndefined();
     expect(theme.colors['editor.background']).toBeUndefined();
+    expect(theme.colors['minimap.background']).toBe('#00000000');
+  }
+});
+
+it('keeps the minimap canvas transparent in both Shiki themes', async () => {
+  const runtime = await import('./monacoShiki');
+  await runtime.initMonacoShiki();
+  for (const name of ['one-light', 'one-dark-pro']) {
+    expect(mock.editor.defineTheme).toHaveBeenCalledWith(name, expect.objectContaining({
+      colors: expect.objectContaining({ 'minimap.background': '#00000000' }),
+    }));
+    const theme = mock.editor.defineTheme.mock.calls.filter(([id]) => id === name).at(-1)[1];
+    expect(theme.colors['minimap.background']).toBe('#00000000');
   }
 });
 

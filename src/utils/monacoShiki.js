@@ -59,7 +59,8 @@ if (!runtime.ready) {
   // These names stay safe even when Shiki cannot load. Never send `vs` to a
   // previously patched Shiki setter during hot replacement.
   for (const [name, dark] of [[LIGHT_THEME_NAME, false], [DARK_THEME_NAME, true]]) {
-    monaco.editor.defineTheme(name, { base: dark ? 'vs-dark' : 'vs', inherit: true, colors: {}, rules: treeTokenRules(dark) });
+    monaco.editor.defineTheme(name, { base: dark ? 'vs-dark' : 'vs', inherit: true,
+      colors: { 'minimap.background': '#00000000' }, rules: treeTokenRules(dark) });
   }
   monaco.editor.setTheme = fallbackSetTheme;
   monaco.editor.create = fallbackCreate;
@@ -102,7 +103,9 @@ function withMgtreeRules(themeName, monacoTheme) {
   return {
     ...monacoTheme,
     inherit: true,
-    colors: monacoTheme.colors || {},
+    // The minimap paints its background into a canvas; CSS transparency alone
+    // cannot expose the editor surface (including a custom background image).
+    colors: { ...monacoTheme.colors, 'minimap.background': '#00000000' },
     rules: [...(monacoTheme.rules || []), ...treeTokenRules(isDarkTheme(themeName))],
   };
 }

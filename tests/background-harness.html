@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="zh">
+  <head><meta charset="UTF-8" /><title>Background surfaces</title></head>
+  <body>
+    <div id="root"></div>
+    <script type="module">
+      import React from 'react';
+      import { createRoot } from 'react-dom/client';
+      import { mockIPC } from '@tauri-apps/api/mocks';
+      import * as monaco from 'monaco-editor';
+      import '/src/monaco-worker.js';
+      import { initMonacoShiki, getMonacoThemeName } from '/src/utils/monacoShiki.js';
+      import Footer from '/src/components/layout/footer/Footer.jsx';
+      import editorStore from '/src/store/useEditorStore.js';
+      import '/src/i18n/index.js';
+      import '/src/assets/styles/index.scss';
+      import '/src/assets/styles/App.scss';
+      import '/src/components/editor/monaco-editor.scss';
+
+      mockIPC((command) => {
+        if (command === 'get_directory_contents') return [
+          { name: 'surface.md', path: '/tmp/surface.md', ext: 'md', is_dir: false },
+          { name: 'notes', path: '/tmp/notes', is_dir: true },
+        ];
+        return null;
+      });
+      editorStore.setState({
+        activeTabId: 'surface.md', viewMode: 'split',
+        tabs: [{ id: 'surface.md', name: 'surface.md', path: '/tmp/surface.md' }],
+        tabRenderList: [{ id: 'surface.md', name: 'surface.md', ext: 'md', path: '/tmp/surface.md' }],
+      });
+      createRoot(document.getElementById('root')).render(
+        React.createElement('div', {
+          className: 'app',
+          style: { flexDirection: 'column', '--moki-background-image': 'linear-gradient(120deg, #8b657a, #274c68)', '--moki-background-opacity': '0.7' },
+        }, React.createElement('div', { id: 'editor', style: { flex: 1, minHeight: 0 } }), React.createElement(Footer)),
+      );
+      await initMonacoShiki();
+      while (!document.getElementById('editor')) await new Promise(requestAnimationFrame);
+      const editor = monaco.editor.create(document.getElementById('editor'), {
+        value: Array.from({ length: 60 }, (_, i) => `const note${i} = "background surface";`).join('\n'),
+        language: 'javascript', theme: getMonacoThemeName(false),
+        minimap: { enabled: true }, automaticLayout: true, scrollBeyondLastLine: false,
+      });
+      window.trial = {
+        apply({ theme, background }) {
+          document.documentElement.dataset.theme = theme;
+          document.body.classList.toggle('moki-has-background', background);
+          document.querySelector('.app').classList.toggle('app--background', background);
+          monaco.editor.setTheme(getMonacoThemeName(theme === 'dark'));
+        },
+        editor,
+      };
+    </script>
+  </body>
+</html>

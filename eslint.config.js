@@ -26,6 +26,15 @@ export default [
       '.codex-mde-server-editor/**',
     ],
   },
+  // Browser regression tests run in Node and evaluate browser callbacks.
+  {
+    files: ['tests/**/*.mjs'],
+    languageOptions: {
+      ecmaVersion: 'latest',
+      sourceType: 'module',
+      globals: { ...globals.node, ...globals.browser },
+    },
+  },
   js.configs.recommended,
   {
     files: ['src/**/*.{js,jsx}', 'vite.config.js', 'scripts/**/*.mjs'],

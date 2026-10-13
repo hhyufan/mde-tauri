@@ -63,6 +63,8 @@ body.moki-has-background,
   .tabbar__tab-close:hover,
   .footer__toggle-sidebar:hover,
   .footer__mode-toggle:hover,
+  .footer__breadcrumb-segment:hover,
+  .footer__dropdown-item:hover,
   .timeline__item:hover,
   .ft__btn:hover,
   .output-console button:hover,
@@ -115,6 +117,8 @@ body.moki-has-background,
   // --moki-glass-hover / --moki-glass-code 的中性灰，结果整个 markdown 区域灰成一团。
   // 现在改为在玻璃底里掺 --md-tint（.md-preview 定义、可继承），既透出底图又不丢色相。
   .md-preview {
+    --md-code-bg: color-mix(in srgb, var(--md-tint) 6%, var(--moki-glass-code));
+
     code,
     code[class*='language-'],
     .md-preview__math-source,
@@ -135,7 +139,7 @@ body.moki-has-background,
     .milkdown-code-block,
     .md-runnable-code {
       // 代码块：玻璃底里掺一点点蓝，整块偏灰但不失色相。
-      background: color-mix(in srgb, var(--md-tint) 6%, var(--moki-glass-code));
+      background: var(--md-code-bg);
     }
 
     pre code,
@@ -160,10 +164,8 @@ body.moki-has-background,
  * 深色 + 背景图：同一浓度在暗色底图上几乎看不出蓝，需要再单独加一档。
  * 选择器写在顶层——html 不能作为 body 的后代，无法在上面那个块里嵌套。
  */
-html[data-theme='dark'] body.moki-has-background .md-preview code,
-html[data-theme='dark'] body.moki-has-background .md-preview code[class*='language-'],
-html[data-theme='dark'] .app--background .md-preview code,
-html[data-theme='dark'] .app--background .md-preview code[class*='language-'] {
+html[data-theme='dark'] body.moki-has-background .md-preview :not(pre) > code,
+html[data-theme='dark'] .app--background .md-preview :not(pre) > code {
   background: color-mix(in srgb, var(--md-tint) 32%, transparent);
 }
 
@@ -172,21 +174,17 @@ html[data-theme='dark'] .app--background .md-preview blockquote {
   background: color-mix(in srgb, var(--md-tint) 30%, transparent);
 }
 
-html[data-theme='dark'] body.moki-has-background .md-preview pre,
-html[data-theme='dark'] body.moki-has-background .md-preview pre[class*='language-'],
-html[data-theme='dark'] body.moki-has-background .md-preview .milkdown-code-block,
-html[data-theme='dark'] body.moki-has-background .md-preview .md-runnable-code,
-html[data-theme='dark'] .app--background .md-preview pre,
-html[data-theme='dark'] .app--background .md-preview pre[class*='language-'],
-html[data-theme='dark'] .app--background .md-preview .milkdown-code-block,
-html[data-theme='dark'] .app--background .md-preview .md-runnable-code {
-  background: color-mix(in srgb, var(--md-tint) 16%, var(--moki-glass-code));
+html[data-theme='dark'] body.moki-has-background .md-preview,
+html[data-theme='dark'] .app--background .md-preview {
+  // Change the shared surface token, keeping nested pre/code transparent.
+  --md-code-bg: color-mix(in srgb, var(--md-tint) 16%, var(--moki-glass-code));
 }
 
 // antd 浮层 portal 到 body：变量与底色都必须在 body 级适配，
 // 否则下拉/菜单会是一块与背景模式割裂的实色面板。
 body.moki-has-background {
   .ant-select-dropdown,
+  .footer__dropdown,
   .ant-dropdown .ant-dropdown-menu,
   .ant-picker-dropdown .ant-picker-panel-container {
     background: var(--moki-glass-popup);

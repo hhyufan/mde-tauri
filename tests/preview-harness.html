@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="zh">
+  <head><meta charset="UTF-8" /><title>Preview surface parity</title></head>
+  <body>
+    <div id="root"></div>
+    <script type="module">
+      import { setBuffer } from '/src/utils/editorBuffer.js';
+      import editorStore from '/src/store/useEditorStore.js';
+      import { createRoot } from 'react-dom/client';
+      import React from 'react';
+      import { EditorView as CodeMirrorView } from '@codemirror/view';
+      import MarkdownPreview from '/src/components/editor/MarkdownPreview.jsx';
+      import '/src/i18n/index.js';
+      import '/src/assets/styles/index.scss';
+      import '/src/assets/styles/prism-theme.scss';
+      import '/src/assets/styles/App.scss';
+
+      const content = 'Inline `code`\n\n```javascript\nconst a = 1;\n\nconsole.log(a);\n```\n\n```css\nbody { color: red; }\n```\n\n```\nplain\n```\n';
+      setBuffer('surface.md', content);
+      editorStore.setState({
+        activeTabId: 'surface.md',
+        viewMode: 'split',
+        tabs: [{ id: 'surface.md', name: 'surface.md', content, path: '/tmp/surface.md' }],
+        tabRenderList: [{ id: 'surface.md', name: 'surface.md', modified: false, path: '/tmp/surface.md' }],
+      });
+      const milkdown = new URLSearchParams(location.search).get('renderer') === 'milkdown';
+      const Renderer = milkdown
+        ? (await import('/src/components/editor/MilkdownMarkdownEditor.jsx')).default
+        : MarkdownPreview;
+      createRoot(document.getElementById('root')).render(
+        React.createElement('div', { className: 'app', style: { height: '100vh', display: 'flex' } },
+          React.createElement(Renderer, { className: 'md-preview' })),
+      );
+
+      window.trial = {
+        selectCode() {
+          const view = CodeMirrorView.findFromDOM(document.querySelector('.cm-editor'));
+          view.dispatch({ selection: { anchor: 0, head: view.state.doc.length } });
+          view.focus();
+        },
+        /** 切换主题与背景图模式。 */
+        apply({ theme, background }) {
+          document.documentElement.setAttribute('data-theme', theme);
+          document.body.classList.toggle('moki-has-background', background);
+          document.querySelector('.app').classList.toggle('app--background', background);
+          return { theme, background };
+        },
+        /** 读取代码块各层的计算后底色，用于判断是否同色。 */
+        surfaces() {
+          const bg = (el) => (el ? getComputedStyle(el).backgroundColor : null);
+          const preview = document.querySelector('.md-preview');
+          return {
+            runnableWrapper: bg(preview.querySelector('.md-runnable-code')),
+            runnablePre: bg(preview.querySelector('.md-runnable-code pre')),
+            runnableCode: bg(preview.querySelector('.md-runnable-code pre code')),
+            highlightedPre: bg(preview.querySelector('pre.language-css')),
+            highlightedCode: bg(preview.querySelector('pre code.language-css')),
+            inlineCode: bg(preview.querySelector('p code')),
+            plainPre: bg(preview.querySelector('pre:not([class*="language-"])')),
+            hasRunnable: Boolean(preview.querySelector('.md-runnable-code')),
+            hasRunToolbar: Boolean(preview.querySelector('.md-code-execution')),
+          };
+        },
+      };
+    </script>
+  </body>
+</html>

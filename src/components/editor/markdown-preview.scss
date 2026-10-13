@@ -468,7 +468,8 @@
     position: relative;
     margin: 1em 0;
     overflow: hidden;
-    background: var(--bg);
+    // 与预览代码块共用底色，工具栏留白与代码区只绘制一层。
+    background: var(--md-code-bg);
     border: 1px solid var(--border-light);
     border-radius: var(--radius-sm);
 

@@ -1,10 +1,15 @@
+// 代码块只在外层绘制共享底色；背景模式通过 --md-code-bg 调整颜色。
+.md-preview .md-runnable-code,
+.md-preview .milkdown-code-block {
+  background: var(--md-code-bg);
+}
+
 .md-preview .md-runnable-code {
   position: relative;
   margin: 1em 0;
   overflow: hidden;
   border: 1px solid var(--border-light);
   border-radius: var(--radius-sm);
-  background: var(--bg);
   > pre, > pre[class*='language-'] {
     margin: 0;
     padding: 38px 16px 16px;
