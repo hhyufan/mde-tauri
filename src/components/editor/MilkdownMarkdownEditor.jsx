@@ -113,6 +113,7 @@ import { useEditorBufferContent } from '@hooks/useEditorBufferContent';
 import { setBuffer } from '@utils/editorBuffer';
 import { isImeComposing } from '@utils/keyboard';
 import { hydrateMarkdownImages, parseMarkdownLineHint, resolveMarkdownLinkPath } from '@utils/markdownAssets';
+import { observeMarkdownEnhancements } from '@utils/observeMarkdownEnhancements';
 import i18n from '@/i18n';
 import MermaidRenderer from './MermaidRenderer';
 import { attachCodeBlockExecutions } from './milkdownCodeBlockRuns';
@@ -1589,24 +1590,19 @@ function MilkdownInner({
     if (!wrapper) return undefined;
 
     const run = () => {
-      const cleanupImages = hydrateMarkdownImages(wrapper, documentPath);
-      imageCleanupsRef.current.push(cleanupImages);
+      if (wrapper.querySelector('img[src]:not([data-moki-resolved-src])')) {
+        imageCleanupsRef.current.push(hydrateMarkdownImages(wrapper, documentPath));
+      }
       renderMilkdownHtml(wrapper);
       renderMilkdownMath(wrapper);
     };
 
-    const raf = requestAnimationFrame(run);
-    const observer = new MutationObserver(run);
-    observer.observe(wrapper, {
-      attributes: true,
-      attributeFilter: ['data-value', 'src'],
-      childList: true,
-      subtree: true,
-    });
+    const stop = observeMarkdownEnhancements(wrapper,
+      `img[src], span[data-type="html"], span[data-type="${mathInlineType}"], div[data-type="${mathBlockType}"]`,
+      run, ['data-value', 'src']);
 
     return () => {
-      cancelAnimationFrame(raf);
-      observer.disconnect();
+      stop();
       imageCleanupsRef.current.forEach((cleanup) => cleanup?.());
       imageCleanupsRef.current = [];
     };
@@ -1622,14 +1618,7 @@ function MilkdownInner({
       mermaidRoots: mermaidRootsRef.current,
     });
 
-    const raf = requestAnimationFrame(run);
-    const observer = new MutationObserver(run);
-    observer.observe(wrapper, { childList: true, subtree: true });
-
-    return () => {
-      cancelAnimationFrame(raf);
-      observer.disconnect();
-    };
+    return observeMarkdownEnhancements(wrapper, 'pre', run);
   }, [readOnly, renderTick]);
 
   useEffect(() => {

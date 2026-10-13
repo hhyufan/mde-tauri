@@ -532,7 +532,6 @@ function EditorContent() {
       >
         {viewMode === 'edit' && (
           <MonacoEditor
-            key={activeTabId}
             ref={monacoRef}
             className="editor-content__editor"
             onAutoSave={triggerAutoSave}
@@ -560,7 +559,6 @@ function EditorContent() {
         {viewMode === 'split' && hasPreview && (
           <>
             <MonacoEditor
-              key={`${activeTabId}-split`}
               ref={monacoRef}
               className="editor-content__editor editor-content__editor--half"
               onAutoSave={triggerAutoSave}
@@ -588,7 +586,6 @@ function EditorContent() {
         )}
         {!hasPreview && viewMode !== 'edit' && (
           <MonacoEditor
-            key={`${activeTabId}-fallback`}
             ref={monacoRef}
             className="editor-content__editor"
             onAutoSave={triggerAutoSave}

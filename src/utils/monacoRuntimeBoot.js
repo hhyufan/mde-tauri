@@ -17,3 +17,31 @@ export function prepareMonacoRuntime() {
   // Keep this import dynamic so Monaco stays outside the entry chunk.
   return import('./monacoShiki').then(({ initMonacoShiki }) => initMonacoShiki());
 }
+
+let editorLoad = null;
+let loadedEditor = null;
+
+/** Start at application boot, and share the result with every editor mount. */
+export function preloadMonacoEditor() {
+  if (!editorLoad) {
+    // Importing the component does not create an editor. Load its code alongside
+    // the highlighter, but expose it only after themes and tokenizers are ready.
+    editorLoad = Promise.all([
+      prepareMonacoRuntime(),
+      import('../components/editor/MonacoEditor'),
+    ]).then(([, module]) => {
+      loadedEditor = module.default;
+      return module;
+    }).catch((error) => {
+      editorLoad = null;
+      throw error;
+    });
+  }
+  return editorLoad;
+}
+
+// A resolved preload can render synchronously without React.lazy suspending for
+// an extra microtask when the user opens the first file.
+export function getLoadedMonacoEditor() {
+  return loadedEditor;
+}

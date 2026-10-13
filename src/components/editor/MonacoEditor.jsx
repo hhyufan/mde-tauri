@@ -4,7 +4,7 @@
  * 该文件负责创建 Monaco 实例、桥接缓冲区与全局状态、同步主题与语言配置，
  * 并统一接入桌面端右键菜单和移动端选区增强交互。
  */
-import { useEffect, useRef, useImperativeHandle, forwardRef, useState, useCallback } from 'react';
+import { useEffect, useLayoutEffect, useRef, useImperativeHandle, forwardRef, useState, useCallback } from 'react';
 import * as monaco from 'monaco-editor';
 import '@/monaco-worker';
 import useEditorStore from '@store/useEditorStore';
@@ -18,12 +18,24 @@ import { readFileContent, openExternal } from '@utils/tauriApi';
 import { externalLink } from '@utils/editorLinks';
 import { getFileLanguage } from '@utils/fileLanguage';
 import { initMonacoShiki, isMonacoShikiReady, getMonacoThemeName } from '@utils/monacoShiki';
-import { setBuffer, getBuffer, hasBuffer } from '@utils/editorBuffer';
+import { setBuffer, getBuffer } from '@utils/editorBuffer';
 import MonacoContextMenu from './MonacoContextMenu';
 import MobileSelectionBar from './MobileSelectionBar';
 import MonacoSelectionHandles from './MonacoSelectionHandles';
 import { useResponsiveLayout } from '@hooks/useResponsiveLayout';
 import './monaco-editor.scss';
+
+function documentModelInfo(tab) {
+  const language = getFileLanguage(tab.name);
+  if (!monaco.languages.getLanguages().some((item) => item.id === language)) monaco.languages.register({ id: language });
+  return {
+    value: getBuffer(tab.id, tab.content || ''),
+    language,
+    uri: tab.path && /^(?:[a-z]:[\\/]|\/)/i.test(tab.path)
+      ? monaco.Uri.file(tab.path)
+      : monaco.Uri.parse(`inmemory://mokidown/${encodeURIComponent(tab.id)}/${encodeURIComponent(tab.name)}`),
+  };
+}
 
 /**
  * Monaco 编辑器组件。
@@ -46,6 +58,7 @@ import './monaco-editor.scss';
 const MonacoEditorComponent = forwardRef(function MonacoEditorComponent({ className, onAutoSave }, ref) {
   const containerRef = useRef(null);
   const editorRef = useRef(null);
+  const modelsRef = useRef(new Map());
   const currentTabIdRef = useRef(null);
   const suppressModelChangeRef = useRef(false);
   const pendingJump = useProblemsStore((state) => state.pendingJump);
@@ -139,15 +152,22 @@ const MonacoEditorComponent = forwardRef(function MonacoEditorComponent({ classN
   onAutoSaveRef.current = onAutoSave;
 
   // Monaco 实例只初始化一次，后续通过 model 与 options 更新内容和表现。
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (!containerRef.current) return;
+    const models = modelsRef.current;
 
     const isDark = document.documentElement.dataset.theme === 'dark';
     const initialTheme = getMonacoThemeName(isDark);
+    const tab = useEditorStore.getState().getActiveTab();
+    const initial = tab ? documentModelInfo(tab) : null;
+    const initialModel = initial ? monaco.editor.createModel(initial.value, initial.language, initial.uri) : null;
+    if (tab) modelsRef.current.set(tab.id, { model: initialModel, viewState: null });
+    currentTabIdRef.current = tab?.id || null;
 
     const editor = monaco.editor.create(containerRef.current, {
-      value: '',
-      language: 'markdown',
+      // Create the real document once, instead of constructing and immediately
+      // disposing a blank Markdown model before attaching the active file.
+      model: initialModel,
       theme: initialTheme,
       automaticLayout: true,
       minimap,
@@ -189,24 +209,11 @@ const MonacoEditorComponent = forwardRef(function MonacoEditorComponent({ classN
       },
     });
 
-    let dirtyMarkScheduled = false;
     let charCountScheduled = false;
+    let charCountTimer = null;
     let autoSaveTimer = null;
-    let autoSavePending = false;
+    const pendingAutoSave = new Set();
     let isComposing = false;
-
-    /**
-     * 延迟写入脏标记，避免每次击键都直接触发状态更新。
-     */
-    const scheduleDirtyMark = () => {
-      if (dirtyMarkScheduled) return;
-      dirtyMarkScheduled = true;
-      setTimeout(() => {
-        dirtyMarkScheduled = false;
-        const tabId = currentTabIdRef.current;
-        if (tabId) markTabDirty(tabId, true);
-      }, 200);
-    };
 
     /**
      * 节流更新字符统计，降低频繁输入时的全局状态写入成本。
@@ -214,7 +221,8 @@ const MonacoEditorComponent = forwardRef(function MonacoEditorComponent({ classN
     const scheduleCharCount = () => {
       if (charCountScheduled) return;
       charCountScheduled = true;
-      setTimeout(() => {
+      charCountTimer = setTimeout(() => {
+        charCountTimer = null;
         charCountScheduled = false;
         if (editorRef.current) {
           setCharacterCount(editorRef.current.getValue().length);
@@ -225,14 +233,16 @@ const MonacoEditorComponent = forwardRef(function MonacoEditorComponent({ classN
     /**
      * 在短暂空闲后触发自动保存回调，合并连续输入期间的多次变更。
      */
+    const flushAutoSave = () => {
+      for (const tabId of pendingAutoSave) onAutoSaveRef.current?.(tabId);
+      pendingAutoSave.clear();
+    };
     const scheduleAutoSave = () => {
-      autoSavePending = true;
       if (isComposing || autoSaveTimer !== null) return;
       autoSaveTimer = setTimeout(() => {
         autoSaveTimer = null;
-        if (isComposing || !autoSavePending) return;
-        autoSavePending = false;
-        onAutoSaveRef.current?.();
+        if (isComposing) return;
+        flushAutoSave();
       }, 300);
     };
 
@@ -250,7 +260,7 @@ const MonacoEditorComponent = forwardRef(function MonacoEditorComponent({ classN
       isComposing = false;
       // Monaco can emit its final content change after compositionend. Let
       // that event update the buffer before the pending save is dispatched.
-      if (autoSavePending) scheduleAutoSave();
+      if (pendingAutoSave.size) scheduleAutoSave();
     });
 
     editor.onDidChangeModelContent(() => {
@@ -261,8 +271,11 @@ const MonacoEditorComponent = forwardRef(function MonacoEditorComponent({ classN
       // 1. 先同步写入编辑缓冲区，让预览、大纲等消费者按各自节流节奏读取。
       setBuffer(tabId, value);
       // 2. 脏标记、字数统计与自动保存统一节流，避免每次击键都穿透 Zustand。
-      scheduleDirtyMark();
+      // markTabDirty is a no-op for an already dirty tab. Mark immediately so
+      // switching within 200 ms cannot attribute this edit to the next tab.
+      markTabDirty(tabId, true);
       scheduleCharCount();
+      pendingAutoSave.add(tabId);
       scheduleAutoSave();
     });
 
@@ -406,15 +419,29 @@ const MonacoEditorComponent = forwardRef(function MonacoEditorComponent({ classN
     };
     window.addEventListener('unhandledrejection', handleUnhandledRejection);
 
+    const closedTabs = useEditorStore.subscribe((state, previous) => {
+      if (state.tabs === previous.tabs) return;
+      const openIds = new Set(state.tabs.map((item) => item.id));
+      for (const [id, entry] of modelsRef.current) {
+        if (!openIds.has(id) && entry.model !== editor.getModel()) {
+          entry.model.dispose(); modelsRef.current.delete(id);
+        }
+      }
+    });
+
     return () => {
       window.removeEventListener('outline:jump', handleOutlineJump);
       window.removeEventListener('editor:jump-to-line', handleSearchJump);
       window.removeEventListener('unhandledrejection', handleUnhandledRejection);
       if (jumpDecorTimer) clearTimeout(jumpDecorTimer);
-      const model = editor.getModel();
+      if (charCountTimer !== null) clearTimeout(charCountTimer);
+      if (autoSaveTimer !== null) clearTimeout(autoSaveTimer);
+      if (!isComposing) flushAutoSave();
+      closedTabs();
       linkOpener.dispose();
       editor.dispose();
-      model?.dispose();
+      for (const entry of models.values()) entry.model.dispose();
+      models.clear();
       editorRef.current = null;
       setEditorInstance(null);
     };
@@ -422,38 +449,44 @@ const MonacoEditorComponent = forwardRef(function MonacoEditorComponent({ classN
 
   // 激活标签切换时，同步替换编辑器内容。优先读取最新缓冲区内容，必要时再
   // 回退到标签页持久化内容，保证切回标签时未保存修改仍然保留。
-  useEffect(() => {
+  useLayoutEffect(() => {
     const editor = editorRef.current;
     if (!editor) return;
     const tab = activeTabId
       ? useEditorStore.getState().tabs.find((t) => t.id === activeTabId) || null
       : null;
+    const previousId = currentTabIdRef.current;
+    const previous = modelsRef.current.get(previousId);
+    if (previousId !== activeTabId && previous) previous.viewState = editor.saveViewState();
     if (!activeTabId || !tab) {
       currentTabIdRef.current = null;
       suppressModelChangeRef.current = true;
-      const previous = editor.getModel();
-      editor.setModel(monaco.editor.createModel('', 'markdown'));
-      previous?.dispose();
+      editor.setModel(null);
       suppressModelChangeRef.current = false;
       return;
     }
 
     currentTabIdRef.current = activeTabId;
-    const newValue = hasBuffer(activeTabId)
-      ? getBuffer(activeTabId, tab.content || '')
-      : tab.content || '';
-
-    const lang = getFileLanguage(tab.name);
-    if (!monaco.languages.getLanguages().some((language) => language.id === lang)) monaco.languages.register({ id: lang });
-    const uri = tab.path && /^(?:[a-z]:[\\/]|\/)/i.test(tab.path)
-      ? monaco.Uri.file(tab.path)
-      : monaco.Uri.parse(`inmemory://mokidown/${encodeURIComponent(tab.id)}/${encodeURIComponent(tab.name)}`);
-    if (editor.getModel()?.uri.toString() !== uri.toString()) {
-      const previous = editor.getModel();
+    const { value: newValue, language: lang, uri } = documentModelInfo(tab);
+    let entry = modelsRef.current.get(activeTabId);
+    let replacedModel = null;
+    if (!entry || entry.model.uri.toString() !== uri.toString()) {
+      const replaced = entry;
+      entry = { model: monaco.editor.createModel(newValue, lang, uri), viewState: null };
+      modelsRef.current.set(activeTabId, entry);
+      replacedModel = replaced?.model;
+    }
+    if (editor.getModel() !== entry.model) {
       suppressModelChangeRef.current = true;
-      editor.setModel(monaco.editor.createModel(newValue, lang, uri));
+      editor.setModel(entry.model);
+      if (entry.viewState) editor.restoreViewState(entry.viewState);
       suppressModelChangeRef.current = false;
-      previous?.dispose();
+      setContextMenu((menu) => menu.visible ? { ...menu, visible: false } : menu);
+    }
+    replacedModel?.dispose();
+    const openIds = new Set(useEditorStore.getState().tabs.map((item) => item.id));
+    for (const [id, cached] of modelsRef.current) {
+      if (!openIds.has(id)) { cached.model.dispose(); modelsRef.current.delete(id); }
     }
 
     if (editor.getValue() !== newValue) {

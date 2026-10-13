@@ -16,9 +16,9 @@
  * Shiki theme. If an editor is created before that patch is in place — which is
  * what used to happen, because the highlighter takes a while to load and the
  * editor was mounted first — the editor keeps Monaco's Monarch tokenizers and
- * unpainted tokens. `prepareMonacoRuntime()` therefore resolves this module
- * before `MonacoEditor` is even imported, so the patch and the tokenizers are
- * always in place before the first editor exists.
+ * unpainted tokens. Startup preloading can import the editor component in
+ * parallel, but only exposes it after `prepareMonacoRuntime()` resolves, so
+ * the patch and tokenizers are in place before the first editor exists.
  */
 import * as monaco from 'monaco-editor';
 import { registerMgtreeLanguage, treeTokenRules } from './mgtreeLanguage';
