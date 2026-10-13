@@ -68,6 +68,13 @@ export default function MokiSettings({ SettingGroup, SettingRow }) {
           onChange={(value) => config.setConfig('mokiDisplay', value ? 'welcome' : 'hidden')}
         />
       </SettingRow>
+      <SettingRow label={t('moki.icon')} desc={t('moki.iconDesc')}>
+        <Switch
+          aria-label={t('moki.icon')}
+          checked={Boolean(config.mokiIcon)}
+          onChange={(value) => config.setConfig('mokiIcon', value)}
+        />
+      </SettingRow>
     </>
   );
 }

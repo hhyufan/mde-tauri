@@ -457,6 +457,8 @@
   "moki.settingsTitle": "Moki · 主题与形象",
   "moki.display": "人物显示",
   "moki.displayDesc": "关闭后主题卡片与欢迎页都不显示 Moki；她的明暗服装跟随界面主题。",
+  "moki.icon": "Moki 图标",
+  "moki.iconDesc": "开启后，左上角的 M 标识换成 Moki 形象徽章。",
   "moki.theme.light": "晴笺 · 浅色",
   "moki.theme.dark": "夜读 · 深色",
   "moki.theme.lightDesc": "挥手笑迎，明亮轻快",

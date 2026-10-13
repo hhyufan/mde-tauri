@@ -457,6 +457,8 @@
   "moki.settingsTitle": "Moki · Theme & mascot",
   "moki.display": "Show character",
   "moki.displayDesc": "When off, Moki is hidden in both the theme cards and the welcome page. Her outfit follows the interface theme.",
+  "moki.icon": "Moki icon",
+  "moki.iconDesc": "When on, the M mark at the top-left is replaced by Moki's emblem.",
   "moki.theme.light": "Daylight · Light",
   "moki.theme.dark": "Night reading · Dark",
   "moki.theme.lightDesc": "A cheerful wave in daylight",

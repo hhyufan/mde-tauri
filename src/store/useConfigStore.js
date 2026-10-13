@@ -10,6 +10,8 @@ import { readInitialLanguage } from '@/i18n/language';
 const DEVICE_LOCAL_CONFIG_KEYS = new Set([
   'workspacePath', 'serverUrl', 'syncEnabled',
   'backgroundImage', 'backgroundImageName', 'backgroundEnabled', 'backgroundTransparency',
+  // 品牌标识属于本机外观偏好，不必跟着账号同步到其它设备。
+  'mokiIcon',
 ]);
 const initialLanguage = readInitialLanguage();
 
@@ -38,6 +40,8 @@ const useConfigStore = create(
       backgroundEnabled: false,
       backgroundTransparency: { dark: 80, light: 80 },
       mokiDisplay: 'welcome',
+      // 是否用 Moki 形象徽章替换界面左上角的 M 图标。纯外观偏好，默认关闭。
+      mokiIcon: false,
       autoSave: true,
       workspacePath: '',
       serverUrl: 'https://www.miaogu.xyz',
