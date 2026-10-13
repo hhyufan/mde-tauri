@@ -103,6 +103,9 @@ import '@milkdown/kit/prose/view/style/prosemirror.css';
 import '@milkdown/kit/prose/tables/style/tables.css';
 import 'katex/dist/katex.min.css';
 import { useFileManager } from '@hooks/useFileManager';
+import { useEditorContextMenu } from '@hooks/useEditorContextMenu';
+import EditorContextMenu from './EditorContextMenu';
+import { milkdownContextItems } from './milkdownContextMenu';
 import useEditorStore from '@store/useEditorStore';
 import useConfigStore from '@store/useConfigStore';
 import useToastStore from '@store/useToastStore';
@@ -1362,6 +1365,13 @@ function MilkdownInner({
   const mermaidRootsRef = useRef(new Map());
   const imageCleanupsRef = useRef([]);
   const [renderTick, setRenderTick] = useState(0);
+  const { menu, openMenu, closeMenu } = useEditorContextMenu(`${activeTabId}:${renderTick}`);
+  const handleContextMenu = (event) => {
+    const editor = editorRef.current;
+    if (!editor || readOnly || event.target.closest('input, textarea, button, select')) return;
+    const items = milkdownContextItems({ editor, target: event.target, x: event.clientX, y: event.clientY, t: i18n.t.bind(i18n) });
+    openMenu(event, items, 'wysiwyg');
+  };
   const { openFileFromPath } = useFileManager();
   const markTabDirty = useEditorStore((s) => s.markTabDirty);
   const setCharacterCount = useEditorStore((s) => s.setCharacterCount);
@@ -1767,6 +1777,7 @@ function MilkdownInner({
   return (
     <div
       ref={wrapperRef}
+      onContextMenu={handleContextMenu}
       className={`md-preview md-preview--milkdown ${editorInfo.loading ? 'md-preview--stale' : ''} ${className || ''}`}
       style={{
         fontSize: `${fontSize || 14}px`,
@@ -1774,6 +1785,7 @@ function MilkdownInner({
       }}
     >
       <Milkdown />
+      <EditorContextMenu menu={menu} onClose={closeMenu} />
     </div>
   );
 }

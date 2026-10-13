@@ -61,6 +61,9 @@ import { useFileManager } from '@hooks/useFileManager';
 import useEditorStore from '@store/useEditorStore';
 import useConfigStore from '@store/useConfigStore';
 import useToastStore from '@store/useToastStore';
+import { useEditorContextMenu } from '@hooks/useEditorContextMenu';
+import EditorContextMenu from './EditorContextMenu';
+import { MENU_MOD } from '@utils/contextMenuShortcuts';
 import { parseFootnotes, addFootnoteJumpHandlers } from '@utils/footnoteParser';
 import { loadMarkdownImageSrc, parseMarkdownLineHint, resolveMarkdownLinkPath } from '@utils/markdownAssets';
 import MermaidRenderer from './MermaidRenderer';
@@ -282,6 +285,23 @@ const MarkdownPreview = forwardRef(function MarkdownPreview({ className }, ref) 
   const documentPath = activeTab?.path || '';
   const rawContent = useEditorBufferContent(activeTabId, fallback, 240);
   const containerRef = useRef(null);
+  const { menu, openMenu, closeMenu } = useEditorContextMenu(activeTabId);
+  useEffect(closeMenu, [closeMenu, rawContent]);
+  const handleContextMenu = (event) => {
+    const selection = window.getSelection();
+    const root = containerRef.current;
+    const selected = root?.contains(selection?.anchorNode) && root?.contains(selection?.focusNode) ? selection.toString() : '';
+    openMenu(event, [
+      { key: 'copy', label: i18n.t('editor.menu.copy'), shortcut: `${MENU_MOD}+C`, disabled: !selected,
+        run: () => navigator.clipboard.writeText(selected) },
+      { key: 'copyAll', label: i18n.t('editor.menu.copyAll'), run: () => navigator.clipboard.writeText(rawContent) },
+      { key: 's1', separator: true },
+      { key: 'selectAll', label: i18n.t('editor.menu.selectAll'), shortcut: `${MENU_MOD}+A`, run: () => {
+        const range = document.createRange(); range.selectNodeContents(root);
+        selection.removeAllRanges(); selection.addRange(range);
+      } },
+    ], 'preview');
+  };
 
   const [workerProcessedContent, setWorkerProcessedContent] = useState('');
   const processedContent = useMemo(() => {
@@ -552,6 +572,11 @@ const MarkdownPreview = forwardRef(function MarkdownPreview({ className }, ref) 
   return (
     <div
       ref={containerRef}
+      onMouseDown={(event) => {
+        const selection = window.getSelection();
+        if (event.button === 2 && !selection?.isCollapsed && containerRef.current?.contains(selection?.anchorNode)) event.preventDefault();
+      }}
+      onContextMenu={handleContextMenu}
       className={`md-preview ${isStale ? 'md-preview--stale' : ''} ${className || ''}`}
       style={{
         fontSize: `${fontSize || 14}px`,
@@ -559,6 +584,7 @@ const MarkdownPreview = forwardRef(function MarkdownPreview({ className }, ref) 
       }}
     >
       <MarkdownView content={content} components={components} />
+      <EditorContextMenu menu={menu} onClose={closeMenu} />
     </div>
   );
 });

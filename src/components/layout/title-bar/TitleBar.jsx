@@ -88,6 +88,17 @@ function TitleBar({ searchOpen, onOpenSearch, onCloseSearch, onRequestClose }) {
       .catch(() => setIsPinned(false));
   };
 
+  // A native CSS drag region handles right-clicks before the WebView can cancel
+  // its system menu. Start only left-button drags through Tauri instead.
+  const handleDragMouseDown = (event) => {
+    if (!isDesktopWindow || event.button !== 0) return;
+    event.preventDefault();
+    const action = event.detail === 2
+      ? (isMaximized ? appWindow.unmaximize() : appWindow.maximize())
+      : appWindow.startDragging();
+    action.catch(() => {});
+  };
+
   return (
     <header className={`titlebar ${!isDesktopWindow ? 'titlebar--mobile' : ''}`}>
       <TbBtn title={t('topbar.toggleSidebar')} onClick={toggleSidebar}>
@@ -99,7 +110,7 @@ function TitleBar({ searchOpen, onOpenSearch, onCloseSearch, onRequestClose }) {
 
       <SearchDropdown open={searchOpen} onOpen={onOpenSearch} onClose={onCloseSearch} />
 
-      <div className="titlebar__drag" />
+      <div className="titlebar__drag" onMouseDown={handleDragMouseDown} onContextMenu={(event) => event.preventDefault()} />
 
       {isDesktopWindow && (
         <div className="titlebar__actions">

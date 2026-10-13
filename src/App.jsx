@@ -23,6 +23,7 @@ import { useResponsiveLayout } from '@hooks/useResponsiveLayout';
 import { useViewportInsets } from '@hooks/useViewportInsets';
 import { useBackgroundImage } from '@hooks/useBackgroundImage';
 import { getBackgroundTransparency } from '@utils/backgroundImage';
+import { disableNativeContextMenu } from '@utils/nativeContextMenu';
 import { syncEngine } from '@/services/syncEngine';
 import {
   discardRecoverySnapshot,
@@ -86,6 +87,7 @@ function isAssociatedMarkdownPath(path) {
  * 并渲染编辑器主布局与顶层模态层。
  */
 function App() {
+  useEffect(() => disableNativeContextMenu(), []);
   const { t } = useTranslation();
   const initTheme = useThemeStore((s) => s.initTheme);
   const toggleSidebar = useEditorStore((s) => s.toggleSidebar);
@@ -347,6 +349,7 @@ function App() {
    * @param {KeyboardEvent} e 键盘事件对象。
    */
   const handleKeyDown = useCallback((e) => {
+    if (document.querySelector('.editor-context-menu')) return;
     // 输入法组合期间不处理任何应用级快捷键：这一阶段 keyCode 会是 229，
     // 并且回车、方向键都属于输入法自身，抢过来会导致中文输入彻底失效。
     if (isImeComposing(e)) return;
@@ -774,10 +777,6 @@ function App() {
           isAndroid && 'app--android',
           isPortrait && 'app--portrait',
         )}
-        style={hasBackground ? {
-          '--moki-background-image': `url("${backgroundUrl}")`,
-          '--moki-background-opacity': (100 - getBackgroundTransparency(backgroundTransparency, theme)) / 100,
-        } : undefined}
       >
         <Sidebar
           onOpenSettings={() => setSettingsOpen(true)}

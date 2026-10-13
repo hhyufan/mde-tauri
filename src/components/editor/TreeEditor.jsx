@@ -13,6 +13,9 @@ import { useEditorBufferContent } from '../../hooks/useEditorBufferContent';
 import { getBuffer, setBuffer } from '@utils/editorBuffer';
 import { isImeComposing } from '@utils/keyboard';
 import { editTreeSource, flattenTree, parseTreeText } from '@utils/mgtree';
+import { useEditorContextMenu } from '@hooks/useEditorContextMenu';
+import EditorContextMenu from './EditorContextMenu';
+import { MENU_MOD } from '@utils/contextMenuShortcuts';
 import './tree-editor.scss';
 
 function InlineTitle({ title }) {
@@ -49,6 +52,7 @@ export default function TreeEditor({ className = '', onAutoSave, onSourceChange 
   const suppressImeEnterRef = useRef(false);
   const cancelledRef = useRef(false);
   const inputValueRef = useRef('');
+  const { menu, openMenu, closeMenu } = useEditorContextMenu(`${tabId}:${source}`);
 
   const updateExpanded = (keys) => {
     setExpanded(keys);
@@ -113,6 +117,27 @@ export default function TreeEditor({ className = '', onAutoSave, onSourceChange 
     setEditing(null);
   };
 
+  const handleContextMenu = (event, node = null) => {
+    if (event.target.closest('input')) return;
+    const item = (key, run, extra = {}) => ({ key, label: t(`tree.${key}`), run, ...extra });
+    const items = node ? [
+      { key: 'copy', label: t('editor.menu.copy'), shortcut: `${MENU_MOD}+C`, run: () => navigator.clipboard.writeText(node.originalText) },
+      { key: 's1', separator: true },
+      item('editNode', () => startEdit(node), { shortcut: 'F2' }),
+      item('addChild', () => addNode(node), { shortcut: 'Insert' }),
+      { key: 's2', separator: true },
+      item('deleteNode', () => deleteNode(node), { danger: true, shortcut: 'Delete' }),
+    ] : [
+      item('addRoot', () => addNode(null), { shortcut: 'Insert' }),
+      { key: 's1', separator: true },
+      item('expandAll', () => updateExpanded(flat.filter((node) => node.children.length).map((node) => node.key))),
+      item('collapseAll', () => updateExpanded([])),
+      { key: 's2', separator: true },
+      { key: 'copyAll', label: t('editor.menu.copyAll'), run: () => navigator.clipboard.writeText(source) },
+    ];
+    openMenu(event, items, 'tree');
+  };
+
   const action = (name, icon, onClick, extra = {}) => (
     <Tooltip title={t(`tree.${name}`)}>
       <Button type="text" size="small" aria-label={t(`tree.${name}`)} icon={icon} onClick={onClick} {...extra} />
@@ -127,7 +152,7 @@ export default function TreeEditor({ className = '', onAutoSave, onSourceChange 
       key: node.key,
       className: index === siblings.length - 1 ? 'moki-tree__last' : '',
       title: (
-        <div className={`moki-tree__node ${node.jumpLanguage ? 'moki-tree__node--linked' : ''}`}>
+        <div className={`moki-tree__node ${node.jumpLanguage ? 'moki-tree__node--linked' : ''}`} onContextMenu={(event) => handleContextMenu(event, node)}>
           <Icon className={`moki-tree__icon ${branch ? 'moki-tree__icon--folder' : ''}`} />
           {editing === node.key ? (
             <Input autoFocus className="moki-tree__input" size="small" value={value}
@@ -183,7 +208,8 @@ export default function TreeEditor({ className = '', onAutoSave, onSourceChange 
   };
 
   return (
-    <section className={`moki-tree ${className}`} aria-label={t('tree.title')} style={{ '--tree-font-size': `${fontSize}px` }}>
+    <section className={`moki-tree ${className}`} aria-label={t('tree.title')} style={{ '--tree-font-size': `${fontSize}px` }} onContextMenu={(event) => handleContextMenu(event)}>
+      <EditorContextMenu menu={menu} onClose={closeMenu} />
       <div className="moki-tree__toolbar">
         <div className="moki-tree__tools">
           {action('addRoot', <PlusOutlined />, () => addNode(null), { className: 'moki-tree__add' })}

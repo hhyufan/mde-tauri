@@ -1,0 +1,75 @@
+<!doctype html>
+<html lang="en">
+  <head><meta charset="UTF-8" /><title>Editor context menus</title></head>
+  <body>
+    <div id="root"></div>
+    <script type="module">
+      import React from 'react';
+      import { createRoot } from 'react-dom/client';
+      import { setBuffer, getBuffer } from '/src/utils/editorBuffer.js';
+      import editorStore from '/src/store/useEditorStore.js';
+      import themeStore from '/src/store/useThemeStore.js';
+      import i18n from '/src/i18n/index.js';
+      import { editorViewCtx } from '@milkdown/kit/core';
+      import { TextSelection } from '@milkdown/kit/prose/state';
+      import { EditorView as CodeMirrorView } from '@codemirror/view';
+      import { useBackgroundSurfaces } from '/src/hooks/useBackgroundSurfaces.js';
+      import { disableNativeContextMenu } from '/src/utils/nativeContextMenu.js';
+      import ThemedConfigProvider from '/src/antd/ThemedConfigProvider.jsx';
+      import '/src/assets/styles/index.scss';
+      import '/src/assets/styles/App.scss';
+      import '/src/assets/styles/prism-theme.scss';
+      import '/src/assets/styles/antd-overrides.scss';
+
+      await i18n.changeLanguage('en');
+      disableNativeContextMenu();
+      const mode = new URLSearchParams(location.search).get('mode') || 'preview';
+      const source = mode === 'tree' ? 'Root\n  Child\nOther\n'
+        : 'Alpha beta\n\n```javascript\nconst a = 1;\nconsole.log(a);\n```\n';
+      setBuffer('context', source);
+      editorStore.setState({ activeTabId: 'context', tabs: [{ id: 'context', name: 'context.md', content: source }],
+        tabRenderList: [{ id: 'context', name: 'context.md' }] });
+      const Renderer = mode === 'tree' ? (await import('/src/components/editor/TreeEditor.jsx')).default
+        : mode === 'milkdown' ? (await import('/src/components/editor/MilkdownMarkdownEditor.jsx')).default
+        : (await import('/src/components/editor/MarkdownPreview.jsx')).default;
+      const rendererRef = React.createRef();
+      const imageUrl = `data:image/svg+xml,${encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="800" height="400"><rect width="800" height="400" fill="#63768d"/><circle cx="300" cy="230" r="140" fill="#a87d99"/></svg>')}`;
+      let applyTheme;
+      function Harness() {
+        const [theme, setTheme] = React.useState('dark');
+        applyTheme = setTheme;
+        useBackgroundSurfaces({ enabled: true, imageUrl, opacity: theme === 'dark' ? 0.5 : 0.25 });
+        return React.createElement(ThemedConfigProvider, null,
+          React.createElement('div', { className: 'app app--background', style: { display: 'flex' } },
+            React.createElement(Renderer, mode === 'tree' ? {} : { ref: rendererRef })));
+      }
+      document.body.classList.add('moki-has-background');
+      document.documentElement.dataset.theme = 'dark'; themeStore.setState({ theme: 'dark' });
+      createRoot(document.getElementById('root')).render(React.createElement(Harness));
+      window.trial = {
+        source, clipboard: '',
+        markdown: () => rendererRef.current?.getCurrentValue?.() ?? getBuffer('context'),
+        selectText(text) {
+          if (mode === 'milkdown') rendererRef.current.getEditor().action((ctx) => {
+            const view = ctx.get(editorViewCtx); let from;
+            view.state.doc.descendants((node, pos) => { if (from == null && node.isText && node.text.includes(text)) from = pos + node.text.indexOf(text); });
+            view.dispatch(view.state.tr.setSelection(TextSelection.create(view.state.doc, from, from + text.length))); view.focus();
+          });
+          else {
+            const node = document.querySelector('.md-preview p').firstChild;
+            const range = document.createRange(); range.setStart(node, node.textContent.indexOf(text)); range.setEnd(node, node.textContent.indexOf(text) + text.length);
+            const selection = window.getSelection(); selection.removeAllRanges(); selection.addRange(range);
+          }
+        },
+        selectCode() {
+          const cm = CodeMirrorView.findFromDOM(document.querySelector('.cm-editor'));
+          cm.dispatch({ selection: { anchor: 0, head: cm.state.doc.length } }); cm.focus();
+        },
+        theme(theme) { document.documentElement.dataset.theme = theme; themeStore.setState({ theme }); applyTheme(theme); },
+      };
+      Object.defineProperty(navigator, 'clipboard', { configurable: true, value: {
+        writeText: async (text) => { window.trial.clipboard = text; }, readText: async () => window.trial.clipboard,
+      } });
+    </script>
+  </body>
+</html>
