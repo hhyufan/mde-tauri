@@ -1,35 +1,35 @@
 /**
  * 应用标识样式。
  *
- * 图标资源本身是蓝色圆形（四角透明），这里只负责尺寸、圆形裁切与一层轻投影，
- * 让它在侧栏/关于页的平面上看起来是"贴上去的"，而不是压在文字旁边。
+ * 图标资源本身就是蓝色圆形（四角透明），所以这里**不做圆形裁切**：
+ * border-radius: 50% 会再执行一次没有抗锯齿的硬裁切，正好切在圆弧上，
+ * 结果是外圆出现锯齿——实测把它去掉后圆弧立刻变干净。
+ *
+ * 同样不加 drop-shadow：它在深色底上勾出一圈灰边，让圆弧看起来发毛，
+ * 而图标自带描边已经足以界定形状。
+ *
+ * 结论：这里只负责尺寸与对齐，外观完全交给资源本身。
  */
 .app-mark {
   --app-mark-size: 32px;
   width: var(--app-mark-size);
   height: var(--app-mark-size);
-  border-radius: 50%;
   display: block;
   flex-shrink: 0;
   object-fit: contain;
   user-select: none;
   -webkit-user-drag: none;
-  filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.18));
 }
 
 /**
  * 完整字标变体。
  *
- * 它是横向组合标识（图形 + 文字一体），因此：
- * - 高度由 --app-mark-size 决定，宽度按原比例自适应；
- * - 不能套圆形裁切，否则会被切成椭圆；
- * - 自带描边与投影，再叠一层 filter 只会显脏。
+ * 它是横向组合标识（图形 + 文字一体），因此高度由 --app-mark-size 决定、
+ * 宽度按原比例自适应，且同样不做圆形裁切。
  */
 .app-mark--wordmark {
   width: auto;
   height: var(--app-mark-size);
   max-width: 100%;
-  border-radius: 0;
   object-fit: contain;
-  filter: none;
 }
