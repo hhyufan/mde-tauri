@@ -1306,11 +1306,14 @@ function enhanceCodeBlocks(container, { readOnly, mermaidRoots }) {
  */
 function findNodeByOutlineItem(doc, { line, text, type }) {
   const cleanText = String(text || '').trim();
-  const candidates = findChildren(doc, (node) => {
+  // 注意 findChildren 是柯里化的：先传谓词拿到查询函数，再用 doc 调用。
+  // 之前写成 findChildren(doc, predicate)，等于把 doc 当谓词，拿到的是函数而非数组，
+  // 于是 .find 直接抛 TypeError（点大纲里的列表项必崩）。
+  const candidates = findChildren((node) => {
     if (type === 'heading') return node.type.name === 'heading';
     if (type === 'list-ordered' || type === 'list-unordered') return node.type.name === 'listItem';
     return false;
-  });
+  })(doc);
 
   if (line) {
     const exactLine = candidates.find(({ node }) => node.attrs?.line === line);
