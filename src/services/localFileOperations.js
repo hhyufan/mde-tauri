@@ -1,5 +1,5 @@
 import useEditorStore from '@store/useEditorStore';
-import { getBuffer } from '@utils/editorBuffer';
+import { getBuffer, flushEditorBuffer } from '@utils/editorBuffer';
 import { readFileContent, saveFile } from '@utils/tauriApi';
 import { classifyFileVersions, getDiskBaseline, rememberDiskBaseline, withFileOperation } from './localFileGuard';
 
@@ -10,7 +10,7 @@ export function setLocalFileComposing(composing) {
 
 // Call only while holding the path's operation queue. Read editor state AFTER IO;
 // neither a captured Zustand state nor a watcher event is a disk snapshot.
-async function inspectFile(path, isCurrent = () => true) {
+async function inspectFile(path, isCurrent = () => true, flushEditor = false) {
   for (let attempt = 0; attempt < 3; attempt += 1) {
     const baseline = getDiskBaseline(path);
     const disk = await readFileContent(path).catch(() => null);
@@ -19,6 +19,7 @@ async function inspectFile(path, isCurrent = () => true) {
     const state = useEditorStore.getState();
     const tab = state.tabs.find((item) => item.path === path);
     if (!tab) return null;
+    if (flushEditor) flushEditorBuffer(tab.id);
     const editorContent = getBuffer(tab.id, tab.content || '');
     const diskContent = disk?.content || '';
     return {
@@ -62,7 +63,7 @@ function reloadExternal(path, version) {
 export function saveExistingFile(path, _content, encoding, _tabId) {
   return withFileOperation(path, async () => {
     if (inputComposing) return { success: false, superseded: true };
-    const version = await inspectFile(path, () => !inputComposing);
+    const version = await inspectFile(path, () => !inputComposing, true);
     if (!version) return { success: false, superseded: true };
     const { state, tab, outcome, editorContent, diskContent } = version;
     if (outcome === 'conflict' || outcome === 'unavailable') {

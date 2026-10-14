@@ -18,7 +18,7 @@ import { readFileContent, openExternal } from '@utils/tauriApi';
 import { externalLink } from '@utils/editorLinks';
 import { getFileLanguage } from '@utils/fileLanguage';
 import { initMonacoShiki, isMonacoShikiReady, getMonacoThemeName } from '@utils/monacoShiki';
-import { setBuffer, getBuffer } from '@utils/editorBuffer';
+import { setBuffer, getBuffer, registerEditorBufferFlusher } from '@utils/editorBuffer';
 import { getDocumentViewState, setDocumentViewState, registerDocumentViewState, requestDocumentViewStateSave } from '@utils/documentViewState';
 import MonacoContextMenu from './MonacoContextMenu';
 import MobileSelectionBar from './MobileSelectionBar';
@@ -310,6 +310,16 @@ const MonacoEditorComponent = forwardRef(function MonacoEditorComponent({ classN
       scheduleAutoSave();
     });
 
+    const stopBufferFlusher = registerEditorBufferFlusher(() => currentTabIdRef.current, () => {
+      if (isComposing) return;
+      const tabId = currentTabIdRef.current;
+      const value = editor.getValue();
+      if (tabId && value !== getBuffer(tabId)) {
+        setBuffer(tabId, value);
+        markTabDirty(tabId, true);
+      }
+    });
+
     editor.onDidChangeCursorPosition((e) => {
       setCursorPosition({
         lineNumber: e.position.lineNumber,
@@ -469,6 +479,7 @@ const MonacoEditorComponent = forwardRef(function MonacoEditorComponent({ classN
       if (autoSaveTimer !== null) clearTimeout(autoSaveTimer);
       if (!isComposing) flushAutoSave();
       closedTabs();
+      stopBufferFlusher();
       stopSessionView();
       linkOpener.dispose();
       editor.dispose();

@@ -417,7 +417,12 @@ function App() {
       e.preventDefault();
       return;
     }
-    if (runHotkeyAction(action.id)) e.preventDefault();
+    if (runHotkeyAction(action.id)) {
+      e.preventDefault();
+      // This capture listener already handled the action. Do not deliver the
+      // same keydown to Monaco's command binding and save a second time.
+      e.stopPropagation();
+    }
   }, [matchHotkey, runHotkeyAction]);
 
   useEffect(() => {
@@ -435,7 +440,8 @@ function App() {
     return () => document.removeEventListener('keydown', onKeyDown, true);
   }, [handleKeyDown]);
 
-  // Monaco 获得焦点时会吞掉按键，它注册的键位改为通过事件回到这里执行。
+  // Monaco 的命令入口仍可通过事件执行；已在捕获阶段处理的实体按键
+  // 会停止传播，确保同一次操作不会再走这条入口。
   useEffect(() => {
     const onCommand = (event) => {
       const actionId = event?.detail?.actionId;

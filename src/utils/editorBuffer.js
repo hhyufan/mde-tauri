@@ -12,6 +12,23 @@
 
 const buffers = new Map();
 const listeners = new Set();
+const editorFlushers = new Set();
+
+// Capture the real editor before a save/recovery takes its buffer snapshot.
+export function registerEditorBufferFlusher(getTabId, flushEditor) {
+  const entry = { getTabId, flushEditor };
+  editorFlushers.add(entry);
+  return () => editorFlushers.delete(entry);
+}
+
+export function flushEditorBuffer(tabId) {
+  const entry = [...editorFlushers].reverse().find((item) => item.getTabId() === tabId);
+  entry?.flushEditor();
+}
+
+export function flushEditorBuffers() {
+  for (const entry of editorFlushers) entry.flushEditor();
+}
 
 let pendingIds = new Set();
 let scheduled = false;

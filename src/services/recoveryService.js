@@ -1,5 +1,5 @@
 import useEditorStore from '@store/useEditorStore';
-import { getBuffer, subscribe as subscribeBuffer } from '@utils/editorBuffer';
+import { getBuffer, flushEditorBuffers, subscribe as subscribeBuffer } from '@utils/editorBuffer';
 import {
   clearRecoverySnapshot as clearNativeRecoverySnapshot,
   readFileContent,
@@ -13,6 +13,7 @@ let timer = null;
 let unsubscribeBuffer = null;
 let unsubscribeStore = null;
 let writeChain = Promise.resolve();
+let snapshotRequest = 0;
 
 function isTauriRuntime() {
   return typeof window !== 'undefined' && Boolean(window.__TAURI_INTERNALS__);
@@ -28,10 +29,10 @@ async function buildSnapshot() {
   const state = useEditorStore.getState();
   const metaById = new Map(state.tabRenderList.map((tab) => [tab.id, tab]));
   const dirtyTabs = state.tabs.filter((tab) => metaById.get(tab.id)?.modified ?? tab.modified);
-  const tabs = await Promise.all(dirtyTabs.map(async (tab) => {
+  const drafts = await Promise.all(dirtyTabs.map(async (tab) => {
     const content = getBuffer(tab.id, tab.content || '');
     const lastSavedContent = tab.content || '';
-    return {
+    return { lastSavedContent, draft: {
       recoveryId: tab.recoveryId || tab.id,
       tabId: tab.id,
       name: tab.name || 'Untitled.md',
@@ -42,8 +43,18 @@ async function buildSnapshot() {
       recoveryHash: await hashText(content),
       modified: true,
       content,
-    };
+    } };
   }));
+  // Hashing is asynchronous. A save, close, or new edit may have made these
+  // captured drafts obsolete before the hashes finish.
+  const latest = useEditorStore.getState();
+  const tabs = drafts.filter(({ draft, lastSavedContent }) => {
+    const tab = latest.tabs.find((item) => item.id === draft.tabId);
+    const meta = latest.tabRenderList.find((item) => item.id === draft.tabId);
+    return tab && (meta?.modified ?? tab.modified)
+      && (tab.content || '') === lastSavedContent
+      && getBuffer(tab.id, tab.content || '') === draft.content;
+  }).map(({ draft }) => draft);
   return {
     schemaVersion: RECOVERY_SCHEMA_VERSION,
     updatedAt: Date.now(),
@@ -54,12 +65,15 @@ async function buildSnapshot() {
 
 export async function flushRecoverySnapshot() {
   if (!isTauriRuntime()) return;
+  flushEditorBuffers();
   if (timer) {
     clearTimeout(timer);
     timer = null;
   }
+  const request = ++snapshotRequest;
   const snapshot = await buildSnapshot();
-  writeChain = writeChain.then(() => (
+  if (request !== snapshotRequest) return writeChain;
+  writeChain = writeChain.catch(() => {}).then(() => request !== snapshotRequest ? undefined : (
     snapshot.tabs.length > 0
       ? writeNativeRecoverySnapshot(snapshot)
       : clearNativeRecoverySnapshot()
@@ -124,5 +138,9 @@ export async function loadRecoveryCandidates() {
 }
 
 export async function discardRecoverySnapshot() {
-  if (isTauriRuntime()) await clearNativeRecoverySnapshot();
+  if (!isTauriRuntime()) return;
+  snapshotRequest++;
+  if (timer) { clearTimeout(timer); timer = null; }
+  writeChain = writeChain.catch(() => {}).then(() => clearNativeRecoverySnapshot());
+  await writeChain;
 }

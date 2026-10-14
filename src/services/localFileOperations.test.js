@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { invoke } from '@tauri-apps/api/core';
 import useEditorStore from '@store/useEditorStore';
-import { clearBuffer, getBuffer, setBuffer } from '@utils/editorBuffer';
+import { clearBuffer, getBuffer, setBuffer, registerEditorBufferFlusher } from '@utils/editorBuffer';
 import { saveFile } from '@utils/tauriApi';
 import { clearDiskBaselines, getDiskBaseline, rememberDiskBaseline } from './localFileGuard';
 import { createFileChangeObserver, reconcileFileChange, saveExistingFile, setLocalFileComposing } from './localFileOperations';
@@ -45,6 +45,21 @@ afterEach(() => {
 });
 
 describe('local file save/watch coordination', () => {
+  it('flushes a delayed editor before writing and clears dirty state for that exact snapshot', async () => {
+    const stop = registerEditorBufferFlusher(() => path, () => {
+      setBuffer(path, 'latest editor text');
+      useEditorStore.getState().markTabDirty(path);
+    });
+    try {
+      expect(await saveExistingFile(path, 'old buffer', 'UTF-8', path)).toMatchObject({ success: true, savedContent: 'latest editor text' });
+      expect(diskContent).toBe('latest editor text');
+      expect(useEditorStore.getState().tabRenderList[0].modified).toBe(false);
+      expect(useEditorStore.getState().tabs[0].content).toBe(diskContent);
+      expect(getDiskBaseline(path).content).toBe(diskContent);
+      expect(await reconcileFileChange(path)).toBe('unchanged');
+      expect(useEditorStore.getState().externalFileConflict).toBeNull();
+    } finally { stop(); }
+  });
   it('skips a previously scheduled autosave while IME is composing, then saves the committed buffer', async () => {
     setLocalFileComposing(true);
     expect(await saveExistingFile(path, 'unfinished', 'UTF-8', path)).toMatchObject({ superseded: true });

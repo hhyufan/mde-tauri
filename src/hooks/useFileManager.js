@@ -36,7 +36,7 @@ import useFileStore from '@store/useFileStore';
 import useConfigStore from '@store/useConfigStore';
 import useNotificationStore from '@store/useNotificationStore';
 import { syncEngine, isCloudPath, fileIdFromCloudPath } from '@/services/syncEngine';
-import { getBuffer } from '@utils/editorBuffer';
+import { getBuffer, flushEditorBuffer } from '@utils/editorBuffer';
 import { debounceByKey } from '@utils/debounce';
 import { sortDirectoryContents } from '@utils/directoryContents';
 import { isAndroidRuntime } from '@utils/platform';
@@ -758,6 +758,7 @@ export function useFileManager() {
     // 这里统一通过 getLiveTabById 取最新缓冲内容，避免把过期正文落盘/推云
     // （尤其是云端文档“认领”落盘时，会把旧内容推到云，导致新编辑丢失）。
     const activeId = useEditorStore.getState().activeTabId;
+    flushEditorBuffer(tabId || activeId);
     const tab = getLiveTabById(tabId || activeId);
     if (!tab) return { ok: false };
 
@@ -818,6 +819,7 @@ export function useFileManager() {
    * @returns {Promise<void>}
    */
   const saveAsDialog = useCallback(async () => {
+    flushEditorBuffer(useEditorStore.getState().activeTabId);
     const tab = useEditorStore.getState().getActiveTab();
     if (!tab) return;
 
