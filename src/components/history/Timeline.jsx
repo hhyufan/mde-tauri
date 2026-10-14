@@ -90,7 +90,7 @@ export default function Timeline() {
   if (!eligible) return null;
 
   return (
-    <section className="timeline">
+    <section className={`timeline${expanded ? ' timeline--open' : ''}`}>
       <header className="timeline__header">
         <button
           type="button"
@@ -99,7 +99,7 @@ export default function Timeline() {
           aria-label={t('history.title')}
           onClick={() => setExpanded(!expanded)}
         >
-          <ChevronIcon className={expanded ? 'is-open' : ''} />
+          <ChevronIcon className="timeline__chevron" />
         </button>
         <span className="timeline__label">{t('history.title')}</span>
         <span className="timeline__count">{entries.length}</span>
@@ -110,10 +110,13 @@ export default function Timeline() {
         </Tooltip>
       </header>
 
-      {expanded && (
-        loading ? (
-          <div className="timeline__placeholder">{t('history.empty')}</div>
-        ) : entries.length === 0 ? (
+      {/*
+        内容始终挂载，靠高度过渡做出抽屉效果——条件渲染会把元素直接移除，
+        没有任何可过渡的高度。
+        折叠时用 aria-hidden 让辅助技术跳过它（jsdom 下的 role 查询同样会忽略）。
+      */}
+      <div className="timeline__body" aria-hidden={!expanded}>
+        {loading || entries.length === 0 ? (
           <div className="timeline__placeholder">{t('history.empty')}</div>
         ) : (
           <ul className="timeline__list">
@@ -140,8 +143,8 @@ export default function Timeline() {
               </li>
             ))}
           </ul>
-        )
-      )}
+        )}
+      </div>
     </section>
   );
 }

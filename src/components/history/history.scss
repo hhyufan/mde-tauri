@@ -38,10 +38,32 @@
   background: transparent;
   color: var(--text-sec);
   cursor: pointer;
-  // 与面包屑同款箭头：字形默认朝右（收起态），展开时旋转 90° 朝下。
-  svg { width: 12px; height: 12px; transition: transform 0.12s; }
-  svg.is-open { transform: rotate(90deg); }
   &:hover { color: var(--text); }
+}
+
+/* 与大纲箭头同款：字形默认朝右（收起态），展开时旋转 90° 朝下。 */
+.timeline__chevron {
+  width: 12px;
+  height: 12px;
+  transition: transform 0.22s ease;
+}
+
+.timeline--open .timeline__chevron {
+  transform: rotate(90deg);
+}
+
+/*
+ * 抽屉本体：内容始终挂载，靠 max-height 过渡出「拉开 / 收起」的效果。
+ * 时长与箭头旋转保持一致，两者同步收放。
+ */
+.timeline__body {
+  overflow: hidden;
+  max-height: 0;
+  transition: max-height 0.22s ease;
+}
+
+.timeline--open .timeline__body {
+  max-height: calc(var(--timeline-row) * var(--timeline-rows));
 }
 
 .timeline__label {
