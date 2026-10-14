@@ -25,12 +25,18 @@
   display: flex;
   align-items: center;
   /*
-   * 上 17.5 + 字标 24 + 下 5.5 = 47px，加 1px 底线共 48px，与右侧 titlebar 等高：
-   * 字标底边因此落在 41.5px（与搜索框底边齐平），底线也与顶栏底边落在同一水平线。
-   * 搜索框底边 41.5px 为实测值：titlebar 高 48px、搜索框高 36px 居中。
+   * 上 12 + 字标 24 + 下 11 + 1px 底线 = 48px，与右侧 titlebar 等高；
+   * 字标中心因此落在 24px，与搜索框的中心线一致（竖向居中）。
    */
-  padding: 17.5px 16px 5.5px;
+  padding: 12px 16px 11px;
   border-bottom: 1px solid var(--border);
+  /*
+   * 盖掉侧栏自身的 border-right：那条竖线本意是分隔侧栏与内容区，
+   * 但在最上面这一段它会把品牌区与右侧搜索框、窗口控制切开。
+   * 用背景色顶掉这 1px，顶栏横向就是贯通的整体（底线也随之连续）。
+   */
+  margin-right: -1px;
+  background: var(--sidebar);
 }
 
 // 尺寸不在这里设定：AppMark 通过内联样式下发 --app-mark-size，
