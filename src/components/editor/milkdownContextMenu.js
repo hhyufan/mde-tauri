@@ -23,6 +23,7 @@ export function milkdownContextItems({ editor, target, x, y, t }) {
   const selection = cm ? cm.state.selection : view.state.selection;
   const doc = cm ? cm.state.doc : view.state.doc;
   const selected = cm ? cm.state.sliceDoc(selection.main.from, selection.main.to)
+    : selection.node?.type.name === 'html_block' ? selection.node.attrs.value
     : view.state.doc.textBetween(selection.from, selection.to, '\n\n');
   const current = () => cm ? cm.dom.isConnected && cm.state.doc === doc : view.state.doc.eq(doc);
   const restore = () => {
