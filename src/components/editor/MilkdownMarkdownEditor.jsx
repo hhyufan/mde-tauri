@@ -17,7 +17,7 @@ import {
 } from 'react';
 import { createRoot } from 'react-dom/client';
 import { Milkdown, MilkdownProvider, useEditor } from '@milkdown/react';
-import { Editor, commandsCtx, defaultValueCtx, editorViewCtx, editorViewOptionsCtx, rootCtx } from '@milkdown/kit/core';
+import { Editor, commandsCtx, defaultValueCtx, editorViewCtx, editorViewOptionsCtx, rootCtx, serializerCtx } from '@milkdown/kit/core';
 import {
   commonmark,
   bulletListSchema,
@@ -113,14 +113,14 @@ import useToastStore from '@store/useToastStore';
 import { useEditorBufferContent } from '@hooks/useEditorBufferContent';
 import { useDocumentScrollState } from '@hooks/useDocumentScrollState';
 import { getDocumentViewState, registerDocumentViewState, requestDocumentViewStateSave } from '@utils/documentViewState';
-import { setBuffer } from '@utils/editorBuffer';
+import { setBuffer, registerEditorBufferFlusher } from '@utils/editorBuffer';
 import { isImeComposing } from '@utils/keyboard';
 import { hydrateMarkdownImages, parseMarkdownLineHint, resolveMarkdownLinkPath } from '@utils/markdownAssets';
 import { observeMarkdownEnhancements } from '@utils/observeMarkdownEnhancements';
 import i18n from '@/i18n';
 import MermaidRenderer from './MermaidRenderer';
 import { attachCodeBlockExecutions } from './milkdownCodeBlockRuns';
-import { milkdownEditingFlow, milkdownGapCursor, handleMilkdownBlockKeyDown, handleMilkdownBlankPointerDown } from './milkdownEditingFlow';
+import { milkdownEditingFlow, milkdownGapCursor, handleMilkdownBlockKeyDown, handleMilkdownBlankPointerDown, persistentMilkdownDocument } from './milkdownEditingFlow';
 import { isAndroidRuntime } from '@utils/platform';
 import './markdown-preview.scss';
 
@@ -1376,9 +1376,9 @@ function MilkdownInner({
   const editorRef = useRef(null);
   const currentTabIdRef = useRef(activeTabId);
   const onAutoSaveRef = useRef(onAutoSave);
-  const dirtyTimerRef = useRef(null);
   const charTimerRef = useRef(null);
   const saveTimerRef = useRef(null);
+  const publishedMarkdownRef = useRef(null);
   const mermaidRootsRef = useRef(new Map());
   const imageCleanupsRef = useRef([]);
   const [renderTick, setRenderTick] = useState(0);
@@ -1411,12 +1411,8 @@ function MilkdownInner({
 
     setBuffer(tabId, markdown);
 
-    if (!dirtyTimerRef.current) {
-      dirtyTimerRef.current = setTimeout(() => {
-        dirtyTimerRef.current = null;
-        markTabDirty(tabId, true);
-      }, 200);
-    }
+    // A delayed dirty callback can re-light the indicator after saving.
+    markTabDirty(tabId, true);
 
     if (!charTimerRef.current) {
       charTimerRef.current = setTimeout(() => {
@@ -1432,6 +1428,15 @@ function MilkdownInner({
       }, 300);
     }
   }, [markTabDirty, readOnly, setCharacterCount]);
+
+  const publishEditorContent = useCallback((ctx) => {
+    const state = ctx.get(editorViewCtx).state;
+    const markdown = ctx.get(serializerCtx)(persistentMilkdownDocument(state));
+    if (markdown === publishedMarkdownRef.current) return;
+    publishedMarkdownRef.current = markdown;
+    scheduleEditorSideEffects(markdown);
+    setRenderTick((value) => value + 1);
+  }, [scheduleEditorSideEffects]);
 
   const editorInfo = useEditor((root) => {
     const editor = Editor.make()
@@ -1470,11 +1475,11 @@ function MilkdownInner({
           },
         }));
         ctx.get(listenerCtx)
-          .markdownUpdated((_, markdown, prevMarkdown) => {
-            if (markdown === prevMarkdown) return;
-            scheduleEditorSideEffects(markdown);
-            setRenderTick((value) => value + 1);
-          });
+          .mounted((editorCtx) => {
+            const state = editorCtx.get(editorViewCtx).state;
+            publishedMarkdownRef.current = editorCtx.get(serializerCtx)(persistentMilkdownDocument(state));
+          })
+          .markdownUpdated(publishEditorContent);
       })
       .use(commonmark)
       .use(gfm)
@@ -1488,7 +1493,12 @@ function MilkdownInner({
 
     editorRef.current = editor;
     return editor;
-  }, [activeTabId, content, readOnly, scheduleEditorSideEffects]);
+  }, [activeTabId, content, readOnly, publishEditorContent]);
+
+  useEffect(() => {
+    if (editorInfo.loading || readOnly) return undefined;
+    return registerEditorBufferFlusher(() => activeTabId, () => editorRef.current?.action(publishEditorContent));
+  }, [activeTabId, editorInfo.loading, readOnly, publishEditorContent]);
 
   useDocumentScrollState(wrapperRef, activeTabId, 'milkdownScroll', !editorInfo.loading);
   useEffect(() => {
@@ -1520,7 +1530,7 @@ function MilkdownInner({
 
   useImperativeHandle(ref, () => ({
     getEditor: () => editorRef.current,
-    getCurrentValue: () => editorRef.current?.action(getMarkdown()) ?? content ?? '',
+    getCurrentValue: () => editorRef.current?.action((ctx) => ctx.get(serializerCtx)(persistentMilkdownDocument(ctx.get(editorViewCtx).state))) ?? content ?? '',
     handleToolbarAction(action) {
       let handled = false;
       editorRef.current?.action((ctx) => {
@@ -1813,7 +1823,7 @@ function MilkdownInner({
   }, [readOnly]);
 
   useEffect(() => () => {
-    [dirtyTimerRef, charTimerRef, saveTimerRef].forEach((timerRef) => {
+    [charTimerRef, saveTimerRef].forEach((timerRef) => {
       if (timerRef.current) clearTimeout(timerRef.current);
     });
     imageCleanupsRef.current.forEach((cleanup) => cleanup?.());

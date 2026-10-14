@@ -19,12 +19,17 @@ setBuffer('flow.md', content);
 editorStore.setState({ activeTabId: 'flow.md', tabs: [{ id: 'flow.md', name: 'flow.md', content }],
   tabRenderList: [{ id: 'flow.md', name: 'flow.md', modified: false }] });
 const ref = React.createRef();
-createRoot(document.getElementById('root')).render(React.createElement('div',
-  { className: 'app', style: { height: '100vh', display: 'flex' } }, React.createElement(Editor, { ref, readOnly: params.has('readonly') })));
+const root = createRoot(document.getElementById('root'));
+let saves = 0;
+root.render(React.createElement('div',
+  { className: 'app', style: { height: '100vh', display: 'flex' } }, React.createElement(Editor, { ref, readOnly: params.has('readonly'), onAutoSave: () => saves++ })));
 const view = () => ref.current.getEditor().action((ctx) => ctx.get(editorViewCtx));
 window.trial = {
   markdown: () => ref.current.getCurrentValue(),
   buffer: () => getBuffer('flow.md'),
+  saves: () => saves,
+  dirty: () => editorStore.getState().tabRenderList[0]?.modified,
+  close: () => root.render(null),
   state: () => ({ doc: view().state.doc.toJSON(), selection: view().state.selection.toJSON(), parent: view().state.selection.$from.parent.type.name }),
   selectCode(edge = 'end') {
     const cm = CodeMirror.findFromDOM(document.querySelector('.cm-editor'));

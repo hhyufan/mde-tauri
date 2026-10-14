@@ -130,6 +130,67 @@ test('clicking far below a code block focuses prose instead of its code editor',
   expect(await page.evaluate(() => window.trial.markdown())).toContain('first\nlast');
 });
 
+for (const [name, source, selector] of [
+  ['code', code, '.milkdown-code-block'],
+  ['table', table, '.milkdown-editor table'],
+  ['formula', '$$\nx^2+y^2\n$$\n', '.md-preview__math--block'],
+]) {
+  test(`an untouched line below a ${name} disappears on leaving without saving whitespace`, async ({ page }) => {
+    await open(page, source);
+    const original = await page.evaluate(() => window.trial.markdown());
+    const block = await page.locator(selector).boundingBox();
+    await page.mouse.click(block.x + 12, block.y + block.height + 100);
+    await expect(page.locator('.milkdown-editor > p')).toHaveCount(1);
+    expect(await page.evaluate(() => window.trial.markdown())).toBe(original);
+    expect(await page.evaluate(() => window.trial.buffer())).toBe(source);
+    // Wait past the listener and autosave debounce while the caret stays active.
+    // The temporary paragraph must not be promoted by background notifications.
+    await page.waitForTimeout(600);
+    expect(await page.evaluate(() => window.trial.saves())).toBe(0);
+    expect(await page.evaluate(() => window.trial.dirty())).toBe(false);
+    await page.locator(selector).click();
+    await expect(page.locator('.milkdown-editor > p')).toHaveCount(0);
+    expect(await page.evaluate(() => window.trial.buffer())).toBe(source);
+  });
+}
+
+for (const [name, source, selector] of [
+  ['code', code, '.milkdown-code-block'],
+  ['table', table, '.milkdown-editor table'],
+  ['formula', '$$\nx^2+y^2\n$$\n', '.md-preview__math--block'],
+]) {
+  test(`an untouched paragraph above a ${name} also disappears when leaving`, async ({ page }) => {
+    await open(page, source);
+    const box = await page.locator(selector).boundingBox();
+    await page.mouse.click(box.x + 10, box.y - 10);
+    await expect(page.locator('.milkdown-editor > p')).toHaveCount(1);
+    await page.locator(selector).click();
+    await expect(page.locator('.milkdown-editor > p')).toHaveCount(0);
+    expect(await page.evaluate(() => window.trial.buffer())).toBe(source);
+  });
+}
+
+test('typing commits the paragraph while blur and unmount discard untouched ones', async ({ page }) => {
+  await open(page, code);
+  await expect(page.locator('.cm-content')).toBeVisible();
+  await page.evaluate(() => window.trial.selectCode());
+  await page.keyboard.press('ArrowDown');
+  await page.locator('.milkdown-editor').evaluate((element) => element.blur());
+  await expect(page.locator('.milkdown-editor > p')).toHaveCount(0);
+  await page.evaluate(() => window.trial.selectCode());
+  await page.keyboard.press('ArrowDown');
+  await page.keyboard.insertText('需要保留的正文');
+  await page.locator('.cm-content').click();
+  await expect(page.locator('.milkdown-editor > p')).toHaveText('需要保留的正文');
+  await expect.poll(() => page.evaluate(() => window.trial.buffer())).toContain('需要保留的正文');
+  await page.evaluate(() => window.trial.selectCode('start'));
+  await page.keyboard.press('ArrowUp');
+  const buffer = await page.evaluate(() => window.trial.buffer());
+  await page.evaluate(() => window.trial.close());
+  await expect(page.locator('.milkdown-editor')).toHaveCount(0);
+  expect(await page.evaluate(() => window.trial.buffer())).toBe(buffer);
+});
+
 test('existing following prose is reused and selecting code does not exit on Shift+Down', async ({ page }) => {
   await open(page, code + '\n已有正文\n');
   await expect(page.locator('.cm-content')).toBeVisible();

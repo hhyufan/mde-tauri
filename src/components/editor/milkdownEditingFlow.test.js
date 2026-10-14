@@ -1,7 +1,7 @@
 import { expect, it, vi } from 'vitest';
 import { Schema } from '@milkdown/kit/prose/model';
 import { EditorState, NodeSelection, TextSelection } from '@milkdown/kit/prose/state';
-import { handleMilkdownBlankPointerDown, handleMilkdownBlockKeyDown, moveOutsideBlock } from './milkdownEditingFlow';
+import { createMilkdownEditingFlowPlugin, persistentMilkdownDocument, handleMilkdownBlankPointerDown, handleMilkdownBlockKeyDown, moveOutsideBlock } from './milkdownEditingFlow';
 
 const schema = new Schema({
   nodes: {
@@ -20,7 +20,7 @@ const paragraph = (text = '') => schema.nodes.paragraph.create(null, text ? sche
 const code = schema.nodes.code_block.create(null, schema.text('code'));
 function viewFor(doc, selection) {
   const view = { editable: true, focus: vi.fn() };
-  view.state = EditorState.create({ doc, selection });
+  view.state = EditorState.create({ doc, selection, plugins: [createMilkdownEditingFlowPlugin()] });
   view.dispatch = vi.fn((transaction) => { view.state = view.state.apply(transaction); });
   return view;
 }
@@ -33,6 +33,29 @@ it('inserts into the correct parent for a code block inside a blockquote', () =>
   expect(view.state.doc.firstChild.lastChild.type.name).toBe('paragraph');
   expect(view.state.selection.$from.parent.type.name).toBe('paragraph');
   expect(view.state.doc.firstChild.firstChild.eq(code)).toBe(true);
+});
+
+it('excludes untouched landing paragraphs from persistent content and removes them after moving away', () => {
+  const original = schema.nodes.doc.create(null, code);
+  const view = viewFor(original);
+  moveOutsideBlock(view, { node: code, pos: 0 }, 1);
+  expect(view.state.doc.childCount).toBe(2);
+  expect(persistentMilkdownDocument(view.state).eq(original)).toBe(true);
+  view.dispatch(view.state.tr.setSelection(NodeSelection.create(view.state.doc, 0)));
+  expect(view.state.doc.eq(original)).toBe(true);
+});
+
+it('commits a landing paragraph on real input and preserves authored empty paragraphs', () => {
+  const view = viewFor(schema.nodes.doc.create(null, code));
+  moveOutsideBlock(view, { node: code, pos: 0 }, 1);
+  view.dispatch(view.state.tr.insertText('written'));
+  view.dispatch(view.state.tr.setSelection(NodeSelection.create(view.state.doc, 0)));
+  expect(persistentMilkdownDocument(view.state).lastChild.textContent).toBe('written');
+  const original = schema.nodes.doc.create(null, [code, paragraph()]);
+  const existing = viewFor(original);
+  moveOutsideBlock(existing, { node: code, pos: 0 }, 1);
+  existing.dispatch(existing.state.tr.setSelection(NodeSelection.create(existing.state.doc, 0)));
+  expect(existing.state.doc.eq(original)).toBe(true);
 });
 
 it('reuses adjacent text rather than inserting another empty paragraph', () => {

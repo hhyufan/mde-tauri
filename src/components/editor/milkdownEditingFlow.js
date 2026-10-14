@@ -1,10 +1,29 @@
-import { Plugin, NodeSelection, TextSelection } from '@milkdown/kit/prose/state';
+import { Plugin, PluginKey, NodeSelection, TextSelection } from '@milkdown/kit/prose/state';
 import { gapCursor } from '@milkdown/kit/prose/gapcursor';
 import { EditorView as CodeMirrorView } from '@codemirror/view';
 import { $prose } from '@milkdown/kit/utils';
 import { isImeComposing } from '@utils/keyboard';
 
 const enclosedBlocks = new Set(['code_block', 'table', 'math_block', 'table_source_block', 'math_source_block']);
+const temporaryParagraphsKey = new PluginKey('moki-temporary-paragraphs');
+
+// Empty caret landing places are view state, not document content. Keep them
+// out of Markdown, autosave, and clipboard/file consumers until real input.
+export function persistentMilkdownDocument(state) {
+  const positions = temporaryParagraphsKey.getState(state) || [];
+  if (!positions.length) return state.doc;
+  const tr = state.tr;
+  for (const pos of [...positions].sort((a, b) => b - a)) {
+    const node = tr.doc.nodeAt(pos);
+    if (node?.type.name === 'paragraph' && !node.content.size) tr.delete(pos, pos + node.nodeSize);
+  }
+  return tr.doc;
+}
+
+function cancelUnusedParagraphs(view) {
+  if (!view.editable || view.composing || !temporaryParagraphsKey.getState(view.state)?.length) return;
+  view.dispatch(view.state.tr.setMeta(temporaryParagraphsKey, { clear: true }).setMeta('addToHistory', false));
+}
 
 function enclosingBlock($pos) {
   for (let depth = $pos.depth; depth > 0; depth--) {
@@ -30,6 +49,7 @@ export function moveOutsideBlock(view, block, direction) {
     const paragraph = state.schema.nodes.paragraph;
     if (!$pos.parent.canReplaceWith($pos.index(), $pos.index(), paragraph)) return false;
     tr.insert(pos, paragraph.create());
+    tr.setMeta(temporaryParagraphsKey, { add: pos });
     tr.setSelection(TextSelection.create(tr.doc, pos + 1));
     tr.setStoredMarks([]);
   }
@@ -66,7 +86,13 @@ export function handleMilkdownBlankPointerDown(view, event) {
       const content = node.type.name === 'table' ? dom.querySelector('table') || dom : dom;
       if (event.clientY > content.getBoundingClientRect().bottom) previous = { node, pos };
     });
-    if (!previous) return false;
+    if (!previous) {
+      const dom = view.nodeDOM(0);
+      if (!first || !enclosedBlocks.has(first.type.name) || !(dom instanceof Element)
+        || event.clientY >= dom.getBoundingClientRect().top) return false;
+      if (!moveOutsideBlock(view, { node: first, pos: 0 }, -1)) return false;
+      event.preventDefault(); event.stopPropagation(); return true;
+    }
     if (enclosedBlocks.has(previous.node.type.name) || previous.node.type.name === 'heading') {
       if (!moveOutsideBlock(view, previous, 1)) return false;
     } else if (previous.node.isTextblock) {
@@ -151,7 +177,62 @@ export function handleMilkdownBlockKeyDown(view, event) {
   return true;
 }
 
-export const milkdownEditingFlow = $prose(() => new Plugin({
+export const createMilkdownEditingFlowPlugin = () => new Plugin({
+  key: temporaryParagraphsKey,
+  state: {
+    init: () => [],
+    apply(tr, positions) {
+      const next = [];
+      for (const pos of positions) {
+        const mapped = tr.mapping.mapResult(pos, 1);
+        const node = tr.doc.nodeAt(mapped.pos);
+        // Typing, pasting an image, or converting the paragraph to a heading
+        // commits it. Never remove an existing or user-authored empty line.
+        if (!mapped.deleted && node?.type.name === 'paragraph' && !node.content.size) next.push(mapped.pos);
+      }
+      const added = tr.getMeta(temporaryParagraphsKey)?.add;
+      if (Number.isInteger(added)) next.push(added);
+      return [...new Set(next)];
+    },
+  },
+  appendTransaction(transactions, _previous, state) {
+    const positions = temporaryParagraphsKey.getState(state) || [];
+    const clear = transactions.some((tr) => tr.getMeta(temporaryParagraphsKey)?.clear);
+    const unused = positions.filter((pos) => {
+      const node = state.doc.nodeAt(pos);
+      if (!node || node.type.name !== 'paragraph' || node.content.size) return false;
+      const inside = state.selection.from >= pos + 1 && state.selection.to <= pos + node.nodeSize - 1;
+      return clear || !inside;
+    });
+    if (!unused.length) return null;
+    const tr = state.tr.setMeta('addToHistory', false);
+    for (const pos of unused.sort((a, b) => b - a)) tr.delete(pos, pos + state.doc.nodeAt(pos).nodeSize);
+    return tr;
+  },
+  view(view) {
+    let disposed = false;
+    const document = view.dom.ownerDocument;
+    const pointerdown = (event) => {
+      if (event.button !== 0 || event.isPrimary === false || view.composing) return;
+      const positions = temporaryParagraphsKey.getState(view.state) || [];
+      const within = positions.some((pos) => view.nodeDOM(pos)?.contains(event.target));
+      if (!within) cancelUnusedParagraphs(view);
+    };
+    const focusout = () => queueMicrotask(() => {
+      if (disposed) return;
+      const active = document.activeElement;
+      if (active === view.dom) return;
+      const positions = temporaryParagraphsKey.getState(view.state) || [];
+      if (!positions.some((pos) => view.nodeDOM(pos)?.contains(active))) cancelUnusedParagraphs(view);
+    });
+    document.addEventListener('pointerdown', pointerdown, true);
+    view.dom.addEventListener('focusout', focusout);
+    return { destroy() {
+      disposed = true;
+      document.removeEventListener('pointerdown', pointerdown, true);
+      view.dom.removeEventListener('focusout', focusout);
+    } };
+  },
   props: {
     handleClick(view, _pos, event) {
       if (!view.editable || event.button !== 0 || event.shiftKey || event.ctrlKey || event.metaKey) return false;
@@ -184,6 +265,8 @@ export const milkdownEditingFlow = $prose(() => new Plugin({
       return false;
     },
   },
-}));
+});
+
+export const milkdownEditingFlow = $prose(() => createMilkdownEditingFlowPlugin());
 
 export const milkdownGapCursor = $prose(() => gapCursor());

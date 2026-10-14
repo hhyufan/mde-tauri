@@ -15,6 +15,11 @@ test('packaged Milkdown continues after its last code block and accepts a new he
   await expect(page.locator('.milkdown-editor h1')).toHaveText('Document');
   const code = page.locator('.cm-content');
   await expect(code).toBeVisible();
+  const block = await page.locator('.milkdown-code-block').boundingBox();
+  await page.mouse.click(block.x + 12, block.y + block.height + 100);
+  await expect(page.locator('.milkdown-editor > p')).toHaveCount(1);
+  await code.click();
+  await expect(page.locator('.milkdown-editor > p')).toHaveCount(0);
   await code.click();
   await page.keyboard.press('Control+End');
   await page.keyboard.press('ArrowDown');
