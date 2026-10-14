@@ -20,31 +20,18 @@
   }
 }
 
-// 品牌区：完整产品字标在上、品类描述在下。
-// 字标本身已包含圆形图标与「MokiDown」文字，因此不再单独渲染标题行。
+// 品牌区：只放产品字标（蓝边白字「MokiDown」），不再跟一行品类描述。
 .sidebar__header {
   display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 4px;
+  align-items: center;
   padding: 12px 16px;
   border-bottom: 1px solid var(--border);
 }
 
 .sidebar__wordmark {
-  /* 240px 内容宽下，30px 高的字标约占 143px，留有余量不会顶到边界。 */
+  /* 248px 内容宽下，30px 高的字标约 154px，留有余量不会顶到边界。 */
   --app-mark-size: 30px;
   margin-left: -2px;
-}
-
-// 品类描述：跟在字标下方。字标自带「MokiDown」文字，不再需要单独的品牌标题行。
-.sidebar__descriptor {
-  font-size: 10px;
-  line-height: 1.2;
-  color: var(--text-dim);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
 }
 
 .sidebar__tabs {

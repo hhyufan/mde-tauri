@@ -424,12 +424,8 @@ function Sidebar({ onOpenSettings, onOpenStats, onOpenLogin }) {
   return (
     <aside className={cn('sidebar', !sidebarVisible && 'sidebar--hidden')}>
       <div className="sidebar__header">
-        {/*
-          左上角使用完整产品字标（圆形 M 图标 + 手绘圆体「MokiDown」是一体构图），
-          因此不再另起一行文字标题，只保留下方描述。
-        */}
+        {/* 左上角只保留产品字标（蓝边白字「MokiDown」）。 */}
         <AppMark size={30} variant="wordmark" className="sidebar__wordmark" />
-        <p className="sidebar__descriptor">{t('app.descriptor')}</p>
       </div>
 
       <div className="sidebar__tabs" role="tablist" aria-label={t('sidebar.tabs')}>
