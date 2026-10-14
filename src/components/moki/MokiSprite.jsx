@@ -2,6 +2,7 @@ import useThemeStore from '@store/useThemeStore';
 import bustAtlas from '@/assets/characters/moki-day-night-bust.png';
 import themeAtlas from '@/assets/characters/moki-themes.png';
 import statusAtlas from '@/assets/characters/moki-status-empty.png';
+import historyAtlas from '@/assets/characters/moki-history-empty.png';
 import './moki.scss';
 
 /**
@@ -34,14 +35,27 @@ const ATLASES = {
       dark: { left: '0.85%', top: '-4.41%' },
     },
   },
+  // 本地历史为空时的立绘：Moki 趴在「文档 = 文档 ✓」的窗口上，
+  // 旁边是回环箭头与时钟，语义正好是「这里没有任何改动」。
+  // 规格与 themes 相同（1672×941，半格 836×941），偏移同样按实测重心换算：
+  // 浅色格重心 X=51.43%/Y=54.91%，深色格 X=49.76%/Y=55.58%，纵向只补一半。
+  history: {
+    src: historyAtlas,
+    offset: {
+      light: { left: '-1.43%', top: '-2.45%' },
+      dark: { left: '0.24%', top: '-2.79%' },
+    },
+  },
 };
 
 export default function MokiSprite({ theme: explicitTheme, art = 'bust' }) {
   const theme = useThemeStore((state) => state.theme);
   const mode = (explicitTheme || theme) === 'dark' ? 'dark' : 'light';
-  const atlas = ATLASES[art] || ATLASES.bust;
+  // 未收录的 art 回落到 bust；类名用兜底后的键，样式才能按图集比例对齐。
+  const atlasKey = ATLASES[art] ? art : 'bust';
+  const atlas = ATLASES[atlasKey];
   return (
-    <span aria-hidden="true" className={`moki-sprite moki-sprite--${mode}`}>
+    <span aria-hidden="true" className={`moki-sprite moki-sprite--${mode} moki-sprite--${atlasKey}`}>
       {/* 两帧各占一层：切换主题时靠交叉淡入淡出完成"换装"，
           比直接改 background-position 硬切更像人物状态变化（见 moki.scss）。 */}
       {['light', 'dark'].map((frame) => {

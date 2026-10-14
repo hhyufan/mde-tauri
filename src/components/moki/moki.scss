@@ -9,6 +9,16 @@
   position: relative;
   width: 100%;
   aspect-ratio: 1;
+
+  /*
+   * 这两套图集的单格是 836×941（≈ 8:9，竖长），套基类的 1:1 会被纵向压扁约 12%。
+   * 使用处若自带画布比例（如主题卡的 8/9 + sprite 的 aspect-ratio: auto），
+   * 那边的选择器更具体，会照常覆盖这里。
+   */
+  &--themes,
+  &--history {
+    aspect-ratio: 8 / 9;
+  }
   &__art {
     position: absolute;
     display: block;
