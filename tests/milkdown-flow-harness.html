@@ -51,5 +51,18 @@ window.trial = {
     for (let i = 0; i < index; i++) pos += editor.state.doc.child(i).nodeSize;
     editor.dispatch(editor.state.tr.setSelection(NodeSelection.create(editor.state.doc, pos))); editor.focus();
   },
+  selectTextblock(index, edge = 'start') {
+    const editor = view(); let pos = 0;
+    for (let i = 0; i < index; i++) pos += editor.state.doc.child(i).nodeSize;
+    const node = editor.state.doc.child(index);
+    editor.dispatch(editor.state.tr.setSelection(TextSelection.create(editor.state.doc,
+      edge === 'end' ? pos + node.nodeSize - 1 : pos + 1))); editor.focus();
+  },
+  paste(text, html = '', mode) {
+    const data = new DataTransfer(); data.setData('text/plain', text);
+    if (html) data.setData('text/html', html);
+    if (mode) data.setData('vscode-editor-data', JSON.stringify({ mode }));
+    view().dom.dispatchEvent(new ClipboardEvent('paste', { clipboardData: data, bubbles: true, cancelable: true }));
+  },
 };
 </script></body></html>

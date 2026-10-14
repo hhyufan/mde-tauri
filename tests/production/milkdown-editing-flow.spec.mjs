@@ -51,3 +51,60 @@ test('packaged empty Markdown file accepts a caret and text after clicking its b
   await expect(page.locator('.milkdown-editor > p')).toHaveText('Writing starts here');
   await expect(page.locator('.milkdown-block-exit')).toHaveCount(0);
 });
+
+test('packaged Milkdown renders Markdown after HTML and renders pasted source immediately', async ({ page }) => {
+  await page.addInitScript(() => {
+    const content = '<br>\n# Heading\n\n<div>HTML</div>\n$$\nx^2\n$$\n\nTail\n';
+    localStorage.setItem('mokidown-external-docs', JSON.stringify({ state: { docs: {
+      'guest::boundaries': { fileId: 'boundaries', ownerUserId: 'guest', name: 'boundaries.md', content },
+    } }, version: 0 }));
+    localStorage.setItem('mokidown-session', JSON.stringify({ version: 1, activeTabId: 'external-boundaries',
+      tabs: [{ id: 'external-boundaries', name: 'boundaries.md', path: '', externalFileId: 'boundaries', ext: 'md' }] }));
+    localStorage.setItem('mokidown-editor', JSON.stringify({ state: { viewMode: 'preview', sidebarVisible: false }, version: 0 }));
+    localStorage.setItem('mokidown-config', JSON.stringify({ state: { autoSave: false }, version: 0 }));
+  });
+  await page.goto('/');
+  await expect(page.locator('.milkdown-editor h1')).toHaveText('Heading');
+  await expect(page.locator('.md-preview__math--block .katex')).toBeVisible();
+  await page.locator('.milkdown-editor > p').last().click();
+  await page.keyboard.press('End');
+  await page.keyboard.press('Enter');
+  await page.locator('.milkdown-editor').evaluate((el) => {
+    const data = new DataTransfer(); data.setData('text/plain', '## Pasted\n\n**Bold**');
+    data.setData('text/html', '<pre><code>## Pasted\n\n**Bold**</code></pre>');
+    el.dispatchEvent(new ClipboardEvent('paste', { clipboardData: data, bubbles: true, cancelable: true }));
+  });
+  await expect(page.locator('.milkdown-editor h2')).toHaveText('Pasted');
+  await expect(page.locator('.milkdown-editor strong')).toHaveText('Bold');
+  await page.keyboard.press('Control+z');
+  await expect(page.locator('.milkdown-editor h2')).toHaveCount(0);
+  await expect(page.locator('.milkdown-editor h1')).toHaveText('Heading');
+});
+
+test('packaged editor distinguishes a real empty paragraph from the separator after image HTML', async ({ page }) => {
+  await page.addInitScript(() => {
+    const content = '<p align="center">\n<img src="screenshots/main.png" width="880" alt="MokiDown 主界面" />\n</p>\n\n\n## 功能\n';
+    localStorage.setItem('mokidown-external-docs', JSON.stringify({ state: { docs: {
+      'guest::whitespace': { fileId: 'whitespace', ownerUserId: 'guest', name: 'whitespace.md', content },
+    } }, version: 0 }));
+    localStorage.setItem('mokidown-session', JSON.stringify({ version: 1, activeTabId: 'external-whitespace',
+      tabs: [{ id: 'external-whitespace', name: 'whitespace.md', path: '', externalFileId: 'whitespace', ext: 'md' }] }));
+    localStorage.setItem('mokidown-editor', JSON.stringify({ state: { viewMode: 'preview', sidebarVisible: false }, version: 0 }));
+    localStorage.setItem('mokidown-config', JSON.stringify({ state: { autoSave: false }, version: 0 }));
+  });
+  await page.goto('/');
+  await expect(page.locator('.md-preview__html-block img')).toHaveAttribute('alt', 'MokiDown 主界面');
+  await expect(page.locator('.milkdown-editor > p')).toHaveCount(1);
+  await page.locator('.milkdown-editor > p').click(); await page.keyboard.press('Backspace');
+  await expect(page.locator('.milkdown-editor > p')).toHaveCount(0);
+  // The gap caret is drawn by ::after; its widget itself has a zero-size box.
+  await expect(page.locator('.ProseMirror-gapcursor')).toHaveCount(1);
+  await expect(page.locator('.ProseMirror-gapcursor')).toHaveCSS('display', 'block');
+  await expect(page.locator('.milkdown-editor h2')).toHaveText('功能');
+  await page.locator('.md-preview__html-block').hover(); await page.locator('.md-preview__html-edit').click();
+  const input = page.locator('.md-preview__html-input');
+  await expect(input).toHaveCSS('padding-left', '16px');
+  await input.fill('<div>新内容</div>'); await page.locator('.md-preview__html-done').click();
+  await expect(page.locator('.md-preview__html-block-preview')).toHaveText('新内容');
+  await expect(page.locator('.milkdown-editor h2')).toHaveText('功能');
+});

@@ -15,7 +15,7 @@
       import '/src/assets/styles/prism-theme.scss';
       import '/src/assets/styles/App.scss';
 
-      const content = 'Inline `code`\n\n```javascript\nconst a = 1;\n\nconsole.log(a);\n```\n\n```css\nbody { color: red; }\n```\n\n```\nplain\n```\n';
+      const content = new URLSearchParams(location.search).get('content') ?? 'Inline `code`\n\n```javascript\nconst a = 1;\n\nconsole.log(a);\n```\n\n```css\nbody { color: red; }\n```\n\n```\nplain\n```\n';
       setBuffer('surface.md', content);
       editorStore.setState({
         activeTabId: 'surface.md',
