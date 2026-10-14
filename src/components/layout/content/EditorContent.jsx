@@ -19,6 +19,7 @@ import { useResponsiveLayout } from '@hooks/useResponsiveLayout';
 import { lazyWithRetry } from '@utils/lazyWithRetry';
 import { openExternal } from '@utils/tauriApi';
 import { externalLink } from '@utils/editorLinks';
+import { createAppHotkeyHandlers } from '@utils/hotkeyCommands';
 import './editor-content.scss';
 import WelcomeScreen from '@components/moki/WelcomeScreen';
 
@@ -228,6 +229,14 @@ function EditorContent() {
   const tabs = useEditorStore((s) => s.tabRenderList);
   const activeTabId = useEditorStore((s) => s.activeTabId);
   const viewMode = useEditorStore((s) => s.viewMode);
+  const toggleSidebar = useEditorStore((s) => s.toggleSidebar);
+  const toggleEditPreview = useEditorStore((s) => s.toggleEditPreview);
+  // Monaco 会吞掉按键，应用级快捷键需要在编辑器内再注册一次；回调表只依赖
+  // 两个稳定的 store action，因此可以安全地只构建一次。
+  const appHotkeyHandlers = useMemo(
+    () => createAppHotkeyHandlers({ toggleSidebar, togglePreview: toggleEditPreview }),
+    [toggleSidebar, toggleEditPreview],
+  );
   const historyDiff = useHistoryStore((s) => s.diff);
   const previewZoomSync = useConfigStore((s) => s.previewZoomSync ?? true);
   const monacoRef = useRef(null);
@@ -538,6 +547,7 @@ function EditorContent() {
             ref={monacoRef}
             className="editor-content__editor"
             onAutoSave={triggerAutoSave}
+            appHotkeyHandlers={appHotkeyHandlers}
           />
         )}
         {viewMode === 'preview' && isMarkdown && (
@@ -565,6 +575,7 @@ function EditorContent() {
               ref={monacoRef}
               className="editor-content__editor editor-content__editor--half"
               onAutoSave={triggerAutoSave}
+              appHotkeyHandlers={appHotkeyHandlers}
             />
             <Tooltip title={t('editor.splitDivider')} placement="top" mouseEnterDelay={0.5}>
               <div
@@ -592,6 +603,7 @@ function EditorContent() {
             ref={monacoRef}
             className="editor-content__editor"
             onAutoSave={triggerAutoSave}
+            appHotkeyHandlers={appHotkeyHandlers}
           />
         )}
 

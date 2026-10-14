@@ -41,6 +41,9 @@ import EditorContent from '@layout/content/EditorContent';
 import Footer from '@layout/footer/Footer';
 import OutputConsole from '@components/editor/OutputConsole';
 import { handleScriptShortcut } from '@/services/scriptRunner';
+import { useHotkeys } from '@hooks/useHotkeys';
+import { HOTKEY_COMMAND_EVENT } from '@utils/hotkeyCommands';
+import { isCapturingShortcut } from '@/configs/hotkeys';
 import ExternalFileConflictNotice from '@components/overlays/ExternalFileConflictNotice';
 import NotificationContainer from '@components/notification/NotificationContainer';
 import useSyncStore from '@store/useSyncStore';
@@ -154,6 +157,8 @@ function App() {
     openDroppedPathsInEditor,
     moveDroppedPathsToExplorer,
   } = useFileManager();
+  // 应用级快捷键的匹配入口：键位来自注册表，可在「设置 → 快捷键」中改绑。
+  const { matchAction: matchHotkey } = useHotkeys();
   const unsavedTabs = useMemo(
     () => (autoSave ? [] : tabs.filter((tab) => tab.modified)),
     [autoSave, tabs],
@@ -356,7 +361,41 @@ function App() {
   }, [isAndroid, openFileFromPath]);
 
   /**
-   * 处理应用级快捷键，包括搜索、保存、打开文件、侧边栏与视图切换。
+   * 应用级快捷键的执行入口。
+   *
+   * 全局 keydown 与 Monaco 内部注册的键位都汇聚到这里，保证两条路径行为一致。
+   *
+   * @param {string} actionId 动作标识。
+   * @returns {boolean} 是否已处理。
+   */
+  const runHotkeyAction = useCallback((actionId) => {
+    const handlers = {
+      save: saveCurrentFile,
+      openFile: openFileDialog,
+      search: () => setSearchOpen(true),
+      openSettings: () => setSettingsOpen((v) => !v),
+      toggleSidebar,
+      togglePreview: toggleEditPreview,
+      toggleFullscreen: () => {
+        if (!isDesktopWindow) return;
+        appWindow
+          .isFullscreen()
+          .then((isFullscreen) => appWindow.setFullscreen(!isFullscreen))
+          .catch(console.error);
+      },
+    };
+    const handler = handlers[actionId];
+    if (!handler) return false;
+    handler();
+    return true;
+  }, [isDesktopWindow, saveCurrentFile, openFileDialog, toggleSidebar, toggleEditPreview]);
+
+  /**
+   * 处理应用级快捷键。
+   *
+   * 键位来自快捷键注册表（可在「设置 → 快捷键」中修改），统一按物理按键比较，
+   * 因此不再受键盘布局影响——修复前 `Ctrl+Shift+/` 与 `e.key === '/'` 比较，
+   * 而按住 Shift 后 `key` 是 `'?'`，导致该快捷键永远无法触发。
    *
    * @param {KeyboardEvent} e 键盘事件对象。
    */
@@ -365,55 +404,46 @@ function App() {
     // 输入法组合期间不处理任何应用级快捷键：这一阶段 keyCode 会是 229，
     // 并且回车、方向键都属于输入法自身，抢过来会导致中文输入彻底失效。
     if (isImeComposing(e)) return;
-    const mod = e.ctrlKey || e.metaKey;
+
+    // 「设置 → 快捷键」正在录入键位时挂起全局快捷键，避免改绑 Ctrl+S 时真的保存。
+    if (isCapturingShortcut()) return;
 
     if (handleScriptShortcut(e)) return;
 
-    if (e.key === 'F11') {
-      if (!isDesktopWindow) return;
+    const action = matchHotkey(e, 'app');
+    if (!action) return;
+    // F11 长按会连续触发，全屏切换只响应第一次。
+    if (action.id === 'toggleFullscreen' && e.repeat) {
       e.preventDefault();
-      if (e.repeat) return;
-      appWindow
-        .isFullscreen()
-        .then((isFullscreen) => appWindow.setFullscreen(!isFullscreen))
-        .catch(console.error);
       return;
     }
-    if (mod && e.key === 'p') {
-      e.preventDefault();
-      setSearchOpen(true);
-    }
-    if (mod && e.key === 's') {
-      e.preventDefault();
-      saveCurrentFile();
-    }
-    if (mod && e.key === 'o') {
-      e.preventDefault();
-      openFileDialog();
-    }
-    if (mod && e.key === ',') {
-      e.preventDefault();
-      setSettingsOpen((v) => !v);
-    }
-    if (mod && e.key === 'b') {
-      e.preventDefault();
-      toggleSidebar();
-    }
-    if (mod && e.shiftKey && e.key === '/') {
-      e.preventDefault();
-      toggleEditPreview();
-    }
-    if (e.key === 'Escape') {
-      setSearchOpen(false);
-      setSettingsOpen(false);
-      setLoginOpen(false);
-    }
-  }, [isDesktopWindow, saveCurrentFile, openFileDialog, toggleSidebar, toggleEditPreview]);
+    if (runHotkeyAction(action.id)) e.preventDefault();
+  }, [matchHotkey, runHotkeyAction]);
 
   useEffect(() => {
-    document.addEventListener('keydown', handleKeyDown, true);
-    return () => document.removeEventListener('keydown', handleKeyDown, true);
+    const onKeyDown = (event) => {
+      // Escape 不参与键位配置：它需要同时关闭多个浮层，且总是可用。
+      // 正在录入快捷键时例外——那时 Escape 表示取消录入。
+      if (event.key === 'Escape' && !isCapturingShortcut()) {
+        setSearchOpen(false);
+        setSettingsOpen(false);
+        setLoginOpen(false);
+      }
+      handleKeyDown(event);
+    };
+    document.addEventListener('keydown', onKeyDown, true);
+    return () => document.removeEventListener('keydown', onKeyDown, true);
   }, [handleKeyDown]);
+
+  // Monaco 获得焦点时会吞掉按键，它注册的键位改为通过事件回到这里执行。
+  useEffect(() => {
+    const onCommand = (event) => {
+      const actionId = event?.detail?.actionId;
+      if (actionId) runHotkeyAction(actionId);
+    };
+    window.addEventListener(HOTKEY_COMMAND_EVENT, onCommand);
+    return () => window.removeEventListener(HOTKEY_COMMAND_EVENT, onCommand);
+  }, [runHotkeyAction]);
 
   /**
    * 请求关闭窗口；若存在未保存标签，则先转入确认流程。

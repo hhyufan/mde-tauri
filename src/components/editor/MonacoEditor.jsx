@@ -24,6 +24,8 @@ import MonacoContextMenu from './MonacoContextMenu';
 import MobileSelectionBar from './MobileSelectionBar';
 import MonacoSelectionHandles from './MonacoSelectionHandles';
 import { useResponsiveLayout } from '@hooks/useResponsiveLayout';
+import { getResolvedHotkeys } from '@hooks/useHotkeys';
+import { configureMonacoHotkeys, disposeMonacoHotkeys } from '@/services/monacoHotkeys';
 import './monaco-editor.scss';
 
 function documentModelInfo(tab) {
@@ -60,9 +62,13 @@ function horizontalScrollbarOptions(wrapped) {
  * 负责初始化编辑器实例、同步标签缓冲区、接入右键菜单与移动端选区能力，
  * 并对主题、字号、语言与自动保存等外部配置变化做增量响应。
  */
-const MonacoEditorComponent = forwardRef(function MonacoEditorComponent({ className, onAutoSave }, ref) {
+const MonacoEditorComponent = forwardRef(function MonacoEditorComponent({ className, onAutoSave, appHotkeyHandlers = {} }, ref) {
   const containerRef = useRef(null);
   const editorRef = useRef(null);
+  // 快捷键回调通过 ref 传递：它们来自上层工作区，身份每次渲染都可能变化，
+  // 放进依赖数组会导致反复重注册 Monaco 命令。
+  const hotkeyHandlersRef = useRef(appHotkeyHandlers);
+  hotkeyHandlersRef.current = appHotkeyHandlers;
   const modelsRef = useRef(new Map());
   const currentTabIdRef = useRef(null);
   const suppressModelChangeRef = useRef(false);
@@ -606,6 +612,24 @@ const MonacoEditorComponent = forwardRef(function MonacoEditorComponent({ classN
     return () => {
       binding?.dispose();
       modelChanged.dispose(); languageChanged.dispose(); configChanged(); saved(); opener.dispose(); problemWatcher.dispose();
+    };
+  }, [editorInstance]);
+
+  // 编辑器获得焦点时 Monaco 会吞掉自己认识的按键，全局监听收不到事件，因此
+  // 应用级快捷键必须在这里再注册一次；同时把用户改过的编辑器键位写进 Monaco。
+  useEffect(() => {
+    if (!editorInstance) return undefined;
+    const apply = () => configureMonacoHotkeys(monaco, getResolvedHotkeys(), {
+      appHandlers: hotkeyHandlersRef.current,
+    });
+    apply();
+    // 键位变化时重配：先释放旧规则，避免旧键位残留。
+    const unsubscribe = useConfigStore.subscribe((state, previous) => {
+      if (state.hotkeys !== previous.hotkeys) apply();
+    });
+    return () => {
+      unsubscribe();
+      disposeMonacoHotkeys();
     };
   }, [editorInstance]);
 
