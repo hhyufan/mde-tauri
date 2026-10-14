@@ -424,9 +424,10 @@ function Sidebar({ onOpenSettings, onOpenStats, onOpenLogin }) {
   return (
     <aside className={cn('sidebar', !sidebarVisible && 'sidebar--hidden')}>
       <div className="sidebar__header">
-        {/* 左上角只保留产品字标（蓝边白字「MokiDown」）。
-            尺寸走组件参数——AppMark 会把 --app-mark-size 内联下发，
-            在样式表里改同名变量不会生效。 */}
+        {/* 品牌区：应用图标 + 产品字标（蓝边白字「MokiDown」）。
+            两者的尺寸都走组件参数——AppMark 会把 --app-mark-size 内联下发，
+            在样式表里改同名变量不会生效。间距由 .sidebar__header 的 gap 控制。 */}
+        <AppMark size={24} variant="app" className="sidebar__brand-icon" />
         <AppMark size={24} variant="wordmark" className="sidebar__wordmark" />
       </div>
 

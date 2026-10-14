@@ -20,29 +20,23 @@
   }
 }
 
-// 品牌区：只放产品字标（蓝边白字「MokiDown」）。
+// 品牌区：应用图标 + 产品字标。
 .sidebar__header {
   display: flex;
   align-items: center;
   /*
-   * 上 12 + 字标 24 + 下 11 + 1px 底线 = 48px，与右侧 titlebar 等高；
+   * 图标与字标之间的距离。
+   * 注：不要靠给字标加负 margin 来收紧——那会连带吃掉这段间距
+   * （此前单字标时代的 margin-left: -2px 就造成过这个偏差）。
+   */
+  gap: 10px;
+  /*
+   * 上 12 + 内容 24 + 下 11 + 1px 底线 = 48px，与右侧 titlebar 等高；
    * 字标中心因此落在 24px，与搜索框的中心线一致（竖向居中）。
+   * 前提是图标与字标同为 24px：任一更高都会把容器撑高、错开底线。
    */
   padding: 12px 16px 11px;
   border-bottom: 1px solid var(--border);
-  /*
-   * 盖掉侧栏自身的 border-right：那条竖线本意是分隔侧栏与内容区，
-   * 但在最上面这一段它会把品牌区与右侧搜索框、窗口控制切开。
-   * 用背景色顶掉这 1px，顶栏横向就是贯通的整体（底线也随之连续）。
-   */
-  margin-right: -1px;
-  background: var(--sidebar);
-}
-
-// 尺寸不在这里设定：AppMark 通过内联样式下发 --app-mark-size，
-// 在此处覆盖同名变量不会生效，改尺寸请改 Sidebar 里的 size 参数。
-.sidebar__wordmark {
-  margin-left: -2px;
 }
 
 .sidebar__tabs {
