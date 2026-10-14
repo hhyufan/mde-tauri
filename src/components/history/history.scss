@@ -247,6 +247,34 @@
   flex: 1;
   min-height: 0;
   &[hidden] { display: none; }
+
+  /*
+   * Monaco 在并排模式下给左右编辑器各投一条柔和阴影
+   * （`.monaco-diff-editor.side-by-side .editor.original|modified`，
+   * `6px 0 5px -5px` / `-6px 0 5px -5px`），两条在中间叠成一条十几像素宽的
+   * 灰带，看上去就像「被虚化的竖线」，也和标题行那根 1px 实线对不上。
+   *
+   * 另外它自带的 `border-*: 1px solid var(--vscode-diffEditor-border)` 在我们
+   * 的主题里没有定义该变量，等于失效，所以中间其实只有阴影、没有实线。
+   *
+   * 这里撤掉阴影，只用我们自己的一根 1px 实线，颜色取主题边框色，与标题行贯通。
+   * 选择器必须带上 .side-by-side 才能压过 Monaco 自带的规则。
+   */
+  .monaco-diff-editor.side-by-side {
+    .editor.original,
+    .editor.modified {
+      box-shadow: none;
+    }
+
+    .editor.original {
+      border-right: 1px solid var(--border);
+    }
+
+    /* Monaco 自带的那条（变量未定义时本就不生效），显式清掉避免将来重复。 */
+    .editor.modified {
+      border-left: 0;
+    }
+  }
 }
 
 .history-diff__empty {
