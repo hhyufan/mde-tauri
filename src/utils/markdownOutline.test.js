@@ -24,3 +24,34 @@ it('preserves nested collapse state when a higher heading is expanded', () => {
   const rows = outlineRows(extractItems('# A\n## B\n- nested\n## C\n- sibling'), { 1: true });
   expect(rows.map((row) => row.hidden)).toEqual([false, false, true, false, false]);
 });
+
+it('recognises HTML headings alongside Markdown ones', () => {
+  expect(extractItems('<h1>One</h1>\n## Two\n<h3 align="center">Three</h3>')).toEqual([
+    { type: 'heading', level: 1, text: 'One', line: 1 },
+    { type: 'heading', level: 2, text: 'Two', line: 2 },
+    { type: 'heading', level: 3, text: 'Three', line: 3 },
+  ]);
+});
+
+it('reads HTML heading text through inline tags and line breaks, reporting the start line', () => {
+  expect(extractItems('<h2><em>Fancy</em> title</h2>')).toEqual([
+    { type: 'heading', level: 2, text: 'Fancy title', line: 1 },
+  ]);
+  expect(extractItems('<h1>\n  Split title\n</h1>\n- item')).toEqual([
+    { type: 'heading', level: 1, text: 'Split title', line: 1 },
+    { type: 'list-unordered', indent: 0, text: 'item', line: 4, parentLevel: 1 },
+  ]);
+});
+
+it('never lets an unclosed HTML heading swallow the content below it', () => {
+  expect(extractItems('<h2>Loose heading\n\n- item')).toEqual([
+    { type: 'heading', level: 2, text: 'Loose heading', line: 1 },
+    { type: 'list-unordered', indent: 0, text: 'item', line: 3, parentLevel: 2 },
+  ]);
+});
+
+it('ignores HTML headings inside fenced code', () => {
+  expect(extractItems('```html\n<h1>Not a heading</h1>\n```\n<h2>Real</h2>')).toEqual([
+    { type: 'heading', level: 2, text: 'Real', line: 4 },
+  ]);
+});

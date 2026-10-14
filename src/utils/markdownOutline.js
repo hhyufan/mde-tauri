@@ -1,9 +1,16 @@
+// HTML 标题的闭合标签最多向下找这么多行；超出就当作只有开始标签，
+// 避免一个未闭合的 `<h1>` 把后面整篇正文都吞进标题里。
+const HTML_HEADING_LOOKAHEAD = 10;
+
 export function extractItems(content) {
   if (!content) return [];
   const lines = content.split('\n');
   const items = [];
   let inCodeBlock = false;
   let currentHeadingLevel = 0;
+
+  // 剥离行内标签与 Markdown 标记，只留下可见文字。
+  const plain = (value) => value.replace(/<[^>]*>/g, '').replace(/[*_`~[\]]/g, '').replace(/\s+/g, ' ').trim();
 
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i];
@@ -13,7 +20,7 @@ export function extractItems(content) {
     }
     if (inCodeBlock) continue;
 
-    // 标题行。
+    // Markdown 标题。
     const hm = line.match(/^(#{1,6})\s+(.+)/);
     if (hm) {
       currentHeadingLevel = hm[1].length;
@@ -23,6 +30,32 @@ export function extractItems(content) {
         text: hm[2].replace(/[*_`~[\]]/g, '').trim(),
         line: i + 1,
       });
+      continue;
+    }
+
+    // HTML 标题：`<h1>标题</h1>`。允许属性，允许内容里再嵌行内标签；
+    // 开始标签单独占一行时，向下找到闭合标签（有上限，避免把正文整段吞掉）。
+    const hh = line.match(/^\s*<h([1-6])(?:\s[^>]*)?>([\s\S]*)$/i);
+    if (hh) {
+      const level = Number(hh[1]);
+      const startLine = i;
+      const closer = new RegExp(`</h${level}>`, 'i');
+      let raw = hh[2];
+      let endLine = i;
+      if (!closer.test(raw)) {
+        // 只有找到闭合标签才向下扩展；否则只认本行，免得把后文吞成标题。
+        let collected = raw;
+        for (let j = i + 1; j < lines.length && j - i <= HTML_HEADING_LOOKAHEAD; j++) {
+          collected += `\n${lines[j]}`;
+          if (closer.test(lines[j])) { raw = collected; endLine = j; break; }
+        }
+      }
+      const text = plain(raw.replace(closer, ''));
+      i = endLine;
+      if (text) {
+        currentHeadingLevel = level;
+        items.push({ type: 'heading', level, text, line: startLine + 1 });
+      }
       continue;
     }
 
