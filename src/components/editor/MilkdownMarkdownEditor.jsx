@@ -110,6 +110,8 @@ import useEditorStore from '@store/useEditorStore';
 import useConfigStore from '@store/useConfigStore';
 import useToastStore from '@store/useToastStore';
 import { useEditorBufferContent } from '@hooks/useEditorBufferContent';
+import { useDocumentScrollState } from '@hooks/useDocumentScrollState';
+import { getDocumentViewState, registerDocumentViewState, requestDocumentViewStateSave } from '@utils/documentViewState';
 import { setBuffer } from '@utils/editorBuffer';
 import { isImeComposing } from '@utils/keyboard';
 import { hydrateMarkdownImages, parseMarkdownLineHint, resolveMarkdownLinkPath } from '@utils/markdownAssets';
@@ -1471,6 +1473,34 @@ function MilkdownInner({
     editorRef.current = editor;
     return editor;
   }, [activeTabId, content, readOnly, scheduleEditorSideEffects]);
+
+  useDocumentScrollState(wrapperRef, activeTabId, 'milkdownScroll', !editorInfo.loading);
+  useEffect(() => {
+    if (editorInfo.loading || readOnly) return undefined;
+    const editor = editorRef.current;
+    if (!editor) return undefined;
+    let stopView;
+    editor.action((ctx) => {
+      const view = ctx.get(editorViewCtx);
+      const saved = getDocumentViewState(activeTabId, 'milkdown');
+      if (saved && Number.isFinite(saved.anchor) && Number.isFinite(saved.head)) {
+        const end = view.state.doc.content.size;
+        const anchor = Math.max(0, Math.min(end, saved.anchor));
+        const head = Math.max(0, Math.min(end, saved.head));
+        const selection = TextSelection.between(view.state.doc.resolve(anchor), view.state.doc.resolve(head));
+        view.dispatch(view.state.tr.setSelection(selection));
+      }
+      stopView = registerDocumentViewState('milkdown', () => activeTabId, () => {
+        const { anchor, head } = view.state.selection;
+        return { anchor, head };
+      });
+    });
+    document.addEventListener('selectionchange', requestDocumentViewStateSave);
+    return () => {
+      stopView?.();
+      document.removeEventListener('selectionchange', requestDocumentViewStateSave);
+    };
+  }, [activeTabId, editorInfo.loading, readOnly]);
 
   useImperativeHandle(ref, () => ({
     getEditor: () => editorRef.current,

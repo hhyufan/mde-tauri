@@ -266,7 +266,7 @@ html[data-theme='dark'] {
     transition: opacity var(--moki-scrollbar-fade-out) linear !important;
   }
 
-  .monaco-scrollable-element:hover > .scrollbar {
+  .monaco-scrollable-element:hover > .scrollbar:not(.invisible) {
     opacity: 1 !important;
     pointer-events: auto !important;
     transition-duration: var(--moki-scrollbar-fade-in) !important;

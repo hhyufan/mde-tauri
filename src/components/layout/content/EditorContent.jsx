@@ -234,7 +234,7 @@ function EditorContent() {
   const previewRef = useRef(null);
   const containerRef = useRef(null);
   const isDragging = useRef(false);
-  const [splitRatio, setSplitRatio] = useState(0.5);
+  const [splitRatio, setSplitRatio] = useState(() => useEditorStore.getState().splitRatio);
   const [previewSyncHandle, setPreviewSyncHandle] = useState(null);
   const setConfig = useConfigStore((s) => s.setConfig);
   const { triggerAutoSave } = useFileManager();
@@ -299,6 +299,7 @@ function EditorContent() {
     const dividerEl = e.currentTarget;
     const vertical = isMobileLayout; // column layout when true → drag vertically
     isDragging.current = true;
+    let finalRatio = useEditorStore.getState().splitRatio;
     document.body.style.cursor = vertical ? 'row-resize' : 'col-resize';
     document.body.style.userSelect = 'none';
     try {
@@ -315,12 +316,14 @@ function EditorContent() {
       const ratio = vertical
         ? (moveEvt.clientY - rect.top) / rect.height
         : (moveEvt.clientX - rect.left) / rect.width;
-      setSplitRatio(Math.max(0.15, Math.min(0.85, ratio)));
+      finalRatio = Math.max(0.15, Math.min(0.85, ratio));
+      setSplitRatio(finalRatio);
     };
 
     const stop = (endEvt) => {
       if (endEvt && endEvt.pointerId !== e.pointerId) return;
       isDragging.current = false;
+      useEditorStore.getState().setSplitRatio(finalRatio);
       document.body.style.cursor = '';
       document.body.style.userSelect = '';
       try {

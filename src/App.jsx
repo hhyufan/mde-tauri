@@ -27,6 +27,7 @@ import { useBackgroundSurfaces } from '@hooks/useBackgroundSurfaces';
 import { getBackgroundTransparency } from '@utils/backgroundImage';
 import { disableNativeContextMenu } from '@utils/nativeContextMenu';
 import { syncEngine } from '@/services/syncEngine';
+import { restoreEditorSession, startEditorSessionTracking, flushEditorSession } from '@/services/editorSession';
 import {
   discardRecoverySnapshot,
   flushRecoverySnapshot,
@@ -149,7 +150,7 @@ function App() {
     saveAsDialog,
     openFileDialog,
     openFileFromPath,
-    loadDirectory,
+    loadFilesOnly,
     openDroppedPathsInEditor,
     moveDroppedPathsToExplorer,
   } = useFileManager();
@@ -197,7 +198,7 @@ function App() {
     loadToken();
     useLspStore.getState().refresh();
 
-    // Windows 主窗口由 Tauri 在创建时显示；这里仅初始化界面状态。
+    // 桌面主窗口由启动交接模块在界面就绪后显示；这里仅初始化界面状态。
 
     // 不影响首屏可见内容的工作统一延后到浏览器空闲期执行，避免阻塞交互就绪：
     // 例如同步引擎重置、资源管理器目录恢复等。
@@ -205,7 +206,7 @@ function App() {
     idle(() => {
       syncEngine.ensureLocalReset();
       const savedDir = useFileStore.getState().currentDir;
-      if (savedDir) loadDirectory(savedDir);
+      if (savedDir) loadFilesOnly(savedDir);
     });
   }, []);
 
@@ -268,8 +269,12 @@ function App() {
   useEffect(() => {
     let cancelled = false;
     let stopTracking = () => {};
+    let stopSessionTracking = () => {};
     (async () => {
       try {
+        await restoreEditorSession();
+        if (cancelled) return;
+        stopSessionTracking = startEditorSessionTracking();
         const drafts = await loadRecoveryCandidates();
         if (!cancelled) setRecoveryDrafts(drafts);
       } catch (error) {
@@ -281,6 +286,7 @@ function App() {
     return () => {
       cancelled = true;
       stopTracking();
+      stopSessionTracking();
     };
   }, []);
 
@@ -299,13 +305,14 @@ function App() {
 
   useEffect(() => {
     if (cliArgsOpenedRef.current || isAndroid) return;
-    cliArgsOpenedRef.current = true;
 
     let cancelled = false;
     (async () => {
       try {
+        await restoreEditorSession();
         const args = await getCliArgs();
         if (cancelled || !Array.isArray(args)) return;
+        cliArgsOpenedRef.current = true;
 
         for (const path of args.filter(isAssociatedMarkdownPath)) {
           const name = path.split(/[\\/]/).pop() || path;
@@ -419,6 +426,7 @@ function App() {
       return;
     }
     if (!isDesktopWindow) return;
+    flushEditorSession();
     await flushRecoverySnapshot().catch(console.error);
     allowWindowCloseRef.current = true;
     appWindow.close();
@@ -430,6 +438,7 @@ function App() {
     const unlisten = appWindow.onCloseRequested(async (event) => {
       if (allowWindowCloseRef.current) return;
       event.preventDefault();
+      flushEditorSession();
       await flushRecoverySnapshot().catch((error) => {
         console.warn('[App] Failed to flush recovery snapshot before close:', error);
       });
@@ -532,6 +541,7 @@ function App() {
     }
 
     await flushRecoverySnapshot().catch(console.error);
+    flushEditorSession();
     if (!isDesktopWindow) {
       setUnsavedPromptOpen(false);
       return;
@@ -555,6 +565,7 @@ function App() {
     }
 
     await discardRecoverySnapshot().catch(console.error);
+    flushEditorSession();
     if (!isDesktopWindow) {
       setUnsavedPromptOpen(false);
       return;

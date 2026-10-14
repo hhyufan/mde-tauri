@@ -101,6 +101,7 @@ function MonacoConflictDiff({
         lineNumbersMinChars,
         lineNumbersPadding: 0,
         wordWrap: 'on',
+        diffWordWrap: 'on',
         wrappingIndent: 'same',
         tabSize,
         fontSize,
@@ -116,7 +117,8 @@ function MonacoConflictDiff({
         },
         scrollbar: {
           verticalScrollbarSize: 6,
-          horizontalScrollbarSize: 6,
+          horizontal: 'hidden',
+          horizontalScrollbarSize: 0,
           useShadows: false,
         },
       });

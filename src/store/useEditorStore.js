@@ -13,6 +13,7 @@ import {
   renameBuffer,
 } from '@utils/editorBuffer';
 import { historyCapture } from '@utils/tauriApi';
+import { renameDocumentViewState } from '@utils/documentViewState';
 
 let untitledCounter = 1;
 
@@ -53,6 +54,7 @@ const useEditorStore = create(
       sidebarView: 'explorer',
       viewMode: 'edit',
       toolbarVisible: false,
+      splitRatio: 0.5,
       uiStateUpdatedAt: 0,
       cursorPosition: { lineNumber: 1, column: 1 },
       characterCount: 0,
@@ -151,10 +153,37 @@ const useEditorStore = create(
         });
       },
 
+      /** Restore a session in one update; files opened meanwhile retain priority. */
+      restoreSessionTabs: (restoredTabs, activeId, initialTabs = null) => {
+        const current = get();
+        const tabsToKeep = current.tabs === initialTabs ? [] : current.tabs;
+        const existing = new Map(tabsToKeep.map((tab) => [tab.id, tab]));
+        const unique = new Map(restoredTabs.map((tab) => [tab.id, { ...tab, ext: tab.ext || tab.name.split('.').pop() || 'md' }]));
+        for (const tab of tabsToKeep) unique.set(tab.id, tab);
+        const tabs = [...unique.values()];
+        for (const tab of tabs) if (!existing.has(tab.id)) setBuffer(tab.id, tab.content || '');
+        set({ tabs, tabRenderList: tabs.map(toTabMeta),
+          activeTabId: (tabsToKeep.length && current.activeTabId) || (unique.has(activeId) ? activeId : tabs[0]?.id || null),
+          tabsRevision: current.tabsRevision + 1 });
+        for (const tab of tabs) {
+          const number = /^Untitled-(\d+)$/.exec(tab.name)?.[1];
+          if (number) untitledCounter = Math.max(untitledCounter, Number(number) + 1);
+        }
+      },
+
       /** Restore a draft as a dirty tab without writing over its original disk file. */
       restoreRecoveredTab: (draft) => {
         const { tabs, tabRenderList } = get();
         const baseId = draft.tabId || draft.path || `recovered-${Date.now()}`;
+        const existing = tabs.find((tab) => tab.id === baseId && tab.path === (draft.path || '')
+          && !tab.modified && getBuffer(tab.id, tab.content) === tab.content);
+        if (existing) {
+          setBuffer(existing.id, draft.content || '');
+          set({ tabs: tabs.map((tab) => tab === existing ? { ...tab, content: draft.content || '', modified: true } : tab),
+            tabRenderList: tabRenderList.map((tab) => tab.id === existing.id ? { ...tab, modified: true } : tab),
+            activeTabId: existing.id, tabsRevision: get().tabsRevision + 1 });
+          return existing.id;
+        }
         const id = tabs.some((tab) => tab.id === baseId)
           ? `recovered-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`
           : baseId;
@@ -197,6 +226,7 @@ const useEditorStore = create(
        * `editorBuffer` 的键也从旧 tabId 迁移到新路径。
        */
       updateTabPath: (tabId, path, name) => {
+        renameDocumentViewState(tabId, path);
         renameBuffer(tabId, path);
         set((state) => ({
           tabs: state.tabs.map((t) =>
@@ -484,6 +514,7 @@ const useEditorStore = create(
         toolbarVisible: !s.toolbarVisible,
         uiStateUpdatedAt: Date.now(),
       })),
+      setSplitRatio: (value) => set({ splitRatio: Math.max(0.15, Math.min(0.85, value)) }),
       setToolbarVisible: (v, meta = {}) => set({
         toolbarVisible: v,
         uiStateUpdatedAt: meta.updatedAt ?? Date.now(),
@@ -514,6 +545,7 @@ const useEditorStore = create(
         sidebarView: state.sidebarView,
         viewMode: state.viewMode,
         toolbarVisible: state.toolbarVisible,
+        splitRatio: state.splitRatio,
         uiStateUpdatedAt: state.uiStateUpdatedAt,
       }),
     }

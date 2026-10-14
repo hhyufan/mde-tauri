@@ -19,6 +19,7 @@ import { externalLink } from '@utils/editorLinks';
 import { getFileLanguage } from '@utils/fileLanguage';
 import { initMonacoShiki, isMonacoShikiReady, getMonacoThemeName } from '@utils/monacoShiki';
 import { setBuffer, getBuffer } from '@utils/editorBuffer';
+import { getDocumentViewState, setDocumentViewState, registerDocumentViewState, requestDocumentViewStateSave } from '@utils/documentViewState';
 import MonacoContextMenu from './MonacoContextMenu';
 import MobileSelectionBar from './MobileSelectionBar';
 import MonacoSelectionHandles from './MonacoSelectionHandles';
@@ -35,6 +36,10 @@ function documentModelInfo(tab) {
       ? monaco.Uri.file(tab.path)
       : monaco.Uri.parse(`inmemory://mokidown/${encodeURIComponent(tab.id)}/${encodeURIComponent(tab.name)}`),
   };
+}
+
+function horizontalScrollbarOptions(wrapped) {
+  return { horizontal: wrapped ? 'hidden' : 'auto', horizontalScrollbarSize: wrapped ? 0 : 6 };
 }
 
 /**
@@ -161,7 +166,8 @@ const MonacoEditorComponent = forwardRef(function MonacoEditorComponent({ classN
     const tab = useEditorStore.getState().getActiveTab();
     const initial = tab ? documentModelInfo(tab) : null;
     const initialModel = initial ? monaco.editor.createModel(initial.value, initial.language, initial.uri) : null;
-    if (tab) modelsRef.current.set(tab.id, { model: initialModel, viewState: null });
+    const initialView = tab ? getDocumentViewState(tab.id, 'monaco') : null;
+    if (tab) modelsRef.current.set(tab.id, { model: initialModel, viewState: initialView });
     currentTabIdRef.current = tab?.id || null;
 
     const editor = monaco.editor.create(containerRef.current, {
@@ -193,12 +199,31 @@ const MonacoEditorComponent = forwardRef(function MonacoEditorComponent({ classN
       unusualLineTerminators: 'off',
       scrollbar: {
         verticalScrollbarSize: 6,
-        horizontalScrollbarSize: 6,
+        ...horizontalScrollbarOptions(wordWrap),
         useShadows: false,
       },
     });
 
     editorRef.current = editor;
+    // Follow effective wrapping, including temporary runtime overrides, so an
+    // unwrapped line never becomes inaccessible behind a hidden scrollbar.
+    const syncHorizontalScrollbar = () => {
+      const wrapped = editor.getOption(monaco.editor.EditorOption.wrappingInfo).wrappingColumn >= 0;
+      const current = editor.getOption(monaco.editor.EditorOption.scrollbar);
+      const options = horizontalScrollbarOptions(wrapped);
+      if (current.horizontalScrollbarSize !== options.horizontalScrollbarSize) {
+        editor.updateOptions({ scrollbar: options });
+      }
+    };
+    editor.onDidChangeConfiguration((event) => {
+      if (event.hasChanged(monaco.editor.EditorOption.wrappingInfo)
+        || event.hasChanged(monaco.editor.EditorOption.scrollbar)) syncHorizontalScrollbar();
+    });
+    syncHorizontalScrollbar();
+    if (initialView) editor.restoreViewState(initialView);
+    const stopSessionView = registerDocumentViewState('monaco', () => currentTabIdRef.current, () => editor.saveViewState());
+    editor.onDidChangeCursorSelection(requestDocumentViewStateSave);
+    editor.onDidScrollChange(requestDocumentViewStateSave);
     setEditorInstance(editor);
     const linkOpener = monaco.editor.registerLinkOpener({
       async open(resource) {
@@ -438,6 +463,7 @@ const MonacoEditorComponent = forwardRef(function MonacoEditorComponent({ classN
       if (autoSaveTimer !== null) clearTimeout(autoSaveTimer);
       if (!isComposing) flushAutoSave();
       closedTabs();
+      stopSessionView();
       linkOpener.dispose();
       editor.dispose();
       for (const entry of models.values()) entry.model.dispose();
@@ -457,7 +483,10 @@ const MonacoEditorComponent = forwardRef(function MonacoEditorComponent({ classN
       : null;
     const previousId = currentTabIdRef.current;
     const previous = modelsRef.current.get(previousId);
-    if (previousId !== activeTabId && previous) previous.viewState = editor.saveViewState();
+    if (previousId !== activeTabId && previous) {
+      previous.viewState = editor.saveViewState();
+      setDocumentViewState(previousId, 'monaco', previous.viewState);
+    }
     if (!activeTabId || !tab) {
       currentTabIdRef.current = null;
       suppressModelChangeRef.current = true;
@@ -472,7 +501,7 @@ const MonacoEditorComponent = forwardRef(function MonacoEditorComponent({ classN
     let replacedModel = null;
     if (!entry || entry.model.uri.toString() !== uri.toString()) {
       const replaced = entry;
-      entry = { model: monaco.editor.createModel(newValue, lang, uri), viewState: null };
+      entry = { model: monaco.editor.createModel(newValue, lang, uri), viewState: getDocumentViewState(activeTabId, 'monaco') };
       modelsRef.current.set(activeTabId, entry);
       replacedModel = replaced?.model;
     }
@@ -615,6 +644,7 @@ const MonacoEditorComponent = forwardRef(function MonacoEditorComponent({ classN
     if (editorRef.current) {
       editorRef.current.updateOptions({
         wordWrap: wordWrap ? 'on' : 'off',
+        scrollbar: horizontalScrollbarOptions(wordWrap),
         tabSize: editorRef.current.getModel()?.getLanguageId() === 'mgtree' ? 2 : tabSize,
         lineNumbers: lineNumbers ? 'on' : 'off',
         minimap,

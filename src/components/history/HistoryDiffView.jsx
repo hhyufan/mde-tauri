@@ -87,6 +87,7 @@ function MonacoHistoryDiff({
           folding: false,
           lineNumbers: 'on',
           wordWrap: 'on',
+          diffWordWrap: 'on',
           tabSize: props.tabSize,
           fontSize: props.fontSize,
           fontFamily: props.mono,
@@ -99,7 +100,7 @@ function MonacoHistoryDiff({
             minimumLineCount: 3,
             revealLineCount: 2,
           },
-          scrollbar: { verticalScrollbarSize: 6, horizontalScrollbarSize: 6, useShadows: false },
+          scrollbar: { verticalScrollbarSize: 6, horizontal: 'hidden', horizontalScrollbarSize: 0, useShadows: false },
         });
         diffRef.current = diff;
         const originalModel = monaco.editor.createModel(props.original, props.language);

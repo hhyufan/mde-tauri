@@ -17,6 +17,7 @@ import {
   useImperativeHandle,
 } from 'react';
 import { useEditorBufferContent } from '@hooks/useEditorBufferContent';
+import { useDocumentScrollState } from '@hooks/useDocumentScrollState';
 import { useMarkdownAnalysis } from '@hooks/useMarkdownAnalysis';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
@@ -310,6 +311,7 @@ const MarkdownPreview = forwardRef(function MarkdownPreview({ className }, ref) 
   // 预览树尚在构建时，旧树仍然保持可交互，从而降低长文档下编辑器、滚动条
   // 与侧边栏一起卡顿的概率。
   const content = useDeferredValue(processedContent);
+  useDocumentScrollState(containerRef, activeTabId, 'preview', !isAnalyzing && content === processedContent);
 
   // Prism 的代码块配色随应用样式表一起打包（见 `@styles/prism-theme.scss`），
   // 这里不再在运行时插入/移除 `<link id="prism-theme">`：那个元素此前由本组件和

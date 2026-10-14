@@ -10,6 +10,7 @@ import { useTranslation } from 'react-i18next';
 import useEditorStore from '@store/useEditorStore';
 import useConfigStore from '@store/useConfigStore';
 import { useEditorBufferContent } from '../../hooks/useEditorBufferContent';
+import { useDocumentScrollState } from '@hooks/useDocumentScrollState';
 import { getBuffer, setBuffer } from '@utils/editorBuffer';
 import { isImeComposing } from '@utils/keyboard';
 import { editTreeSource, flattenTree, parseTreeText } from '@utils/mgtree';
@@ -47,6 +48,7 @@ export default function TreeEditor({ className = '', onAutoSave, onSourceChange 
   const [zoom, setZoom] = useState(1);
   const [showTop, setShowTop] = useState(false);
   const scrollRef = useRef(null);
+  useDocumentScrollState(scrollRef, tabId, 'tree');
   const composingRef = useRef(false);
   const pendingBlurRef = useRef(false);
   const suppressImeEnterRef = useRef(false);
