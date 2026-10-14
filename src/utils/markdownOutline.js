@@ -9,8 +9,17 @@ export function extractItems(content) {
   let inCodeBlock = false;
   let currentHeadingLevel = 0;
 
-  // 剥离行内标签与 Markdown 标记，只留下可见文字。
-  const plain = (value) => value.replace(/<[^>]*>/g, '').replace(/[*_`~[\]]/g, '').replace(/\s+/g, ' ').trim();
+  // 剥离行内标记，只留下渲染后真正可见的文字。
+  //
+  // 链接必须只保留文字：`[功能文档](docs/x.md)` → `功能文档`。
+  // 若把 URL 留在文本里，大纲显示的内容就与实际渲染出的文本对不上，
+  // 点击时按文本匹配不到目标，回退到编辑器节点查找（列表项尤其常见）。
+  const plain = (value) => value
+    .replace(/!?\[([^\]]*)\]\([^)]*\)/g, '$1')   // 行内链接 / 图片
+    .replace(/\[([^\]]*)\]\[[^\]]*\]/g, '$1')    // 引用式链接
+    .replace(/<[^>]*>/g, '')                     // HTML 标签
+    .replace(/[*_`~[\]]/g, '')                   // 残留的 Markdown 标记
+    .trim();
 
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i];
@@ -27,7 +36,7 @@ export function extractItems(content) {
       items.push({
         type: 'heading',
         level: currentHeadingLevel,
-        text: hm[2].replace(/[*_`~[\]]/g, '').trim(),
+        text: plain(hm[2]),
         line: i + 1,
       });
       continue;
@@ -50,7 +59,7 @@ export function extractItems(content) {
           if (closer.test(lines[j])) { raw = collected; endLine = j; break; }
         }
       }
-      const text = plain(raw.replace(closer, ''));
+      const text = plain(raw.replace(closer, '')).replace(/\s+/g, ' ');
       i = endLine;
       if (text) {
         currentHeadingLevel = level;
@@ -66,7 +75,7 @@ export function extractItems(content) {
         type: 'list-ordered',
         indent: Math.floor(om[1].length / 2),
         order: Number(om[2]),
-        text: om[3].replace(/[*_`~[\]]/g, '').trim(),
+        text: plain(om[3]),
         line: i + 1,
         parentLevel: currentHeadingLevel,
       });
@@ -79,7 +88,7 @@ export function extractItems(content) {
       items.push({
         type: 'list-unordered',
         indent: Math.floor(um[1].length / 2),
-        text: um[2].replace(/[*_`~[\]]/g, '').trim(),
+        text: plain(um[2]),
         line: i + 1,
         parentLevel: currentHeadingLevel,
       });

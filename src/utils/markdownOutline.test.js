@@ -55,3 +55,24 @@ it('ignores HTML headings inside fenced code', () => {
     { type: 'heading', level: 2, text: 'Real', line: 4 },
   ]);
 });
+
+it('keeps link text but drops the URL so outline labels match what is rendered', () => {
+  expect(extractItems('* [功能文档](docs/Function/README.md) · [语言服务](docs/语言服务.md)')).toEqual([
+    {
+      type: 'list-unordered',
+      indent: 0,
+      text: '功能文档 · 语言服务',
+      line: 1,
+      parentLevel: 0,
+    },
+  ]);
+  expect(extractItems('# [标题](docs/a.md)')).toEqual([
+    { type: 'heading', level: 1, text: '标题', line: 1 },
+  ]);
+  expect(extractItems('- ![图](a.png) 说明')).toEqual([
+    { type: 'list-unordered', indent: 0, text: '图 说明', line: 1, parentLevel: 0 },
+  ]);
+  expect(extractItems('1. [指南][ref] 与 `代码`')).toEqual([
+    { type: 'list-ordered', indent: 0, order: 1, text: '指南 与 代码', line: 1, parentLevel: 0 },
+  ]);
+});
