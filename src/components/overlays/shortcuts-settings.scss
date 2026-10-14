@@ -1,0 +1,16 @@
+.shortcuts-settings {
+  &__header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 16px;
+    margin-bottom: 4px;
+  }
+
+  &__intro {
+    margin: 0;
+    color: var(--text-sec);
+    font-size: 12px;
+    line-height: 1.6;
+  }
+}

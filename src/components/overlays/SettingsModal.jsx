@@ -23,6 +23,7 @@ import {
   GithubOutlined,
   StarFilled,
   AppstoreOutlined,
+  ThunderboltOutlined,
 } from '@ant-design/icons';
 import AppMark from '@components/ui/AppMark';
 import { REPO_URL } from '@/configs/repository';
@@ -44,18 +45,20 @@ import './settings-modal.scss';
 import LanguageServices from './LanguageServices';
 import BackgroundSettings from './BackgroundSettings';
 import MokiSettings from '@components/moki/MokiSettings';
+import ShortcutsSettings from './ShortcutsSettings';
 import MokiSprite from '@components/moki/MokiSprite';
 
 const NAV_ICONS = {
   general: <SettingOutlined />,
   appearance: <BgColorsOutlined />,
   editor: <EditOutlined />,
+  shortcuts: <ThunderboltOutlined />,
   languages: <AppstoreOutlined />,
   cloud: <CloudOutlined />,
   about: <InfoCircleOutlined />,
 };
 
-const NAV_KEYS = ['general', 'appearance', 'editor', 'languages', 'cloud', 'about'];
+const NAV_KEYS = ['general', 'appearance', 'editor', 'shortcuts', 'languages', 'cloud', 'about'];
 
 /**
  * 设置弹窗。
@@ -420,6 +423,10 @@ function SettingsModal({ open: openProp, onClose }) {
                   />
                 </SettingRow>
               </div>
+            )}
+
+            {activeNav === 'shortcuts' && (
+              <ShortcutsSettings SettingGroup={SettingGroup} SettingRow={SettingRow} />
             )}
 
             {activeNav === 'languages' && <LanguageServices />}
