@@ -13,6 +13,7 @@
   "app": {
     "windows": [
       {
+        "label": "main",
         "title": "MokiDown",
         "width": 1200,
         "height": 800,
@@ -23,13 +24,34 @@
         "minimizable": true,
         "closable": true,
         "center": true,
-        "visible": true,
+        "visible": false,
+        "focus": false,
         "transparent": false,
         "decorations": false,
         "shadow": false,
         "devtools": true,
         "dragDropEnabled": true,
-        "backgroundColor": "#121212"
+        "backgroundColor": "#f5f5f7"
+      },
+      {
+        "label": "splash",
+        "title": "MokiDown",
+        "url": "splash/index.html",
+        "width": 640,
+        "height": 400,
+        "resizable": false,
+        "maximizable": false,
+        "minimizable": false,
+        "closable": false,
+        "center": true,
+        "alwaysOnTop": true,
+        "skipTaskbar": true,
+        "visible": false,
+        "focus": false,
+        "transparent": false,
+        "decorations": false,
+        "shadow": false,
+        "backgroundColor": "#f5f5f7"
       }
     ],
     "security": {

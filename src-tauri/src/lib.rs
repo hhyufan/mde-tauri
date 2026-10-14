@@ -21,6 +21,8 @@ mod lsp;
 mod msvc;
 mod script_runner;
 mod search;
+mod startup;
+mod startup_gate;
 
 /// 返回给前端的轻量级文件系统条目元数据，
 /// 用于资源管理器界面展示文件和目录。
@@ -1438,6 +1440,9 @@ where
 
 /// 将主窗口带回前台并聚焦，用于关联文件打开与单实例转发场景。
 fn focus_main_window(app: &AppHandle) {
+    if startup::is_starting(app) {
+        return;
+    }
     if let Some(window) = app.get_webview_window("main") {
         let _ = window.show();
         let _ = window.unminimize();
@@ -1459,11 +1464,16 @@ async fn get_cli_args() -> Result<Vec<String>, String> {
 async fn show_main_window(app: AppHandle) -> Result<(), String> {
     #[cfg(not(target_os = "android"))]
     {
+        if startup::is_starting(&app) {
+            return Ok(());
+        }
         match app.get_webview_window("main") {
             Some(window) => {
                 window
                     .show()
                     .map_err(|e| format!("Failed to show window: {}", e))?;
+                window.unminimize().map_err(|error| error.to_string())?;
+                window.set_focus().map_err(|error| error.to_string())?;
                 Ok(())
             }
             None => Err("Main window not found".to_string()),
@@ -1674,25 +1684,25 @@ pub fn run() {
 
     #[allow(unused_mut)]
     let mut builder = tauri::Builder::default()
+        .manage(startup::StartupState::default())
         .plugin(tauri_plugin_fs::init())
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_store::Builder::default().build())
         .plugin(tauri_plugin_process::init());
 
-    // 启动期初始化：调试构建自动打开 devtools；Windows 下补回关闭阴影后
-    // 失去的窗口圆角，并确保 DWM 不绘制强调色边框。
+    // 启动期初始化：Windows 下补回关闭阴影后失去的窗口圆角，
+    // 并确保 DWM 不绘制强调色边框。
     builder = builder.setup(|app| {
         // 品牌更名导致 app_data_dir() 指向新目录：先把旧目录里的本地历史与草稿搬过来。
         migrate_legacy_app_data(app.handle());
         let main_window = app.get_webview_window("main");
-        #[cfg(all(debug_assertions, not(target_os = "android")))]
-        if let Some(window) = main_window.as_ref() {
-            window.open_devtools();
-        }
         #[cfg(windows)]
         if let Some(window) = main_window.as_ref() {
             style_window_frame(window);
         }
+        // Both windows start hidden; the decoded splash and mounted App announce
+        // readiness independently. Never open devtools here and steal focus.
+        startup::install_watchdog(app.handle());
         let _ = &main_window;
         Ok(())
     });
@@ -1747,6 +1757,8 @@ pub fn run() {
             search::cancel_search,
             show_in_explorer,
             show_main_window,
+            startup::main_window_ready,
+            startup::splash_ready,
             get_app_documents_dir,
             get_cli_args,
             open_external,

@@ -36,6 +36,11 @@ export default [
     },
   },
   js.configs.recommended,
+  // Static startup scripts are served directly from public, outside Vite.
+  {
+    files: ['public/**/*.js'],
+    languageOptions: { globals: globals.browser },
+  },
   {
     files: ['src/**/*.{js,jsx}', 'vite.config.js', 'scripts/**/*.mjs'],
     languageOptions: {
