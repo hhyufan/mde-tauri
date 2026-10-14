@@ -43,6 +43,7 @@ import {
   toggleStrikethroughCommand,
 } from '@milkdown/kit/preset/gfm';
 import { history } from '@milkdown/kit/plugin/history';
+import { clipboard } from '@milkdown/kit/plugin/clipboard';
 import { listener, listenerCtx } from '@milkdown/kit/plugin/listener';
 import { codeBlockComponent, codeBlockConfig } from '@milkdown/kit/component/code-block';
 import { $ctx, $inputRule, $nodeSchema, $prose, $remark, getMarkdown, insert, replaceRange } from '@milkdown/kit/utils';
@@ -55,6 +56,7 @@ import { EditorView as CodeMirrorView } from '@codemirror/view';
 import { tags } from '@lezer/highlight';
 import katex from 'katex';
 import remarkMath from 'remark-math';
+import remarkMarkdownHtml from '@utils/remarkMarkdownHtml';
 import { javascript, json, typescript } from '@codemirror/legacy-modes/mode/javascript';
 import { css, sCSS } from '@codemirror/legacy-modes/mode/css';
 import { html, xml } from '@codemirror/legacy-modes/mode/xml';
@@ -121,6 +123,9 @@ import i18n from '@/i18n';
 import MermaidRenderer from './MermaidRenderer';
 import { attachCodeBlockExecutions } from './milkdownCodeBlockRuns';
 import { milkdownEditingFlow, milkdownGapCursor, handleMilkdownBlockKeyDown, handleMilkdownBlankPointerDown, persistentMilkdownDocument } from './milkdownEditingFlow';
+import { milkdownMarkdownPaste } from './milkdownMarkdownPaste';
+import { htmlBlockSchema, htmlBlockView, sanitizeMilkdownHtml } from './milkdownHtmlBlock';
+import { configureEditingWhitespace, initialEditingSelection } from './milkdownWhitespace';
 import { isAndroidRuntime } from '@utils/platform';
 import './markdown-preview.scss';
 
@@ -206,6 +211,7 @@ const tableSourceBlockType = 'table_source_block';
 const mathSourceEditMeta = 'mokidownMathSourceEdit';
 const markdownSourceEditMeta = 'mokidownMarkdownSourceEdit';
 const remarkMathPlugin = $remark('remarkMath', () => remarkMath);
+const markdownHtmlPlugin = $remark('mokiMarkdownHtml', () => remarkMarkdownHtml, { editing: true });
 const katexOptionsCtx = $ctx({
   throwOnError: false,
   strict: false,
@@ -1101,6 +1107,7 @@ function isNonEditablePreviewTarget(target) {
  */
 function createNonEditablePreviewSelectionHandler(getEditor) {
   return function stopNonEditablePreviewSelection(event) {
+    if (event.target.closest?.('[data-type="html_block"]')) return;
     if (!isNonEditablePreviewTarget(event.target)) return;
 
     const footnoteRef = event.target.closest?.('sup[data-type="footnote_reference"]');
@@ -1169,28 +1176,6 @@ function createNonEditablePreviewSelectionHandler(getEditor) {
     event.nativeEvent?.stopImmediatePropagation?.();
     event.stopImmediatePropagation?.();
   };
-}
-
-/**
- * 对内嵌 HTML 预览内容做最小化安全清洗。
- *
- * @param {string} value 原始 HTML 字符串。
- * @returns {string} 去除危险标签和内联脚本后的 HTML。
- */
-function sanitizeMilkdownHtml(value) {
-  const template = document.createElement('template');
-  template.innerHTML = value;
-  template.content.querySelectorAll('script, iframe, object, embed, link, meta').forEach((node) => node.remove());
-  template.content.querySelectorAll('*').forEach((node) => {
-    [...node.attributes].forEach((attr) => {
-      const name = attr.name.toLowerCase();
-      const attrValue = attr.value.trim().toLowerCase();
-      if (name.startsWith('on') || attrValue.startsWith('javascript:')) {
-        node.removeAttribute(attr.name);
-      }
-    });
-  });
-  return template.innerHTML;
 }
 
 /**
@@ -1441,6 +1426,7 @@ function MilkdownInner({
   const editorInfo = useEditor((root) => {
     const editor = Editor.make()
       .config((ctx) => {
+        configureEditingWhitespace(ctx, { readOnly });
         ctx.set(rootCtx, root);
         ctx.set(defaultValueCtx, content || '');
         ctx.set(katexOptionsCtx.key, {
@@ -1476,20 +1462,26 @@ function MilkdownInner({
         }));
         ctx.get(listenerCtx)
           .mounted((editorCtx) => {
-            const state = editorCtx.get(editorViewCtx).state;
+            const view = editorCtx.get(editorViewCtx);
+            const selection = !readOnly && initialEditingSelection(view.state);
+            if (selection) view.dispatch(view.state.tr.setSelection(selection));
+            const state = view.state;
             publishedMarkdownRef.current = editorCtx.get(serializerCtx)(persistentMilkdownDocument(state));
           })
           .markdownUpdated(publishEditorContent);
       })
+      .use(markdownHtmlPlugin)
       .use(commonmark)
       .use(gfm)
+      .use(htmlBlockSchema)
+      .use(htmlBlockView)
       .use(taskListCheckboxPlugin)
       .use(mathPlugins)
       .use(history)
       .use(codeBlockComponent)
       .use(listener);
 
-    if (!readOnly) editor.use(milkdownEditingFlow).use(milkdownGapCursor);
+    if (!readOnly) editor.use(milkdownMarkdownPaste).use(clipboard).use(milkdownEditingFlow).use(milkdownGapCursor);
 
     editorRef.current = editor;
     return editor;
