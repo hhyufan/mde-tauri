@@ -22,6 +22,7 @@ import { useMarkdownAnalysis } from '@hooks/useMarkdownAnalysis';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import remarkMath from 'remark-math';
+import remarkMarkdownHtml from '@utils/remarkMarkdownHtml';
 import rehypeRaw from 'rehype-raw';
 import rehypeKatex from 'rehype-katex';
 import rehypeSanitize, { defaultSchema } from 'rehype-sanitize';
@@ -152,7 +153,7 @@ const sanitizeSchema = {
   },
 };
 
-const remarkPlugins = [remarkGfm, remarkMath];
+const remarkPlugins = [remarkGfm, remarkMath, remarkMarkdownHtml];
 const rehypePlugins = [
   rehypeRaw,
   [rehypeSanitize, sanitizeSchema],
