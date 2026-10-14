@@ -84,8 +84,16 @@ beforeEach(() => {
 });
 afterEach(() => { cleanup(); clearBuffer(path); vi.restoreAllMocks(); vi.unstubAllGlobals(); });
 
+it('starts collapsed so the file tree keeps the vertical space', async () => {
+  render(<Timeline />);
+  expect(screen.getByRole('button', { name: '本地历史' })).toHaveAttribute('aria-expanded', 'false');
+  expect(screen.queryByRole('img', { name: '回滚记录' })).toBeNull();
+});
+
 it('shows a rollback icon and its source on the marked entry, while old plain entries remain selectable', async () => {
   render(<Timeline />);
+  // 时间线默认收起，先展开再断言列表内容。
+  fireEvent.click(screen.getByRole('button', { name: '本地历史' }));
   const icon = await screen.findByRole('img', { name: '回滚记录' });
   expect(screen.getAllByRole('img', { name: '回滚记录' })).toHaveLength(1);
   expect(icon).not.toHaveAttribute('title');

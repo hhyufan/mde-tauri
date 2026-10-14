@@ -37,7 +37,9 @@ export default function Timeline() {
   const diff = useHistoryStore((s) => s.diff);
   const setDiff = useHistoryStore((s) => s.setDiff);
 
-  const [expanded, setExpanded] = useState(true);
+  // 默认收起：本地历史是资源管理器左下角的一个可展开面板，
+  // 不展开时只占标题那一行，把纵向空间让给文件树。
+  const [expanded, setExpanded] = useState(false);
   const [entries, setEntries] = useState([]);
   const [loading, setLoading] = useState(false);
 

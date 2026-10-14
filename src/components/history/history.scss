@@ -1,9 +1,16 @@
 /* 左侧资源管理器底部的历史时间线（VS Code Timeline 同款）。 */
 .timeline {
+  --timeline-row: 27px;   /* 单行高度，行高与列表上限共用同一个值 */
+  --timeline-rows: 6;     /* 展开时最多显示 6 行，超出滚动 */
+
   display: flex;
   flex-direction: column;
   flex-shrink: 0;
-  max-height: 40%;
+  /* 贴住侧边栏底部：上方无论是不是空态占位，这里都固定在左下角。 */
+  margin-top: auto;
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
   min-height: 0;
   border-top: 1px solid var(--border);
   background: var(--sidebar);
@@ -72,10 +79,13 @@
 .timeline__list {
   list-style: none;
   margin: 0;
-  padding: 0 4px 6px;
-  overflow: auto;
+  padding: 0 4px;
+  overflow-y: auto;
+  overflow-x: hidden;
   flex: 1;
   min-height: 0;
+  /* 恰好 6 行，第 7 条起滚动；由列表自己限制，不依赖标题栏的高度。 */
+  max-height: calc(var(--timeline-row) * var(--timeline-rows));
 }
 
 .timeline__item {
@@ -83,7 +93,9 @@
   align-items: center;
   gap: 6px;
   width: 100%;
-  padding: 5px 6px;
+  box-sizing: border-box;
+  height: var(--timeline-row);
+  padding: 0 6px;
   border: 0;
   border-radius: 4px;
   background: transparent;
