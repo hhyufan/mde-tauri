@@ -1,0 +1,36 @@
+/**
+ * Rust 后端检查入口。
+ *
+ * 直接调用 `cargo` 会因为缺少 MSVC 开发环境（`vcvars`）而在链接 proc-macro 构建
+ * 脚本时失败（`LNK1104: 无法打开文件 msvcrt.lib`）。这里复用 `scripts/tauri.mjs`
+ * 同一套 `initializeMsvc`，保证手工检查与正式构建使用完全相同的编译器环境。
+ *
+ * 用法：
+ *   node scripts/rust.mjs
+ *     等价于 cargo check --lib
+ *   node scripts/rust.mjs run --example hotkey_probe_check
+ *     真机验证全局热键占用探测
+ */
+import { spawnSync } from 'node:child_process';
+import { fileURLToPath } from 'node:url';
+import { initializeMsvc } from './windows-msvc.mjs';
+
+try {
+  // initializeMsvc 只认 build/dev 子命令，这里借 build 完成环境注入。
+  initializeMsvc(['build']);
+  if (!process.env.CARGO_TARGET_DIR) {
+    process.env.CARGO_TARGET_DIR = fileURLToPath(new URL('../src-tauri/target', import.meta.url));
+  }
+
+  const args = process.argv.slice(2);
+  const cargoArgs = args.length > 0
+    ? args
+    : ['check', '--manifest-path', 'src-tauri/Cargo.toml', '--lib'];
+
+  const result = spawnSync('cargo', cargoArgs, { stdio: 'inherit', env: process.env, shell: false });
+  if (result.error) throw result.error;
+  process.exitCode = result.status ?? 1;
+} catch (error) {
+  console.error(`[mokidown] ${error.message}`);
+  process.exitCode = 1;
+}

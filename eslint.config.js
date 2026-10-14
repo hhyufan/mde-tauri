@@ -35,6 +35,15 @@ export default [
       globals: { ...globals.node, ...globals.browser },
     },
   },
+  // Browser scaffolds are modules that only ever run inside the page.
+  {
+    files: ['tests/**/*.js'],
+    languageOptions: {
+      ecmaVersion: 'latest',
+      sourceType: 'module',
+      globals: { ...globals.browser },
+    },
+  },
   js.configs.recommended,
   // Static startup scripts are served directly from public, outside Vite.
   {

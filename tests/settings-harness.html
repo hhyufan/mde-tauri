@@ -1,0 +1,31 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="UTF-8" />
+    <title>Settings shortcuts verification</title>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module">
+      import React from 'react';
+      import { createRoot } from 'react-dom/client';
+      import SettingsModal from '/src/components/overlays/SettingsModal.jsx';
+      import useConfigStore from '/src/store/useConfigStore.js';
+      import i18n from '/src/i18n/index.js';
+      import '/src/assets/styles/index.scss';
+
+      // 断言依赖固定文案，因此显式锁定语言。
+      await i18n.changeLanguage('zh');
+
+      const root = createRoot(document.getElementById('root'));
+      window.trial = {
+        render() {
+          root.render(React.createElement(SettingsModal, { open: true, onClose: () => {} }));
+        },
+        resetHotkeys: () => useConfigStore.getState().resetHotkeys(),
+        hotkeys: () => useConfigStore.getState().hotkeys,
+      };
+      window.trial.render();
+    </script>
+  </body>
+</html>

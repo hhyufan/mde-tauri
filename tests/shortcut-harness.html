@@ -1,0 +1,100 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="UTF-8" />
+    <title>Shortcut verification</title>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="./shortcut-harness-monaco.js"></script>
+    <script type="module">
+      import React from 'react';
+      import { createRoot } from 'react-dom/client';
+      import ShortcutsSettings from '/src/components/overlays/ShortcutsSettings.jsx';
+      import useConfigStore from '/src/store/useConfigStore.js';
+      import useEditorStore from '/src/store/useEditorStore.js';
+      import { useHotkeys } from '/src/hooks/useHotkeys.js';
+      import { resolveHotkeys } from '/src/configs/hotkeys.js';
+      import '/src/i18n/index.js';
+      import i18n from '/src/i18n/index.js';
+      import '/src/assets/styles/index.scss';
+
+      // 断言依赖固定文案，因此显式锁定语言，不跟随浏览器语言探测。
+      await i18n.changeLanguage('zh');
+
+      const root = createRoot(document.getElementById('root'));
+
+      // 与 App.jsx 相同的全局快捷键路径：document 捕获阶段匹配配置好的键位。
+      function HotkeyProbe() {
+        const { matchAction } = useHotkeys();
+        React.useEffect(() => {
+          const onKeyDown = (event) => {
+            const action = matchAction(event, 'app');
+            if (!action) return;
+            window.trial.hits.push({ id: action.id, code: event.code, key: event.key });
+            event.preventDefault();
+            if (action.id === 'togglePreview') useEditorStore.getState().toggleEditPreview();
+          };
+          document.addEventListener('keydown', onKeyDown, true);
+          return () => document.removeEventListener('keydown', onKeyDown, true);
+        }, [matchAction]);
+        return null;
+      }
+
+      function StubGroup({ label }) {
+        return React.createElement('h3', null, label);
+      }
+      // 类名与真实的 SettingRow 保持一致，让用例选择器可以在两套脚手架上通用。
+      function StubRow({ label, desc, children }) {
+        return React.createElement('div', { className: 'setting-row' },
+          React.createElement('div', { className: 'setting-row__info' },
+            React.createElement('span', { className: 'setting-row__label' }, label),
+            desc ? React.createElement('span', { className: 'setting-row__desc' }, desc) : null),
+          React.createElement('div', { className: 'setting-row__control' }, children));
+      }
+
+      // 可注入的探测实现：默认为“原生确认可用”，与真实 Tauri 环境一致。
+      // 用 URL 参数在页面脚本运行前定好，避免“先渲染再改探针”的竞态：
+      //   ?probe=unsupported  模拟浏览器 / macOS / Linux（探测不到）
+      //   ?probe=taken        模拟系统已占用
+      const probeMode = new URLSearchParams(location.search).get('probe') ?? 'available';
+      let probeImpl = async () => ({ status: probeMode === 'available' ? 'available' : probeMode });
+      const probe = (keybinding) => probeImpl(keybinding);
+      // 运行中切换探测实现时，用递增 key 强制面板重挂载。
+      let panelGeneration = 0;
+
+      window.trial = {
+        hits: [],
+        probeMode,
+        setProbe: (impl) => {
+          probeImpl = impl;
+          panelGeneration += 1;
+          window.trial.render();
+        },
+        render() {
+          // 这里刻意不做任何自动重置：重置会与 zustand 的持久化恢复抢跑，让
+          // “刷新后绑定仍生效”变得无法验证。需要干净起点的用例自行调用 reset()。
+          useEditorStore.getState().setViewMode('edit');
+          root.render(React.createElement(React.Fragment, null,
+            React.createElement(HotkeyProbe),
+            React.createElement(ShortcutsSettings, {
+              key: panelGeneration,
+              SettingGroup: StubGroup,
+              SettingRow: StubRow,
+              probe,
+            })));
+        },
+        /** 恢复默认键位，用于让用例从干净状态开始。 */
+        reset: () => useConfigStore.getState().resetHotkeys(),
+        hotkeys: () => resolveHotkeys(useConfigStore.getState().hotkeys),
+        setHotkey: (id, key) => useConfigStore.getState().setHotkey(id, key),
+        // 绕过校验直接写入，用于模拟旧配置/导入配置里已经存在的重复键位。
+        seedHotkeys: (value) => useConfigStore.setState({ hotkeys: value }),
+        viewMode: () => useEditorStore.getState().viewMode,
+        setViewMode: (mode) => useEditorStore.getState().setViewMode(mode),
+        clearHits: () => { window.trial.hits = []; },
+      };
+      window.trial.render();
+    </script>
+  </body>
+</html>
