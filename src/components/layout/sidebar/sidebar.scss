@@ -20,17 +20,22 @@
   }
 }
 
-// 品牌区：只放产品字标（蓝边白字「MokiDown」），不再跟一行品类描述。
+// 品牌区：只放产品字标（蓝边白字「MokiDown」）。
 .sidebar__header {
   display: flex;
   align-items: center;
-  padding: 12px 16px;
+  /*
+   * 上 17.5 + 字标 24 + 下 5.5 = 47px，加 1px 底线共 48px，与右侧 titlebar 等高：
+   * 字标底边因此落在 41.5px（与搜索框底边齐平），底线也与顶栏底边落在同一水平线。
+   * 搜索框底边 41.5px 为实测值：titlebar 高 48px、搜索框高 36px 居中。
+   */
+  padding: 17.5px 16px 5.5px;
   border-bottom: 1px solid var(--border);
 }
 
+// 尺寸不在这里设定：AppMark 通过内联样式下发 --app-mark-size，
+// 在此处覆盖同名变量不会生效，改尺寸请改 Sidebar 里的 size 参数。
 .sidebar__wordmark {
-  /* 248px 内容宽下，30px 高的字标约 154px，留有余量不会顶到边界。 */
-  --app-mark-size: 30px;
   margin-left: -2px;
 }
 

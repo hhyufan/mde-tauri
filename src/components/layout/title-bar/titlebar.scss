@@ -8,6 +8,8 @@
   display: flex;
   align-items: center;
   padding: 0 12px;
+  // 底线与侧栏品牌区的底线同高（两者高度都是 48px），
+  // 合起来就是最上面整条顶栏下方贯通的一条分隔线。
   border-bottom: 1px solid var(--border);
   background: var(--sidebar);
   font-family: var(--font-app);

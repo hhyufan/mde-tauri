@@ -424,8 +424,10 @@ function Sidebar({ onOpenSettings, onOpenStats, onOpenLogin }) {
   return (
     <aside className={cn('sidebar', !sidebarVisible && 'sidebar--hidden')}>
       <div className="sidebar__header">
-        {/* 左上角只保留产品字标（蓝边白字「MokiDown」）。 */}
-        <AppMark size={30} variant="wordmark" className="sidebar__wordmark" />
+        {/* 左上角只保留产品字标（蓝边白字「MokiDown」）。
+            尺寸走组件参数——AppMark 会把 --app-mark-size 内联下发，
+            在样式表里改同名变量不会生效。 */}
+        <AppMark size={24} variant="wordmark" className="sidebar__wordmark" />
       </div>
 
       <div className="sidebar__tabs" role="tablist" aria-label={t('sidebar.tabs')}>
