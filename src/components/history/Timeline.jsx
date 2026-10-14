@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { Tooltip } from 'antd';
 import { HistoryOutlined, ReloadOutlined } from '@ant-design/icons';
 import ChevronIcon from '@components/ui/ChevronIcon';
+import MokiStatusEmpty from '@components/moki/MokiStatusEmpty';
 import useEditorStore from '@store/useEditorStore';
 import useHistoryStore from '@store/useHistoryStore';
 import { historyList, historyRead, onHistoryChanged } from '@utils/tauriApi';
@@ -116,8 +117,20 @@ export default function Timeline() {
         折叠时用 aria-hidden 让辅助技术跳过它（jsdom 下的 role 查询同样会忽略）。
       */}
       <div className="timeline__body" aria-hidden={!expanded}>
-        {loading || entries.length === 0 ? (
+        {loading ? (
           <div className="timeline__placeholder">{t('history.empty')}</div>
+        ) : entries.length === 0 ? (
+          /*
+           * 没有任何历史版本时，用与文件树 / 大纲同一套空状态：
+           * 角色立绘 + 一句 ACG 口吻的主句 + 一行淡色说明。
+           * 传 compact 是因为这里的画布只有侧边栏宽、且高度受限。
+           */
+          <MokiStatusEmpty
+            compact
+            art="history"
+            title={t('empty.history.title')}
+            hint={t('empty.history.hint')}
+          />
         ) : (
           <ul className="timeline__list">
             {entries.map((entry) => (

@@ -13,6 +13,7 @@ import { historyCapture } from '@utils/tauriApi';
 import { getFileLanguage } from '@utils/fileLanguage';
 import { initMonacoShiki, getMonacoThemeName } from '@utils/monacoShiki';
 import { restoreSelectedHistoryChanges } from '@utils/historyChanges';
+import MokiStatusEmpty from '@components/moki/MokiStatusEmpty';
 import './history.scss';
 
 function formatTime(timestamp) {
@@ -385,8 +386,16 @@ export default function HistoryDiffView() {
         </div>
       </div>
       {noChanges && (
+        /*
+         * 所选版本与当前内容一致时，不必只丢一行冷冰冰的「没有更改」——
+         * 用与文件树 / 提纲同一套空状态：角色立绘 + 一句 ACG 口吻的主句 + 淡色说明。
+         */
         <div className="history-diff__empty" role="status">
-          {t('history.noChanges')}
+          <MokiStatusEmpty
+            art="history"
+            title={t('empty.historyDiff.title')}
+            hint={t('empty.historyDiff.hint')}
+          />
         </div>
       )}
       <MonacoHistoryDiff

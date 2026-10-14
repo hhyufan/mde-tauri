@@ -23,6 +23,8 @@ vi.mock('react-i18next', () => ({ useTranslation: () => ({ t: (key, params) => (
   'history.restoreSelection': '恢复选中差异', 'history.applyChanges': '应用修改',
   'history.current': '现在',
   'history.noChanges': '没有更改',
+  'empty.historyDiff.title': '这个版本和现在一模一样呢～',
+  'empty.historyDiff.hint': '没有更改。',
 }[key] || key) }) }));
 vi.mock('monaco-editor', () => ({ editor: {
   createDiffEditor: (...args) => mock.createDiff(...args),
