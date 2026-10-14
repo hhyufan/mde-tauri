@@ -1,4 +1,6 @@
-import iconUrl from '@/assets/app-icon.png';
+// 矢量应用图标：按 512×512 原图实测重绘（见文件内注释），
+// 任意倍率缩放都保持锐利，不再受位图分辨率限制。
+import iconUrl from '@/assets/app-icon.svg';
 import mokiIconUrl from '@/assets/moki-icon.png';
 // 完整产品字标：左侧圆形 M 图标 + 手绘圆体「MokiDown」，两者是一体构图，
 // 不能拆开单独使用，因此按整张图以高度为准等比缩放。
