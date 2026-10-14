@@ -51,8 +51,6 @@ MokiDown 是基于 Tauri 2、React、Monaco 与 Milkdown 的开源 Markdown 编�
 | :-------------------------------------: | :------------------------------------: |
 | ![浅色欢迎页](screenshots/welcome-light.png) | ![深色欢迎页](screenshots/welcome-dark.png) |
 
-<br />
-
 |     三模式编辑（源码 / WYSIWYG / 分屏）     |          树编辑器（mgtree）         |
 | :------------------------------: | :---------------------------: |
 | ![三模式编辑](screenshots/editor.png) | ![树编辑器](screenshots/tree.png) |
