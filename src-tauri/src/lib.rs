@@ -15,6 +15,7 @@ use std::process::Command;
 use std::sync::{Arc, Mutex};
 use std::time::{SystemTime, UNIX_EPOCH};
 use tauri::{AppHandle, Emitter, Manager};
+mod hotkeys;
 mod language_plugins;
 mod lsp;
 #[cfg(windows)]
@@ -1759,6 +1760,7 @@ pub fn run() {
             show_main_window,
             startup::main_window_ready,
             startup::splash_ready,
+            hotkeys::check_hotkey_available,
             get_app_documents_dir,
             get_cli_args,
             open_external,

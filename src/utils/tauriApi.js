@@ -510,3 +510,24 @@ export function onOpenPaths(callback) {
     callback(payload);
   });
 }
+
+/**
+ * 询问原生侧某个全局热键是否已被别的程序占用。
+ *
+ * 浏览器 / WebView 拿不到操作系统的热键注册表，只有原生侧能真正回答这个问题。
+ * 探测失败（非 Tauri 环境）时返回 `unsupported`，调用方必须把它当作"不知道"，
+ * 而不是"可用"。
+ *
+ * @param {string} keybinding 归一化键位，形如 `Ctrl+Shift+Slash`。
+ * @returns {Promise<{status: string, reason?: string, platform?: string}>} 探测结果。
+ */
+export function checkHotkeyAvailable(keybinding) {
+  if (typeof window === 'undefined' || !window.__TAURI_INTERNALS__) {
+    return Promise.resolve({ status: 'unsupported', platform: 'web' });
+  }
+  return invoke('check_hotkey_available', { keybinding })
+    .catch((error) => {
+      console.warn('[tauriApi] check_hotkey_available failed:', error);
+      return { status: 'unsupported', platform: 'unknown' };
+    });
+}
