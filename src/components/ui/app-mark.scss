@@ -16,3 +16,20 @@
   -webkit-user-drag: none;
   filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.18));
 }
+
+/**
+ * 完整字标变体。
+ *
+ * 它是横向组合标识（图形 + 文字一体），因此：
+ * - 高度由 --app-mark-size 决定，宽度按原比例自适应；
+ * - 不能套圆形裁切，否则会被切成椭圆；
+ * - 自带描边与投影，再叠一层 filter 只会显脏。
+ */
+.app-mark--wordmark {
+  width: auto;
+  height: var(--app-mark-size);
+  max-width: 100%;
+  border-radius: 0;
+  object-fit: contain;
+  filter: none;
+}

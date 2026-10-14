@@ -387,8 +387,6 @@ function Sidebar({ onOpenSettings, onOpenStats, onOpenLogin }) {
   const { theme, toggleTheme } = useThemeStore();
   // 云同步开启时登录入口会占回底栏首位，GitHub 入口要让位（两者互斥）。
   const syncEnabled = useConfigStore((state) => state.syncEnabled);
-  // 开启后左上角标识换成 Moki 形象徽章（设置 · Moki 主题与形象）。
-  const mokiIcon = useConfigStore((state) => state.mokiIcon);
   const themeButtonRef = useRef(null);
   const notify = useNotificationStore.getState().notify;
 
@@ -426,11 +424,12 @@ function Sidebar({ onOpenSettings, onOpenStats, onOpenLogin }) {
   return (
     <aside className={cn('sidebar', !sidebarVisible && 'sidebar--hidden')}>
       <div className="sidebar__header">
-        <AppMark size={32} variant={mokiIcon ? 'moki' : 'app'} />
-        <div className="sidebar__brand">
-          <h1 className="sidebar__title">{t('app.name')}</h1>
-          <p className="sidebar__descriptor">{t('app.descriptor')}</p>
-        </div>
+        {/*
+          左上角使用完整产品字标（圆形 M 图标 + 手绘圆体「MokiDown」是一体构图），
+          因此不再另起一行文字标题，只保留下方描述。
+        */}
+        <AppMark size={30} variant="wordmark" className="sidebar__wordmark" />
+        <p className="sidebar__descriptor">{t('app.descriptor')}</p>
       </div>
 
       <div className="sidebar__tabs" role="tablist" aria-label={t('sidebar.tabs')}>
