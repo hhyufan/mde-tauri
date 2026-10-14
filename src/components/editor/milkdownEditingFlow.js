@@ -1,10 +1,10 @@
 import { Plugin, PluginKey, NodeSelection, TextSelection } from '@milkdown/kit/prose/state';
-import { gapCursor } from '@milkdown/kit/prose/gapcursor';
+import { gapCursor, GapCursor } from '@milkdown/kit/prose/gapcursor';
 import { EditorView as CodeMirrorView } from '@codemirror/view';
 import { $prose } from '@milkdown/kit/utils';
 import { isImeComposing } from '@utils/keyboard';
 
-const enclosedBlocks = new Set(['code_block', 'table', 'math_block', 'table_source_block', 'math_source_block']);
+const enclosedBlocks = new Set(['code_block', 'table', 'math_block', 'table_source_block', 'math_source_block', 'html_block']);
 const temporaryParagraphsKey = new PluginKey('moki-temporary-paragraphs');
 
 // Empty caret landing places are view state, not document content. Keep them
@@ -109,8 +109,52 @@ export function handleMilkdownBlockKeyDown(view, event) {
   if (!view.editable || view.composing || isImeComposing(event) || event.altKey) return false;
   const target = event.target instanceof Element ? event.target : null;
   if (!target || target.closest('input, textarea, button, select, .md-code-execution-mount')) return false;
-  if (!['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Enter', 'Home', 'End'].includes(event.key)) return false;
+  if (!['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Enter', 'Home', 'End', 'Backspace', 'Delete'].includes(event.key)) return false;
   const { selection } = view.state;
+  if (['Backspace', 'Delete'].includes(event.key) && selection.empty
+    && !event.ctrlKey && !event.metaKey && !event.shiftKey) {
+    if (target.closest('.cm-editor')) return false;
+    const { $from } = selection;
+    // A gap caret is a block boundary, not an empty paragraph. Backspace here
+    // must not delete the preceding HTML/code/table as if it were whitespace.
+    if (selection instanceof GapCursor) {
+      event.preventDefault(); event.stopPropagation(); return true;
+    }
+    // Deleting an authored empty line must not select/delete the block before
+    // it. At a heading boundary, remove the empty paragraph before downgrading.
+    if ($from.depth > 0) {
+      const pos = $from.before();
+      const paragraph = $from.parent;
+      const previous = view.state.doc.resolve(pos).nodeBefore;
+      let from;
+      let to;
+      if (paragraph.type.name === 'paragraph' && !paragraph.content.size && $from.node($from.depth - 1).childCount > 1) {
+        from = pos; to = pos + paragraph.nodeSize;
+      } else if (event.key === 'Backspace' && paragraph.type.name === 'heading' && !$from.parentOffset
+        && previous?.type.name === 'paragraph' && !previous.content.size) {
+        from = pos - previous.nodeSize; to = pos;
+      }
+      if (from != null) {
+        const tr = view.state.tr.delete(from, to);
+        const $boundary = tr.doc.resolve(from);
+        const besideBlock = $boundary.nodeBefore?.isAtom || $boundary.nodeAfter?.isAtom
+          || $boundary.nodeBefore?.type.spec.isolating || $boundary.nodeAfter?.type.spec.isolating;
+        tr.setSelection(paragraph.type.name === 'heading'
+          ? TextSelection.create(tr.doc, tr.mapping.map(selection.from))
+          : besideBlock && GapCursor.valid($boundary) ? new GapCursor($boundary)
+            : TextSelection.near($boundary, event.key === 'Backspace' ? -1 : 1));
+        view.dispatch(tr.scrollIntoView()); view.focus();
+        event.preventDefault(); event.stopPropagation(); return true;
+      }
+      const side = event.key === 'Backspace' ? $from.nodeBefore : $from.nodeAfter;
+      if (side?.type.name === 'html') {
+        const cursor = $from.pos + (event.key === 'Backspace' ? -side.nodeSize : side.nodeSize);
+        view.dispatch(view.state.tr.setSelection(TextSelection.create(view.state.doc, cursor)).scrollIntoView());
+        event.preventDefault(); event.stopPropagation(); return true;
+      }
+    }
+    return false;
+  }
   if (['Home', 'End'].includes(event.key) && selection.empty && selection.$from.parent.type.name === 'heading'
     && !event.ctrlKey && !event.metaKey && !event.shiftKey) {
     // Chromium's native Home/End can land on a centered heading's decorative
