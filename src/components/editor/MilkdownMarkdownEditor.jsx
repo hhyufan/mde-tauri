@@ -101,6 +101,7 @@ import 'prismjs/components/prism-r';
 import 'prismjs/components/prism-dart';
 import '@milkdown/kit/prose/view/style/prosemirror.css';
 import '@milkdown/kit/prose/tables/style/tables.css';
+import '@milkdown/kit/prose/gapcursor/style/gapcursor.css';
 import 'katex/dist/katex.min.css';
 import { useFileManager } from '@hooks/useFileManager';
 import { useEditorContextMenu } from '@hooks/useEditorContextMenu';
@@ -119,6 +120,7 @@ import { observeMarkdownEnhancements } from '@utils/observeMarkdownEnhancements'
 import i18n from '@/i18n';
 import MermaidRenderer from './MermaidRenderer';
 import { attachCodeBlockExecutions } from './milkdownCodeBlockRuns';
+import { milkdownEditingFlow, milkdownGapCursor, handleMilkdownBlockKeyDown, handleMilkdownBlankPointerDown } from './milkdownEditingFlow';
 import { isAndroidRuntime } from '@utils/platform';
 import './markdown-preview.scss';
 
@@ -1138,7 +1140,19 @@ function createNonEditablePreviewSelectionHandler(getEditor) {
       if (!target) return;
 
       try {
-        const resolved = resolveCodeBlockNodeFromDom(view, target);
+        let resolved = resolveCodeBlockNodeFromDom(view, target);
+        if (!resolved) {
+          const $pos = view.state.doc.resolve(view.posAtDOM(target, 0));
+          if ($pos.nodeAfter?.isAtom) resolved = { node: $pos.nodeAfter, pos: $pos.pos };
+          else {
+            for (let depth = $pos.depth; depth > 0; depth -= 1) {
+              if ($pos.node(depth).isAtom) {
+                resolved = { node: $pos.node(depth), pos: $pos.before(depth) };
+                break;
+              }
+            }
+          }
+        }
         const pos = resolved?.pos ?? -1;
         const node = resolved?.node ?? null;
         if (!node?.isAtom && !node?.isBlock) return;
@@ -1470,6 +1484,8 @@ function MilkdownInner({
       .use(codeBlockComponent)
       .use(listener);
 
+    if (!readOnly) editor.use(milkdownEditingFlow).use(milkdownGapCursor);
+
     editorRef.current = editor;
     return editor;
   }, [activeTabId, content, readOnly, scheduleEditorSideEffects]);
@@ -1723,6 +1739,18 @@ function MilkdownInner({
   }, []);
 
   useEffect(() => {
+    if (readOnly || editorInfo.loading) return undefined;
+    const wrapper = wrapperRef.current;
+    if (!wrapper) return undefined;
+
+    const focusBlank = (event) => {
+      editorRef.current?.action((ctx) => handleMilkdownBlankPointerDown(ctx.get(editorViewCtx), event));
+    };
+    wrapper.addEventListener('pointerdown', focusBlank, true);
+    return () => wrapper.removeEventListener('pointerdown', focusBlank, true);
+  }, [readOnly, editorInfo.loading]);
+
+  useEffect(() => {
     if (readOnly) return undefined;
     const wrapper = wrapperRef.current;
     if (!wrapper) return undefined;
@@ -1748,6 +1776,7 @@ function MilkdownInner({
     const keydownHandler = (event) => {
       editorRef.current?.action((ctx) => {
         const view = ctx.get(editorViewCtx);
+        if (handleMilkdownBlockKeyDown(view, event)) return;
         commitTypedCodeBlockLanguage(view, event);
       });
     };

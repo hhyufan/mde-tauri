@@ -361,8 +361,16 @@
     cursor: default;
   }
 
+  .milkdown-editor:not(.milkdown-editor--readonly) {
+    // Keep a real hit area below the final block, including short documents.
+    padding-bottom: 3em;
+    h1::before, h2::before { pointer-events: none; }
+  }
+
   .ProseMirror {
     outline: none;
+
+    .ProseMirror-gapcursor::after { border-top-color: var(--text); }
 
     > *:first-child {
       margin-top: 0;

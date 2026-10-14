@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="zh"><head><meta charset="UTF-8"><title>Milkdown editing flow</title></head>
+<body><div id="root"></div><script type="module">
+import React from 'react';
+import { createRoot } from 'react-dom/client';
+import Editor from '/src/components/editor/MilkdownMarkdownEditor.jsx';
+import editorStore from '/src/store/useEditorStore.js';
+import { setBuffer, getBuffer } from '/src/utils/editorBuffer.js';
+import { editorViewCtx } from '@milkdown/kit/core';
+import { TextSelection, NodeSelection } from '@milkdown/kit/prose/state';
+import { EditorView as CodeMirror } from '@codemirror/view';
+import '/src/i18n/index.js';
+import '/src/assets/styles/index.scss';
+import '/src/assets/styles/prism-theme.scss';
+import '/src/assets/styles/App.scss';
+const params = new URLSearchParams(location.search);
+const content = params.get('content') ?? '# 标题\n\n正文\n';
+setBuffer('flow.md', content);
+editorStore.setState({ activeTabId: 'flow.md', tabs: [{ id: 'flow.md', name: 'flow.md', content }],
+  tabRenderList: [{ id: 'flow.md', name: 'flow.md', modified: false }] });
+const ref = React.createRef();
+createRoot(document.getElementById('root')).render(React.createElement('div',
+  { className: 'app', style: { height: '100vh', display: 'flex' } }, React.createElement(Editor, { ref, readOnly: params.has('readonly') })));
+const view = () => ref.current.getEditor().action((ctx) => ctx.get(editorViewCtx));
+window.trial = {
+  markdown: () => ref.current.getCurrentValue(),
+  buffer: () => getBuffer('flow.md'),
+  state: () => ({ doc: view().state.doc.toJSON(), selection: view().state.selection.toJSON(), parent: view().state.selection.$from.parent.type.name }),
+  selectCode(edge = 'end') {
+    const cm = CodeMirror.findFromDOM(document.querySelector('.cm-editor'));
+    cm.dispatch({ selection: { anchor: edge === 'end' ? cm.state.doc.length : 0 } }); cm.focus();
+  },
+  selectCodeRange() {
+    const cm = CodeMirror.findFromDOM(document.querySelector('.cm-editor'));
+    cm.dispatch({ selection: { anchor: 0, head: cm.state.doc.length } }); cm.focus();
+  },
+  selectCell(edge = 'end') {
+    const editor = view(); const cells = [];
+    editor.state.doc.descendants((node, pos) => { if (['table_cell', 'table_header'].includes(node.type.name)) cells.push({ node, pos }); });
+    const cell = edge === 'end' ? cells.at(-1) : cells[0];
+    const pos = edge === 'end' ? cell.pos + cell.node.nodeSize - 2 : cell.pos + 2;
+    editor.dispatch(editor.state.tr.setSelection(TextSelection.create(editor.state.doc, pos))); editor.focus();
+  },
+  selectBlock(index = 0) {
+    const editor = view(); let pos = 0;
+    for (let i = 0; i < index; i++) pos += editor.state.doc.child(i).nodeSize;
+    editor.dispatch(editor.state.tr.setSelection(NodeSelection.create(editor.state.doc, pos))); editor.focus();
+  },
+};
+</script></body></html>
