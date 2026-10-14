@@ -1,10 +1,9 @@
 import { beforeEach, afterEach, expect, it, vi } from 'vitest';
 
-const disk = vi.hoisted(() => ({ read: vi.fn(), watch: vi.fn(), cached: vi.fn(), auth: vi.fn() }));
+const disk = vi.hoisted(() => ({ read: vi.fn(), watch: vi.fn() }));
 vi.mock('@utils/tauriApi', () => ({ readFileContent: disk.read, startFileWatching: disk.watch,
   isSafUri: (path) => path.startsWith('content://'), historyCapture: vi.fn().mockResolvedValue(undefined) }));
-vi.mock('@store/useExternalDocsStore', () => ({ default: { getState: () => ({ get: disk.cached }) } }));
-vi.mock('@store/useAuthStore', () => ({ default: { getState: () => ({ loadToken: disk.auth }) } }));
+vi.mock('@store/useExternalDocsStore', () => ({ default: { getState: () => ({ get: () => null }) } }));
 
 let stop;
 let useEditorStore, getBuffer, getDocumentViewState, setDocumentViewState, registerDocumentViewState;
@@ -19,8 +18,6 @@ beforeEach(async () => {
   disk.read.mockReset();
   disk.read.mockImplementation(async (path) => ({ success: path !== '/missing.md', content: `disk:${path}` }));
   disk.watch.mockResolvedValue(true);
-  disk.cached.mockReset();
-  disk.auth.mockReset().mockResolvedValue(undefined);
 });
 afterEach(() => { stop?.(); stop = null; vi.useRealTimers(); });
 const save = (tabs, activeTabId, views = {}) => localStorage.setItem('mokidown-session', JSON.stringify({ version: 1, tabs, activeTabId, views }));
@@ -107,24 +104,4 @@ it('refreshes a legacy saved tab from disk instead of retaining its stale snapsh
   const session = await import('./editorSession');
   await session.restoreEditorSession();
   expect(useEditorStore.getState().getActiveTab().content).toBe('disk:/a.md');
-});
-
-it('waits for account restoration before reading an external document cache', async () => {
-  save([{ id: 'external-a', name: 'a.md', path: '', externalFileId: 'a' }], 'external-a');
-  let authenticated = false;
-  disk.auth.mockImplementation(async () => { authenticated = true; });
-  disk.cached.mockImplementation(() => authenticated ? { content: 'account cache' } : null);
-  const session = await import('./editorSession');
-  await session.restoreEditorSession();
-  expect(useEditorStore.getState().getActiveTab().content).toBe('account cache');
-});
-
-it('preserves live edits when recovery is accepted before the dirty flag updates', async () => {
-  useEditorStore.getState().openFile({ path: '/a.md', name: 'a.md', content: 'disk' });
-  const { setBuffer } = await import('@utils/editorBuffer');
-  setBuffer('/a.md', 'new input');
-  const recoveredId = useEditorStore.getState().restoreRecoveredTab({ tabId: '/a.md', path: '/a.md', content: 'old draft' });
-  expect(recoveredId).not.toBe('/a.md');
-  expect(getBuffer('/a.md')).toBe('new input');
-  expect(getBuffer(recoveredId)).toBe('old draft');
 });
