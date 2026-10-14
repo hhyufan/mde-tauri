@@ -31,30 +31,38 @@ MokiDown 是基于 Tauri 2、React、Monaco 与 Milkdown 的开源 Markdown 编�
 
 ## 功能
 
-- **三种编辑模式**：源码、所见即所得与分屏，支持 GFM、LaTeX 公式和 Mermaid 图表。
-- **可执行代码块**：桌面端可运行 C#、JavaScript、Python、Java、Kotlin、Rust，支持输出、交互输入与停止；需安装对应语言环境。
-- **语言服务**：按需安装 LSP 插件，提供代码补全、悬停提示与诊断。
-- **知识树**：用 `.mgtree` 整理笔记层级，支持节点编辑与跳转到文档代码块。
-- **文件与工作区**：多标签页、目录浏览、大纲、全局搜索、书签与自动保存。
-- **可选云同步**：同步文档与设置，发生冲突时可对比并选择保留版本。
-- **个性化**：支持明暗主题与中英双语界面。
+* **三种编辑模式**：源码、所见即所得与分屏，支持 GFM、LaTeX 公式和 Mermaid 图表。
+
+* **可执行代码块**：桌面端可运行 C#、JavaScript、Python、Java、Kotlin、Rust，支持输出、交互输入与停止；需安装对应语言环境。
+
+* **语言服务**：按需安装 LSP 插件，提供代码补全、悬停提示与诊断。
+
+* **知识树**：用 `.mgtree` 整理笔记层级，支持节点编辑与跳转到文档代码块。
+
+* **文件与工作区**：多标签页、目录浏览、大纲、全局搜索、书签与自动保存。
+
+* **可选云同步**：同步文档与设置，发生冲突时可对比并选择保留版本。
+
+* **个性化**：支持明暗主题与中英双语界面。
 
 ## 📸 界面截图
 
-| 晴笺 · 浅色欢迎页 | 夜读 · 深色欢迎页 |
-| :---: | :---: |
+|                晴笺 · 浅色欢迎页               |               夜读 · 深色欢迎页               |
+| :-------------------------------------: | :------------------------------------: |
 | ![浅色欢迎页](screenshots/welcome-light.png) | ![深色欢迎页](screenshots/welcome-dark.png) |
 
-| 三模式编辑（源码 / WYSIWYG / 分屏） | 树编辑器（mgtree） |
-| :---: | :---: |
+<br />
+
+|     三模式编辑（源码 / WYSIWYG / 分屏）     |          树编辑器（mgtree）         |
+| :------------------------------: | :---------------------------: |
 | ![三模式编辑](screenshots/editor.png) | ![树编辑器](screenshots/tree.png) |
 
-| 云同步 | 代码块运行 |
-| :---: | :---: |
+|                  云同步                  |                代码块运行               |
+| :-----------------------------------: | :--------------------------------: |
 | ![同步冲突](screenshots/sync-display.png) | ![代码块运行](screenshots/code-run.png) |
 
-| 深色编辑 | 外观与角色设置 |
-| :---: | :---: |
+|                 深色编辑                 |                 外观与角色设置                |
+| :----------------------------------: | :------------------------------------: |
 | ![深色编辑](screenshots/editor-dark.png) | ![角色设置](screenshots/moki-settings.png) |
 
 截图来自运行中的实际界面，使用示例文档；代码输出和同步冲突使用演示数据展示真实组件，不代表浏览器可启动桌面执行引擎或已连接同步服务。[移动端欢迎页](screenshots/welcome-mobile.png) · [设计与截图说明](docs/character-design/moki-integration.md)
@@ -80,11 +88,11 @@ npm run tauri:dev
 
 仅调试前端可运行 `npm run dev`。常用命令：
 
-| 命令 | 用途 |
-| --- | --- |
-| `npm run build` | 构建前端与在线展示入口 |
+| 命令                    | 用途                         |
+| --------------------- | -------------------------- |
+| `npm run build`       | 构建前端与在线展示入口                |
 | `npm run tauri:build` | 打包 Windows 桌面端（NSIS + MSI） |
-| `npm run check` | 执行 lint、测试、构建与体积检查 |
+| `npm run check`       | 执行 lint、测试、构建与体积检查         |
 
 桌面安装包输出到 `src-tauri/target/release/bundle/`。示例文档与代码见 [examples](examples/README.md)。
 
@@ -103,8 +111,10 @@ npm run tauri:android:build
 
 ## 文档与贡献
 
-- [功能文档](docs/Function/README.md) · [语言服务](docs/语言服务.md) · [本地脚本运行](docs/本地脚本运行.md)
-- [示例工作区](examples/README.md) · [快捷键](examples/notes/shortcuts.md) · [更多截图](screenshots/)
-- 欢迎通过 [Issues](https://github.com/hhyufan/mde-tauri/issues) 反馈问题或提交 Pull Request。
+* [功能文档](docs/Function/README.md) · [语言服务](docs/语言服务.md) · [本地脚本运行](docs/本地脚本运行.md)
+
+* [示例工作区](examples/README.md) · [快捷键](examples/notes/shortcuts.md) · [更多截图](screenshots/)
+
+* 欢迎通过 [Issues](https://github.com/hhyufan/mde-tauri/issues) 反馈问题或提交 Pull Request。
 
 本项目采用 [MIT 许可证](LICENSE)。
