@@ -8,6 +8,14 @@ import { createElement } from 'react';
 import { createRoot } from 'react-dom/client';
 import TablePicker from './TablePicker';
 
+/**
+ * 鼠标离开表格后延迟收起工具的时长。
+ *
+ * 网格按钮定位在表格上方（top: -30px），与表格之间留有一条窄缝：鼠标穿过去的一瞬间
+ * 既不在表格上也不在按钮上。靠这段延迟容忍穿越，按钮就不必占据任何版面空间。
+ */
+const TOOL_HIDE_DELAY = 180;
+
 export function createEditingTable(schema, rows, columns) {
   if (!tableDimensions(rows, columns)) return null;
   return schema.nodes.table.create(null, Array.from({ length: rows }, (_, row) => (
@@ -268,14 +276,42 @@ export const milkdownTableView = $view(tableSchema.node, () => (initialNode, vie
     addCol.style.left = `${Math.min(rect.right - box.left - 9, box.width - 20)}px`;
     addCol.style.top = `${scroll.getBoundingClientRect().top - box.top - 17}px`;
   });
-  dom.addEventListener('pointerleave', () => { addRow.hidden = true; addCol.hidden = true; });
+  /*
+   * 工具条显隐：进入表格显示，离开后延迟一点再收起。
+   * 按钮在表格上方、与表格之间有一条窄缝，鼠标穿过时既不在表格上也不在按钮上——
+   * 没有这段延迟就会瞬间收起，按钮几乎按不到；有了它就不必为按钮预留版面空间。
+   * 按钮是 dom 的后代，所以指针落在按钮上时并不会触发 dom 的 pointerleave。
+   */
+  let hideTimer = null;
+  const showTools = () => {
+    if (hideTimer) { clearTimeout(hideTimer); hideTimer = null; }
+    dom.classList.add('moki-table--tools-visible');
+  };
+  const hideToolsSoon = () => {
+    if (hideTimer) clearTimeout(hideTimer);
+    hideTimer = setTimeout(() => {
+      hideTimer = null;
+      dom.classList.remove('moki-table--tools-visible');
+      addRow.hidden = true; addCol.hidden = true;
+    }, TOOL_HIDE_DELAY);
+  };
+  dom.addEventListener('pointerenter', showTools);
+  dom.addEventListener('pointerleave', hideToolsSoon);
   schedule();
   return {
     dom, contentDOM,
     update(next) { if (next.type !== node.type) return false; node = next; controls.hidden = !view.editable; schedule(); return true; },
     stopEvent: (event) => controls.contains(event.target),
     ignoreMutation: (mutation) => controls.contains(mutation.target) || (mutation.type === 'attributes' && mutation.target === dom),
-    destroy() { disposed = true; resize.disconnect(); if (frame != null) cancelAnimationFrame(frame); closePicker(); },
+    destroy() {
+      disposed = true;
+      if (hideTimer) clearTimeout(hideTimer);
+      dom.removeEventListener('pointerenter', showTools);
+      dom.removeEventListener('pointerleave', hideToolsSoon);
+      resize.disconnect();
+      if (frame != null) cancelAnimationFrame(frame);
+      closePicker();
+    },
   };
 });
 

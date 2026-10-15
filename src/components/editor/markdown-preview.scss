@@ -885,11 +885,15 @@
     &[hidden] { display: none; }
   }
   /*
-   * 悬停到表格才露出工具。不用 :focus-within —— 光标落在单元格里时表格自然带焦点，
-   * 那会让按钮长期挂在那儿。:hover 按 DOM 树判定，鼠标移到上方溢出的按钮上时，
-   * 表格本身仍处于 hover，所以按钮不会中途消失。
+   * 显隐由 JS 切换 .moki-table--tools-visible，而不是纯 :hover。
+   *
+   * 网格按钮定位在表格上方（top: -30px），与表格之间留有一条窄缝：鼠标穿过去的一瞬
+   * 既不在表格上也不在按钮上，:hover 会立即失效、工具收起，按钮几乎按不到。
+   * JS 用一小段延迟容忍这段穿越，因此不需要为按钮预留任何永久空间。
+   *
+   * 也不用 :focus-within —— 光标落在单元格里时表格自然带焦点，按钮会长期挂着。
    */
-  &:hover .moki-table__tools { opacity: 1; visibility: visible; }
+  &.moki-table--tools-visible .moki-table__tools { opacity: 1; visibility: visible; }
   .moki-table__edit, .moki-table__handle, .moki-table__insert {
     position: absolute;
     pointer-events: auto;
