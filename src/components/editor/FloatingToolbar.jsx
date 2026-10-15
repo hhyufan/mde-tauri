@@ -9,6 +9,8 @@ import { useTranslation } from 'react-i18next';
 import { Tooltip } from 'antd';
 import useEditorStore from '@store/useEditorStore';
 import { cn } from '@utils/classNames';
+import TablePicker from './TablePicker';
+import { tableMarkdown } from './tableDimensions';
 import './floating-toolbar.scss';
 
 const TOOLBAR_POSITION_KEY = 'mokidown:floating-toolbar-position';
@@ -38,6 +40,7 @@ function FtBtn({ title, className, onClick, children }) {
     <Tooltip title={title} placement="top" mouseEnterDelay={0.3}>
       <button
         className={className}
+        aria-label={title}
         onMouseDown={(event) => event.preventDefault()}
         onClick={onClick}
         type="button"
@@ -112,6 +115,7 @@ function FloatingToolbar({ onInsert }) {
   const dragRef = useRef(null);
   const [position, setPosition] = useState(() => readSavedPosition());
   const [headingOpen, setHeadingOpen] = useState(false);
+  const [tableOpen, setTableOpen] = useState(false);
 
   /**
    * 统一分发插入动作，并在执行后关闭标题面板。
@@ -121,7 +125,15 @@ function FloatingToolbar({ onInsert }) {
   const runAction = useCallback((action) => {
     onInsert?.(action);
     setHeadingOpen(false);
+    setTableOpen(false);
   }, [onInsert]);
+
+  useEffect(() => {
+    if (!tableOpen) return undefined;
+    const close = (event) => { if (!event.target.closest('.ft__table-wrap')) setTableOpen(false); };
+    document.addEventListener('pointerdown', close);
+    return () => document.removeEventListener('pointerdown', close);
+  }, [tableOpen]);
 
   /**
    * 对当前选区包裹前后缀，适用于粗体、斜体、链接等行内语法。
@@ -264,13 +276,16 @@ function FloatingToolbar({ onInsert }) {
             <path d="M15 21c3 0 7-1 7-8V5c0-1.25-.757-2.017-2-2h-4c-1.25 0-2 .75-2 1.972V11c0 1.25.75 2 2 2h.75c0 2.25.25 4-2.75 4v3c0 .001 0 1.003 1 1.003z" />
           </svg>
         </FtBtn>
-        <FtBtn title={t('toolbar.table')} className="ft__btn" onClick={() => runAction({ type: 'insert', command: 'table', text: '| Col1 | Col2 | Col3 |\n| --- | --- | --- |\n| | | |\n' })}>
+        <div className="ft__table-wrap">
+        <FtBtn title={t('toolbar.table')} className="ft__btn" onClick={() => { setHeadingOpen(false); setTableOpen((open) => !open); }}>
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" width="16" height="16">
             <rect x="3" y="3" width="18" height="18" rx="2" />
             <line x1="3" y1="9" x2="21" y2="9" /><line x1="3" y1="15" x2="21" y2="15" />
             <line x1="9" y1="3" x2="9" y2="21" /><line x1="15" y1="3" x2="15" y2="21" />
           </svg>
         </FtBtn>
+        {tableOpen && <TablePicker onClose={() => setTableOpen(false)} onInsert={(rows, columns) => runAction({ type: 'insert', command: 'table', rows, columns, text: tableMarkdown(rows, columns) })} />}
+        </div>
         <FtBtn title={t('toolbar.code')} className="ft__btn" onClick={() => runAction({ type: 'insert', command: 'code', text: '```\n\n```\n' })}>
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" width="16" height="16">
             <polyline points="16 18 22 12 16 6" /><polyline points="8 6 2 12 8 18" />

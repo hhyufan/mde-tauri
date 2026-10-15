@@ -35,6 +35,7 @@ import {
 import {
   gfm,
   insertTableCommand,
+  insertTableInputRule,
   tableCellSchema,
   tableHeaderRowSchema,
   tableHeaderSchema,
@@ -126,6 +127,7 @@ import { milkdownEditingFlow, milkdownGapCursor, handleMilkdownBlockKeyDown, han
 import { milkdownMarkdownPaste } from './milkdownMarkdownPaste';
 import { htmlBlockSchema, htmlBlockView, sanitizeMilkdownHtml } from './milkdownHtmlBlock';
 import { configureEditingWhitespace, initialEditingSelection } from './milkdownWhitespace';
+import { configureEditingTables, milkdownTableKeys, milkdownTableView } from './milkdownTables';
 import { isAndroidRuntime } from '@utils/platform';
 import './markdown-preview.scss';
 
@@ -592,7 +594,7 @@ const mathValueEditPlugin = $prose((ctx) => {
     tableCell: tableCellSchema.type(ctx),
   };
   const isMathNode = (node) => node?.type === inlineType || node?.type === blockType;
-  const isEditableRenderedNode = (node) => isMathNode(node) || node?.type === imageType || node?.type === tableType;
+  const isEditableRenderedNode = (node) => isMathNode(node) || node?.type === imageType;
   const isSourceNode = (node) => [
     inlineSourceType,
     blockSourceType,
@@ -1418,6 +1420,7 @@ function MilkdownInner({
   }, [markTabDirty, readOnly, setCharacterCount]);
 
   const publishEditorContent = useCallback((ctx) => {
+    if (!ctx.isInjected(editorViewCtx)) return;
     const state = ctx.get(editorViewCtx).state;
     const markdown = ctx.get(serializerCtx)(persistentMilkdownDocument(state));
     if (markdown === publishedMarkdownRef.current) return;
@@ -1430,6 +1433,7 @@ function MilkdownInner({
     const editor = Editor.make()
       .config((ctx) => {
         configureEditingWhitespace(ctx, { readOnly });
+        configureEditingTables(ctx);
         ctx.set(rootCtx, root);
         ctx.set(defaultValueCtx, content || '');
         ctx.set(katexOptionsCtx.key, {
@@ -1474,8 +1478,10 @@ function MilkdownInner({
           .markdownUpdated(publishEditorContent);
       })
       .use(markdownHtmlPlugin)
+      .use(milkdownTableKeys)
       .use(commonmark)
-      .use(gfm)
+      .use(gfm.filter((plugin) => plugin !== insertTableInputRule))
+      .use(milkdownTableView)
       .use(htmlBlockSchema)
       .use(htmlBlockView)
       .use(taskListCheckboxPlugin)
@@ -1554,7 +1560,7 @@ function MilkdownInner({
             run(wrapInBlockquoteCommand);
             break;
           case 'table':
-            run(insertTableCommand, { row: 3, col: 3 });
+            run(insertTableCommand, { row: action.rows || 3, col: action.columns || 3 });
             break;
           case 'code':
             run(createCodeBlockCommand, '');

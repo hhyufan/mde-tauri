@@ -1,0 +1,28 @@
+.ft__table-panel {
+  position: absolute;
+  bottom: 40px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 236px;
+  padding: 12px;
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius);
+  background: var(--surface);
+  box-shadow: var(--shadow-lg);
+  z-index: 510;
+  color: var(--text);
+  font: 12px/1.5 var(--font-app);
+  .ft__table-size { margin-bottom: 8px; color: var(--text-sec); }
+  .ft__table-grid {
+    display: grid; grid-template-columns: repeat(6, 1fr); gap: 4px; margin-bottom: 12px;
+    button { height: 25px; border: 1px solid var(--border); border-radius: 3px; background: var(--bg); cursor: pointer;
+      &.is-selected { background: var(--accent-bg); border-color: var(--accent); }
+    }
+  }
+  form { display: flex; align-items: flex-end; gap: 8px; }
+  label { display: flex; flex-direction: column; gap: 3px; }
+  input { width: 60px; padding: 5px; border: 1px solid var(--border); border-radius: 4px; background: var(--bg); color: var(--text); font: inherit; }
+  button[type='submit'] { padding: 6px 10px; border: 0; border-radius: 4px; background: var(--accent); color: white; font: inherit; cursor: pointer; }
+  p { color: var(--text-sec); margin: 10px 0 0; font-size: 11px; }
+}
+

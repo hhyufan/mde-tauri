@@ -1,6 +1,6 @@
 import { useLayoutEffect } from 'react';
 
-const POPUPS = '.footer__dropdown, .sort-dropdown, .search-dropdown__panel, .ant-select-dropdown, .ant-dropdown-menu, .ant-picker-panel-container, .ft, .ft__heading-panel, .monaco-context-menu';
+const POPUPS = '.footer__dropdown, .sort-dropdown, .search-dropdown__panel, .ant-select-dropdown, .ant-dropdown-menu, .ant-picker-panel-container, .ft, .ft__heading-panel, .ft__table-panel, .monaco-context-menu';
 const POSITIONERS = '.ant-dropdown, .ant-picker-dropdown';
 
 // Portal popups need the same image, cover dimensions and viewport coordinates

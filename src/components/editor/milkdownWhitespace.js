@@ -30,7 +30,13 @@ export function configureEditingWhitespace(ctx, { readOnly = false } = {}) {
         runner(state, node) {
           if (!node.content.size) {
             state.addNode('html', undefined, '', { data: { mokiEmptyParagraph: true } });
-          } else schema.toMarkdown.runner(state, node);
+          } else {
+            // Paragraph serialization must also work after the view is torn down:
+            // Milkdown's debounced listener may still serialize its last transaction.
+            const content = node.lastChild?.type.name === 'hardbreak'
+              ? node.content.cut(0, node.content.size - node.lastChild.nodeSize) : node.content;
+            state.openNode('paragraph').next(content).closeNode();
+          }
         },
       },
     };

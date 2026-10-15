@@ -868,6 +868,65 @@
   margin: 0;
 }
 
+.md-preview .moki-table {
+  position: relative;
+  margin: 1.6em 0;
+  overflow: visible;
+  max-width: 100%;
+  .moki-table__scroll { overflow-x: auto; border-radius: var(--radius-sm); }
+  .moki-table__tools {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    opacity: 0;
+    visibility: hidden;
+    z-index: 5;
+    user-select: none;
+    &[hidden] { display: none; }
+  }
+  /*
+   * 悬停到表格才露出工具。不用 :focus-within —— 光标落在单元格里时表格自然带焦点，
+   * 那会让按钮长期挂在那儿。:hover 按 DOM 树判定，鼠标移到上方溢出的按钮上时，
+   * 表格本身仍处于 hover，所以按钮不会中途消失。
+   */
+  &:hover .moki-table__tools { opacity: 1; visibility: visible; }
+  .moki-table__edit, .moki-table__handle, .moki-table__insert {
+    position: absolute;
+    pointer-events: auto;
+    box-sizing: border-box;
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    background: var(--surface);
+    color: var(--text-sec);
+    padding: 0;
+    cursor: pointer;
+    &:hover { background: var(--accent-bg); border-color: var(--accent); color: var(--accent); }
+    &:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+  }
+  .moki-table__edit {
+    top: -30px; left: 0; width: 26px; height: 26px;
+    display: grid; place-items: center;
+    svg { width: 16px; height: 16px; }
+  }
+  .moki-table__handle--row, .moki-table__handle--column {
+    border: 0; background: transparent; border-radius: 0;
+    &:hover { border: 0; background: transparent; }
+  }
+  .moki-table__handle--row { left: -12px; width: 10px; cursor: cell; }
+  .moki-table__handle--column { height: 10px; cursor: cell; }
+  .moki-table__insert { width: 18px; height: 18px; border-radius: 50%; font: 16px/16px var(--font-app); z-index: 2; }
+  .moki-table__insert[hidden] { display: none; }
+  .moki-table__insert--row { right: -10px; }
+  .moki-table__insert--column { top: -17px; }
+  /*
+   * 面板浮在网格按钮的正下方（按钮 top: -30px、高 26px，所以按钮底边在 -4px）。
+   * 它是浮层，不占版面——此前靠 .moki-table--resizing 给容器加三百多像素的
+   * padding-top 把表格推下去腾地方，那才是「下拉挤压空间」的来源。
+   */
+  .moki-table__picker { position: absolute; top: -4px; left: 0; pointer-events: auto; z-index: 20; }
+  .moki-table__picker .ft__table-panel { position: relative; top: auto; right: auto; bottom: auto; left: auto; transform: none; z-index: 10; }
+}
+.md-preview .ProseMirror .moki-table table { margin: 0; }
 .md-preview__milkdown-mermaid {
   display: block;
 }
