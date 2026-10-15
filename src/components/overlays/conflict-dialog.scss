@@ -102,6 +102,10 @@
   width: 100%;
 }
 
+.conflict-dialog__diff.external-file-conflict__diff {
+  margin: 0;
+}
+
 .conflict-dialog__pane-labels {
   display: grid;
   grid-template-columns: 1fr 1fr;
