@@ -367,6 +367,94 @@
   }
 }
 
+/*
+ * 新建文件那一行：文件名输入框 + 紧跟文字末尾的后缀选择器。
+ * 后缀不固定在右端，而是随着输入的文字走——看起来就是「note.md」里的那个 .md。
+ * 左偏移由 FileTree.jsx 用隐藏量尺算好后以内联 style 给出。
+ */
+.file-tree__create-field {
+  position: relative;
+  display: flex;
+  flex: 1;
+  min-width: 0;
+  align-items: center;
+}
+
+/*
+ * 量尺：不可见，但字体、字号、左起点都与真实输入框一致，
+ * 这样 offsetWidth 就是已输入文字的实际宽度。
+ */
+.file-tree__create-measure {
+  position: absolute;
+  left: 8px;
+  top: 0;
+  visibility: hidden;
+  white-space: pre;
+  pointer-events: none;
+  font-size: 12px;
+  font-family: var(--font-app);
+}
+
+.file-tree__item-input--creating {
+  // 基类带 flex: 1，会无视 JS 算出的 width 直接拉满容器；这里退出拉伸，
+  // 让宽度完全由内容决定（刚好包住文件名 + 后缀），并随输入逐字变长。
+  flex: 0 0 auto;
+  // 只留一个很小的下限（约三个字符宽），让宽度真正跟着内容走：
+  // 输入 note 时就是「note.md」那么宽，不留多余空白。
+  min-width: 56px;
+  padding-right: 8px;
+}
+
+.file-tree__ext-picker {
+  position: absolute;
+  // 上下贴满输入框内部，让后缀区与输入框等高（差 1px 都会显矮）。
+  top: 1px;
+  bottom: 1px;
+  // 宽度交给内容（后缀本身由 JS 量出后写进 style），不写死：
+  // .md 和 .markdown 差得不少。
+  display: flex;
+  align-items: center;
+  // 这里不能铺底色：后缀区右缘贴着输入框右内边缘，一铺底就把右边框盖掉了。
+  // 长文件名不会压过来——输入框的 padding-right 由 JS 让出了后缀这一段。
+  background: transparent;
+}
+
+/*
+ * 后缀下拉：目标是「只剩文字和一个小箭头」，跟输入框融成一体。
+ * AutoComplete 内部就是 Select，而 variant="borderless" 在部分版本上不生效
+ * （会渲染出独立的边框、圆角和更矮的高度，看起来像两个控件），所以这里兜底
+ * 把边框、阴影、背景全部压掉，并让选择器撑满输入框的高度。
+ */
+.file-tree__ext-select {
+  width: 100%;
+  // 撑满输入框高度：AutoComplete 默认按 size 定高（small 只有 24px），
+  // 比输入框矮一截，点击热区也会跟着变小。antd 的 .ant-select-sm 特异性更高，
+  // 普通声明压不住，这里必须用 !important。
+  height: 100% !important;
+
+  .ant-select-selector {
+    border: 0 !important;
+    box-shadow: none !important;
+    background: transparent !important;
+    padding-inline: 0 !important;
+    height: 100% !important;
+  }
+
+  .ant-select-selection-item,
+  .ant-select-selection-placeholder {
+    line-height: normal !important;
+    padding-inline-end: 0 !important;
+    font-size: 12px;
+    font-family: var(--font-app);
+    color: var(--text-sec);
+  }
+
+  .ant-select-selection-search-input {
+    font-size: 12px;
+    font-family: var(--font-app);
+  }
+}
+
 .file-tree__item-del {
   width: 20px;
   height: 20px;
