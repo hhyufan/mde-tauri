@@ -2252,7 +2252,10 @@ mod tests {
         assert!(!fs::read_dir(root.path())
             .unwrap()
             .flatten()
-            .any(|entry| entry.file_name().to_string_lossy().starts_with(".moki-run-")));
+            .any(|entry| entry
+                .file_name()
+                .to_string_lossy()
+                .starts_with(".moki-run-")));
     }
     #[test]
     #[ignore = "requires locally installed Node.js"]

@@ -458,13 +458,21 @@ fn list_history_timestamps(dir: &Path) -> Result<Vec<u64>, String> {
 /// 历史去重只忽略空行（含仅由空格/制表符构成的行）。
 /// 非空行保留原文比较，避免把代码缩进、字符串空格或实际折行误判为未变化。
 fn same_ignoring_blank_lines(previous: &str, current: &str) -> bool {
-    previous.lines().filter(|line| !line.trim().is_empty())
+    previous
+        .lines()
+        .filter(|line| !line.trim().is_empty())
         .eq(current.lines().filter(|line| !line.trim().is_empty()))
 }
 
 /// 记录一次快照：普通记录去重，首次打开的 force 记录忽略内容差异，均裁剪到上限。
 /// 返回是否真正写入了新快照，供上层决定是否通知前端刷新。
-fn capture_history(app: &AppHandle, file_path: &str, content: &str, force: bool, restored_from: Option<u64>) -> Result<bool, String> {
+fn capture_history(
+    app: &AppHandle,
+    file_path: &str,
+    content: &str,
+    force: bool,
+    restored_from: Option<u64>,
+) -> Result<bool, String> {
     let dir = history_directory(app, file_path)?;
     match restored_from {
         Some(source) => capture_history_with_source(&dir, content, force, Some(source)),
@@ -476,10 +484,18 @@ fn capture_history_in(dir: &Path, content: &str, force: bool) -> Result<bool, St
     capture_history_with_source(dir, content, force, None)
 }
 
-fn capture_history_with_source(dir: &Path, content: &str, force: bool, restored_from: Option<u64>) -> Result<bool, String> {
-    let _write = HISTORY_WRITE_LOCK.lock().map_err(|error| error.to_string())?;
+fn capture_history_with_source(
+    dir: &Path,
+    content: &str,
+    force: bool,
+    restored_from: Option<u64>,
+) -> Result<bool, String> {
+    let _write = HISTORY_WRITE_LOCK
+        .lock()
+        .map_err(|error| error.to_string())?;
     let force = force || restored_from.is_some();
-    fs::create_dir_all(&dir).map_err(|error| format!("Failed to create history directory: {error}"))?;
+    fs::create_dir_all(&dir)
+        .map_err(|error| format!("Failed to create history directory: {error}"))?;
 
     let mut timestamps = list_history_timestamps(&dir)?;
     timestamps.sort_unstable();
@@ -501,10 +517,13 @@ fn capture_history_with_source(dir: &Path, content: &str, force: bool, restored_
     }
 
     // 同一毫秒内的强制记录也必须保留为独立版本，不能覆盖原来的快照。
-    let timestamp = timestamps.last().map_or(now, |last| now.max(last.saturating_add(1)));
+    let timestamp = timestamps
+        .last()
+        .map_or(now, |last| now.max(last.saturating_add(1)));
     atomic_write(&dir.join(timestamp.to_string()), content.as_bytes())?;
     if let Some(restored_from) = restored_from {
-        let metadata = serde_json::to_vec(&HistoryRollback { restored_from }).map_err(|error| error.to_string())?;
+        let metadata = serde_json::to_vec(&HistoryRollback { restored_from })
+            .map_err(|error| error.to_string())?;
         if let Err(error) = atomic_write(&dir.join(format!("{timestamp}.meta.json")), &metadata) {
             let _ = fs::remove_file(dir.join(timestamp.to_string()));
             return Err(error);
@@ -545,10 +564,15 @@ fn list_history_entries(dir: &Path) -> Result<Vec<HistoryEntry>, String> {
     let mut entries = Vec::new();
     for ts in list_history_timestamps(&dir)? {
         if let Ok(meta) = fs::metadata(dir.join(ts.to_string())) {
-            let restored_from = fs::read(dir.join(format!("{ts}.meta.json"))).ok()
+            let restored_from = fs::read(dir.join(format!("{ts}.meta.json")))
+                .ok()
                 .and_then(|bytes| serde_json::from_slice::<HistoryRollback>(&bytes).ok())
                 .map(|metadata| metadata.restored_from);
-            entries.push(HistoryEntry { timestamp: ts, bytes: meta.len(), restored_from });
+            entries.push(HistoryEntry {
+                timestamp: ts,
+                bytes: meta.len(),
+                restored_from,
+            });
         }
     }
     entries.sort_by(|a, b| b.timestamp.cmp(&a.timestamp));
@@ -565,8 +589,20 @@ async fn history_read(app: AppHandle, file_path: String, timestamp: u64) -> Resu
 /// 显式记录快照；首次打开与回滚绕过去重，回滚来源持久化，普通记录保持去重。
 /// 写入新快照后发出 history-changed，让前端时间线即时刷新。
 #[tauri::command]
-async fn history_capture(app: AppHandle, file_path: String, content: String, force: Option<bool>, restored_from: Option<u64>) -> Result<(), String> {
-    if capture_history(&app, &file_path, &content, force.unwrap_or(false), restored_from)? {
+async fn history_capture(
+    app: AppHandle,
+    file_path: String,
+    content: String,
+    force: Option<bool>,
+    restored_from: Option<u64>,
+) -> Result<(), String> {
+    if capture_history(
+        &app,
+        &file_path,
+        &content,
+        force.unwrap_or(false),
+        restored_from,
+    )? {
         let _ = app.emit("history-changed", &HistoryChangeEvent { path: file_path });
     }
     Ok(())
@@ -617,7 +653,12 @@ async fn start_directory_watching(app: AppHandle, dir_path: String) -> Result<bo
                     | EventKind::Modify(notify::event::ModifyKind::Name(_))
             );
             if relevant {
-                let _ = app_clone.emit("directory-changed", &DirectoryChangeEvent { dir: dir_clone.clone() });
+                let _ = app_clone.emit(
+                    "directory-changed",
+                    &DirectoryChangeEvent {
+                        dir: dir_clone.clone(),
+                    },
+                );
             }
         }
     })
@@ -636,7 +677,11 @@ async fn start_directory_watching(app: AppHandle, dir_path: String) -> Result<bo
 
 #[tauri::command]
 async fn stop_directory_watching(dir_path: String) -> Result<bool, String> {
-    Ok(DIRECTORY_WATCHER_STATE.lock().unwrap().remove(&dir_path).is_some())
+    Ok(DIRECTORY_WATCHER_STATE
+        .lock()
+        .unwrap()
+        .remove(&dir_path)
+        .is_some())
 }
 
 fn recovery_directory(app_handle: &AppHandle) -> Result<PathBuf, String> {
@@ -1642,7 +1687,9 @@ fn local_data_dir() -> Option<PathBuf> {
     {
         std::env::var_os("XDG_DATA_HOME")
             .map(PathBuf::from)
-            .or_else(|| std::env::var_os("HOME").map(|home| PathBuf::from(home).join(".local/share")))
+            .or_else(|| {
+                std::env::var_os("HOME").map(|home| PathBuf::from(home).join(".local/share"))
+            })
     }
 }
 
@@ -1834,8 +1881,14 @@ mod tests {
         let prior = u64::MAX / 2;
         fs::write(dir.join(prior.to_string()), "a b").unwrap();
         assert!(capture_history_in(dir, "a  b\n", true).unwrap());
-        assert_eq!(fs::read_to_string(dir.join(prior.to_string())).unwrap(), "a b");
-        assert_eq!(fs::read_to_string(dir.join((prior + 1).to_string())).unwrap(), "a  b\n");
+        assert_eq!(
+            fs::read_to_string(dir.join(prior.to_string())).unwrap(),
+            "a b"
+        );
+        assert_eq!(
+            fs::read_to_string(dir.join((prior + 1).to_string())).unwrap(),
+            "a  b\n"
+        );
         assert!(!capture_history_in(dir, "a  b\n\n", false).unwrap());
         assert_eq!(list_history_timestamps(dir).unwrap().len(), 2);
         assert!(capture_history_in(dir, "a c", false).unwrap());
@@ -1851,7 +1904,10 @@ mod tests {
         }
         fs::write(dir.join("1.meta.json"), br#"{"restored_from":0}"#).unwrap();
         assert!(capture_history_in(dir, "same", true).unwrap());
-        assert_eq!(list_history_timestamps(dir).unwrap().len(), HISTORY_MAX_SNAPSHOTS);
+        assert_eq!(
+            list_history_timestamps(dir).unwrap().len(),
+            HISTORY_MAX_SNAPSHOTS
+        );
         assert!(!dir.join("1").exists());
         assert!(!dir.join("1.meta.json").exists());
         assert!(dir.join("2").exists());
@@ -1871,7 +1927,10 @@ mod tests {
         assert_eq!(entries[0].restored_from, Some(source));
         assert_eq!(entries[1].restored_from, Some(source));
         assert_eq!(entries[2].restored_from, None);
-        assert_eq!(fs::read_to_string(dir.join(entries[0].timestamp.to_string())).unwrap(), "original\n\n");
+        assert_eq!(
+            fs::read_to_string(dir.join(entries[0].timestamp.to_string())).unwrap(),
+            "original\n\n"
+        );
         let serialized = serde_json::to_value(&entries).unwrap();
         assert_eq!(serialized[0]["restoredFrom"], source);
         assert!(serialized[2].get("restoredFrom").is_none());
@@ -1884,10 +1943,17 @@ mod tests {
         let original = "first\nsecond\n";
         assert!(capture_history_in(dir, original, true).unwrap());
         let timestamps = list_history_timestamps(dir).unwrap();
-        for content in ["first\n\nsecond\n", "\nfirst\n \t\nsecond\n\n", "first\nsecond"] {
+        for content in [
+            "first\n\nsecond\n",
+            "\nfirst\n \t\nsecond\n\n",
+            "first\nsecond",
+        ] {
             assert!(!capture_history_in(dir, content, false).unwrap());
             assert_eq!(list_history_timestamps(dir).unwrap(), timestamps);
-            assert_eq!(fs::read_to_string(dir.join(timestamps[0].to_string())).unwrap(), original);
+            assert_eq!(
+                fs::read_to_string(dir.join(timestamps[0].to_string())).unwrap(),
+                original
+            );
         }
         // 实际文字变化仍记录，即使同时存在空行差异。
         assert!(capture_history_in(dir, "first\n\nchanged\n", false).unwrap());

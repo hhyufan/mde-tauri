@@ -36,22 +36,39 @@ fn main() {
     let after = probe("Ctrl+Shift+F23");
     println!("撤销后探测: {after:?}");
 
-    assert!(matches!(before, HotkeyAvailability::Available), "before={before:?}");
-    assert!(matches!(during, HotkeyAvailability::Taken), "during={during:?}");
-    assert!(matches!(after, HotkeyAvailability::Available), "after={after:?}");
+    assert!(
+        matches!(before, HotkeyAvailability::Available),
+        "before={before:?}"
+    );
+    assert!(
+        matches!(during, HotkeyAvailability::Taken),
+        "during={during:?}"
+    );
+    assert!(
+        matches!(after, HotkeyAvailability::Available),
+        "after={after:?}"
+    );
 
     // 非法输入不应被当成可用
     for bad in ["Ctrl", "KeyS", "Ctrl+Shift+UnknownKey"] {
         let result = probe(bad);
         println!("非法输入 {bad:?}: {result:?}");
-        assert!(matches!(result, HotkeyAvailability::Invalid { .. }), "{bad}");
+        assert!(
+            matches!(result, HotkeyAvailability::Invalid { .. }),
+            "{bad}"
+        );
     }
 
     // 注册表里真实用到的键位都要能给出结论：功能键不能因为“没有修饰键”而被判非法。
     // 无修饰键的功能键（F1/F11）本来就是合法的全局热键。
     println!("--- 注册表默认键位 ---");
     for keybinding in [
-        "F11", "F1", "Ctrl+KeyS", "Ctrl+Shift+KeyF", "Ctrl+Slash", "Ctrl+Shift+KeyZ",
+        "F11",
+        "F1",
+        "Ctrl+KeyS",
+        "Ctrl+Shift+KeyF",
+        "Ctrl+Slash",
+        "Ctrl+Shift+KeyZ",
     ] {
         let result = probe(keybinding);
         println!("  {keybinding:<18} {result:?}");

@@ -38,7 +38,9 @@ impl From<HotkeyAvailability> for HotkeyProbeResult {
             HotkeyAvailability::Available => HotkeyProbeResult::Available,
             HotkeyAvailability::Taken => HotkeyProbeResult::Taken,
             #[cfg(not(target_os = "windows"))]
-            HotkeyAvailability::Unsupported { platform } => HotkeyProbeResult::Unsupported { platform },
+            HotkeyAvailability::Unsupported { platform } => {
+                HotkeyProbeResult::Unsupported { platform }
+            }
             HotkeyAvailability::Invalid { reason } => HotkeyProbeResult::Invalid { reason },
         }
     }
@@ -56,6 +58,8 @@ pub fn check_hotkey_available(keybinding: String) -> HotkeyProbeResult {
     #[cfg(not(target_os = "windows"))]
     {
         let _ = keybinding;
-        HotkeyProbeResult::Unsupported { platform: std::env::consts::OS.to_string() }
+        HotkeyProbeResult::Unsupported {
+            platform: std::env::consts::OS.to_string(),
+        }
     }
 }
