@@ -4,7 +4,7 @@
  * 组织编辑器多标签切换、标签重命名、设备同步开关，以及 Markdown 相关工具按钮，
  * 为主编辑区提供高频文件操作入口。
  */
-import { useRef, useCallback, useMemo, useState } from 'react';
+import { useRef, useCallback, useMemo, useState, useLayoutEffect, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Tooltip } from 'antd';
 import useEditorStore from '@store/useEditorStore';
@@ -25,6 +25,9 @@ import { cn } from '@utils/classNames';
 import { isImeComposing } from '@utils/keyboard';
 import FileTypeIcon from '@components/ui/FileTypeIcon';
 import './tabbar.scss';
+import '@/assets/styles/rename-input.scss';
+import { installTabStripWheel } from './tabStripWheel';
+import { installTabStripDrag } from './tabStripDrag';
 
 /**
  * 顶部标签栏。
@@ -41,6 +44,7 @@ function TabBar({ onRequestCloseTab }) {
   const setActiveTab = useEditorStore((s) => s.setActiveTab);
   const renameTab = useEditorStore((s) => s.renameTab);
   const updateTabPath = useEditorStore((s) => s.updateTabPath);
+  const reorderTabs = useEditorStore((s) => s.reorderTabs);
   const viewMode = useEditorStore((s) => s.viewMode);
   const toggleSplit = useEditorStore((s) => s.toggleSplit);
   const toolbarVisible = useEditorStore((s) => s.toolbarVisible);
@@ -55,8 +59,53 @@ function TabBar({ onRequestCloseTab }) {
   const pathToId = useFileIdStore((s) => s.pathToId);
   const replicas = useSyncStore((s) => s.replicas);
   const currentDir = useFileStore((s) => s.currentDir);
-  const { loadDirectory, createFileWithDialog } = useFileManager();
+  const { loadDirectory, createNewTab } = useFileManager();
   const scrollRef = useRef(null);
+  const dragRef = useRef(null);
+  const previousTabsRef = useRef(new Set(tabs.map((tab) => tab.id)));
+  const previousActiveRef = useRef(null);
+  const positionsRef = useRef(new Map());
+  const [draggedId, setDraggedId] = useState(null);
+  const [dropTarget, setDropTarget] = useState(null);
+  useEffect(() => installTabStripDrag(scrollRef.current, {
+    onDragChange: (id) => { dragRef.current = id; setDraggedId(id); },
+    onDropTarget: (target) => setDropTarget((current) => current?.id === target?.id && current?.after === target?.after ? current : target),
+    onReorder: reorderTabs,
+  }), [reorderTabs]);
+  useEffect(() => installTabStripWheel(scrollRef.current, scrollRef.current.closest('.tabbar')), []);
+
+  useLayoutEffect(() => {
+    const container = scrollRef.current;
+    if (!container) return;
+    const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    const elements = [...container.querySelectorAll('[data-tab-id]')];
+    const added = elements.some((element) => !previousTabsRef.current.has(element.dataset.tabId));
+    const positions = new Map();
+    for (const element of elements) {
+      const id = element.dataset.tabId;
+      const previous = positionsRef.current.get(id);
+      positions.set(id, element.offsetLeft);
+      if (!reducedMotion && element.animate) {
+        if (!previousTabsRef.current.has(id)) element.animate([{ opacity: 0, transform: 'translateX(12px)' }, { opacity: 1, transform: 'translateX(0)' }], { duration: 180, easing: 'ease-out' });
+        else if (previous != null && previous !== element.offsetLeft) element.animate([{ transform: `translateX(${previous - element.offsetLeft}px)` }, { transform: 'translateX(0)' }], { duration: 180, easing: 'ease-out' });
+      }
+    }
+    positionsRef.current = positions;
+    previousTabsRef.current = new Set(tabs.map((tab) => tab.id));
+    const activeChanged = previousActiveRef.current !== activeTabId;
+    previousActiveRef.current = activeTabId;
+    if (dragRef.current) return;
+    const behavior = reducedMotion ? 'auto' : 'smooth';
+    if (added) container.scrollTo({ left: container.scrollWidth, behavior });
+    else if (activeChanged) {
+      const active = elements.find((element) => element.dataset.tabId === activeTabId);
+      if (active) {
+        const box = active.getBoundingClientRect(), viewport = container.getBoundingClientRect();
+        if (box.left < viewport.left) container.scrollBy({ left: box.left - viewport.left, behavior });
+        else if (box.right > viewport.right) container.scrollBy({ left: box.right - viewport.right, behavior });
+      }
+    }
+  }, [tabs, activeTabId]);
 
   const [renamingTabId, setRenamingTabId] = useState(null);
   const [renameValue, setRenameValue] = useState('');
@@ -69,19 +118,6 @@ function TabBar({ onRequestCloseTab }) {
     () => /^(md|markdown|mdx)$/i.test(activeTab?.ext || ''),
     [activeTab],
   );
-
-  /**
-   * 根据当前字体设置估算标签重命名输入框所需宽度。
-   *
-   * @param {string} text 待测量的文本内容。
-   * @returns {number} 文本渲染宽度。
-   */
-  const getTextWidth = useCallback((text) => {
-    const canvas = document.createElement('canvas');
-    const ctx = canvas.getContext('2d');
-    ctx.font = '12px -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif';
-    return ctx.measureText(text).width;
-  }, []);
 
   /**
    * 进入标签重命名模式，并在下一帧自动聚焦输入框。
@@ -219,8 +255,11 @@ function TabBar({ onRequestCloseTab }) {
           return (
             <div
               key={tab.id}
-              className={cn('tabbar__tab', activeTabId === tab.id && 'tabbar__tab--active', isRenaming && 'tabbar__tab--renaming')}
+              data-tab-id={tab.id}
+              draggable={false}
+              className={cn('tabbar__tab', activeTabId === tab.id && 'tabbar__tab--active', isRenaming && 'tabbar__tab--renaming', draggedId === tab.id && 'tabbar__tab--dragging', dropTarget?.id === tab.id && (dropTarget.after ? 'tabbar__tab--drop-after' : 'tabbar__tab--drop-before'))}
               onClick={() => !isRenaming && setActiveTab(tab.id)}
+
             >
               <span className="tabbar__tab-icon">
                 <FileTypeIcon extension={tab.ext} fileName={tab.name} size={16} />
@@ -235,10 +274,12 @@ function TabBar({ onRequestCloseTab }) {
                 )}
               </span>
 
-              {isRenaming ? (
+              <span className="tabbar__tab-label">
+                <span className="tabbar__tab-name" style={isRenaming ? { visibility: 'hidden' } : undefined} onDoubleClick={(e) => startRename(tab, e)}>{tab.name}</span>
+              {isRenaming && (
                 <input
                   ref={renameInputRef}
-                  className="tabbar__tab-rename"
+                  className="moki-rename-input tabbar__tab-rename"
                   value={renameValue}
                   onChange={(e) => setRenameValue(e.target.value)}
                   onBlur={() => commitRename(tab)}
@@ -251,21 +292,15 @@ function TabBar({ onRequestCloseTab }) {
                     if (e.key === 'Escape') { e.preventDefault(); cancelRename(); }
                   }}
                   onClick={(e) => e.stopPropagation()}
-                  style={{ width: `${Math.max(getTextWidth(renameValue) + 16, 48)}px` }}
                 />
-              ) : (
-                <span
-                  className="tabbar__tab-name"
-                  onDoubleClick={(e) => startRename(tab, e)}
-                >
-                  {tab.name}
-                </span>
               )}
+              </span>
 
-              {tab.modified && !autoSave && !isRenaming && <span className="tabbar__tab-dot" />}
-              {!isRenaming && (
+              {tab.modified && !autoSave && <span className="tabbar__tab-dot" style={isRenaming ? { visibility: 'hidden' } : undefined} />}
+              {(
                 <span
                   className="tabbar__tab-close"
+                  style={isRenaming ? { visibility: 'hidden' } : undefined}
                   onClick={(e) => {
                     e.stopPropagation();
                     onRequestCloseTab?.(tab.id);
@@ -281,7 +316,7 @@ function TabBar({ onRequestCloseTab }) {
           );
         })}
         <Tooltip title={t('tabbar.newTab')} placement="bottom" mouseEnterDelay={0.3}>
-          <button className="tabbar__new-tab" onClick={createFileWithDialog} type="button">
+          <button className="tabbar__new-tab" aria-label={t('tabbar.newTab')} onClick={createNewTab} type="button">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <line x1="12" y1="5" x2="12" y2="19" />
               <line x1="5" y1="12" x2="19" y2="12" />

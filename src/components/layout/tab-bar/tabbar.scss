@@ -20,6 +20,8 @@
   align-items: flex-end;
   gap: 1px;
   overflow-x: auto;
+  overflow-y: hidden;
+  overscroll-behavior: contain;
   min-width: 0;
   padding: 0 4px;
   scrollbar-width: none;
@@ -45,6 +47,7 @@
   border-bottom: none;
   position: relative;
   user-select: none;
+  touch-action: pan-y;
   flex-shrink: 0;
 
   &:hover {
@@ -75,26 +78,11 @@
   user-select: none;
 }
 
-.tabbar__tab-rename {
-  border: none;
-  outline: none;
-  background: transparent;
-  padding: 0;
-  margin: 0;
-  font-size: 12px;
-  font-family: inherit;
-  color: inherit;
-  line-height: inherit;
-  min-width: 48px;
-  max-width: 200px;
-  display: inline-block;
-  vertical-align: baseline;
-
-  &::selection {
-    background: var(--selection-bg);
-  }
-}
-
+.tabbar__tab-label { position: relative; display: inline-block; line-height: 20px; }
+.tabbar__tab-rename { position: absolute; inset: 0; width: 100%; }
+.tabbar__tab--dragging { opacity: 0.45; }
+.tabbar__tab--drop-before { box-shadow: -2px 0 0 var(--accent); }
+.tabbar__tab--drop-after { box-shadow: 2px 0 0 var(--accent); }
 .tabbar__tab--renaming {
   cursor: default;
   background: var(--surface) !important;
