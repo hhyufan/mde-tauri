@@ -400,7 +400,7 @@ pub(super) fn find_runtime(
     };
     let homes: Vec<_> = variables
         .iter()
-        .filter_map(|name| std::env::var_os(name))
+        .filter_map(std::env::var_os)
         .filter(|home| !home.is_empty())
         .map(|home| PathBuf::from(home.to_string_lossy().trim().trim_matches('"')))
         .collect();
@@ -591,7 +591,8 @@ fn dotnet_sdk(runtime: &Path) -> Result<DotnetSdk, String> {
             })
         })
         .collect::<Vec<_>>();
-    sdks.sort_by(|a, b| b.0.cmp(&a.0));
+    // 版本号降序：Reverse 比手写 cmp 更直白。
+    sdks.sort_by_key(|sdk| std::cmp::Reverse(sdk.0));
     let Some((version, name, sdk_root)) = sdks.first() else {
         return Err("运行 C# 需要 .NET 6 或更高版本 SDK，仅安装运行时不够。".into());
     };
@@ -612,7 +613,7 @@ fn dotnet_sdk(runtime: &Path) -> Result<DotnetSdk, String> {
             (numbers[0] == version[0] && directory.is_dir()).then_some((numbers, directory))
         })
         .collect::<Vec<_>>();
-    references.sort_by(|a, b| b.0.cmp(&a.0));
+    references.sort_by_key(|entry| std::cmp::Reverse(entry.0));
     let roslyn = references.first().and_then(|(_, directory)| {
         let mut dlls = fs::read_dir(directory)
             .ok()?
@@ -1236,7 +1237,7 @@ fn prepare(request: &ScriptRequest, cache: &Path) -> Result<PreparedRun, String>
             fs::create_dir_all(&csharp_project).map_err(|error| error.to_string())?;
             let fingerprint = format!("{:x}", Sha256::digest(request.source.as_bytes()));
             let marker = csharp_project.join("compiled-source.sha256");
-            let output = csharp_project.join("bin/Debug").join(&framework);
+            let output = csharp_project.join("bin/Debug").join(framework);
             let cache_hit = fs::read_to_string(&marker).ok().as_deref() == Some(&fingerprint)
                 && ["Run.dll", "Run.deps.json", "Run.runtimeconfig.json"]
                     .iter()
@@ -1263,10 +1264,13 @@ fn prepare(request: &ScriptRequest, cache: &Path) -> Result<PreparedRun, String>
                 .env("DOTNET_GENERATE_ASPNET_CERTIFICATE", "false")
                 .env("DOTNET_ADD_GLOBAL_TOOLS_TO_PATH", "false")
                 .env("NUGET_PACKAGES", cache.join("nuget"));
-            if !cache_hit && sdk.roslyn.is_some() {
+            // 先把 roslyn 解出来再进分支：写成 let 绑定而不是 is_some() 配 unwrap()，
+            // 既少一次重复判断，也免掉 clippy 的 unnecessary_unwrap。
+            let roslyn = if cache_hit { None } else { sdk.roslyn.as_ref() };
+            if let Some(roslyn) = roslyn {
                 let mut compiler = prepare_roslyn(
                     Path::new(cmd.get_program()),
-                    sdk.roslyn.as_ref().unwrap(),
+                    roslyn,
                     &csharp_project,
                     &output,
                     framework,

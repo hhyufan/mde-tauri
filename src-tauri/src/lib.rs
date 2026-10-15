@@ -494,10 +494,10 @@ fn capture_history_with_source(
         .lock()
         .map_err(|error| error.to_string())?;
     let force = force || restored_from.is_some();
-    fs::create_dir_all(&dir)
+    fs::create_dir_all(dir)
         .map_err(|error| format!("Failed to create history directory: {error}"))?;
 
-    let mut timestamps = list_history_timestamps(&dir)?;
+    let mut timestamps = list_history_timestamps(dir)?;
     timestamps.sort_unstable();
     let now = SystemTime::now()
         .duration_since(UNIX_EPOCH)
@@ -562,7 +562,7 @@ fn list_history_entries(dir: &Path) -> Result<Vec<HistoryEntry>, String> {
         return Ok(Vec::new());
     }
     let mut entries = Vec::new();
-    for ts in list_history_timestamps(&dir)? {
+    for ts in list_history_timestamps(dir)? {
         if let Ok(meta) = fs::metadata(dir.join(ts.to_string())) {
             let restored_from = fs::read(dir.join(format!("{ts}.meta.json")))
                 .ok()
@@ -575,7 +575,8 @@ fn list_history_entries(dir: &Path) -> Result<Vec<HistoryEntry>, String> {
             });
         }
     }
-    entries.sort_by(|a, b| b.timestamp.cmp(&a.timestamp));
+    // 按时间倒序：用 Reverse 让 sort_by_key 表达降序，比 sort_by 里手写 cmp 更直白。
+    entries.sort_by_key(|entry| std::cmp::Reverse(entry.timestamp));
     Ok(entries)
 }
 
@@ -629,8 +630,11 @@ struct DirectoryChangeEvent {
     dir: String,
 }
 
+/// 目录监听表：目录路径 → 该目录的 watcher。
+type DirectoryWatchers = Arc<Mutex<HashMap<String, Box<dyn Watcher + Send>>>>;
+
 /// 目录级监听状态：按目录路径管理 watcher，避免与文件级监听混用。
-static DIRECTORY_WATCHER_STATE: Lazy<Arc<Mutex<HashMap<String, Box<dyn Watcher + Send>>>>> =
+static DIRECTORY_WATCHER_STATE: Lazy<DirectoryWatchers> =
     Lazy::new(|| Arc::new(Mutex::new(HashMap::new())));
 
 /// 监听目录的直接子项变化（新增/删除/重命名），用于让资源管理器
@@ -845,10 +849,7 @@ async fn get_refresh_credential() -> Result<Option<String>, String> {
 /// 这是纯兼容路径：任何读取失败都按“没有旧凭据”处理，绝不影响新凭据的正常流程。
 fn legacy_refresh_credential() -> Option<String> {
     let entry = keyring::Entry::new(LEGACY_CREDENTIAL_SERVICE, REFRESH_TOKEN_ACCOUNT).ok()?;
-    match entry.get_password() {
-        Ok(token) => Some(token),
-        Err(_) => None,
-    }
+    entry.get_password().ok()
 }
 
 #[tauri::command]

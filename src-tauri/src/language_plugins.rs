@@ -459,10 +459,10 @@ fn run_installer(
     let mut child = cmd
         .spawn()
         .map_err(|error| format!("Cannot start installer: {error}"))?;
-    let tree = ProcessTree::attach(&child).map_err(|error| {
+    // 用 inspect_err：这里只是想借失败的机会清理子进程，并不改写错误本身。
+    let tree = ProcessTree::attach(&child).inspect_err(|_| {
         let _ = child.kill();
         let _ = child.wait();
-        error
     })?;
     let tail = Arc::new(Mutex::new(String::new()));
     let mut readers = vec![];

@@ -90,7 +90,7 @@ fn read_text(path: &Path) -> Option<String> {
         let (text, _, malformed) = encoding.decode(&bytes);
         return (!malformed).then(|| text.into_owned());
     }
-    if bytes.iter().any(|byte| *byte == 0) {
+    if bytes.contains(&0) {
         return None;
     }
     String::from_utf8(bytes).ok()
