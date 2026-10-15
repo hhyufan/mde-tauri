@@ -78,6 +78,18 @@ it('recovery replaces a clean reopened tab instead of duplicating it', () => {
   expect(useEditorStore.getState().getActiveTab()).toMatchObject({ content: 'draft', modified: true });
 });
 
+it('persists a reordered tab strip without changing the active document', async () => {
+  const session = await import('./editorSession');
+  await session.restoreEditorSession();
+  stop = session.startEditorSessionTracking();
+  useEditorStore.getState().openFile({ path: '/a.md', name: 'a.md', content: 'a' });
+  useEditorStore.getState().openFile({ path: '/b.md', name: 'b.md', content: 'b' });
+  useEditorStore.getState().reorderTabs('/b.md', '/a.md');
+  const saved = JSON.parse(localStorage.getItem('mokidown-session'));
+  expect(saved.tabs.map((tab) => tab.id)).toEqual(['/b.md', '/a.md']);
+  expect(saved.activeTabId).toBe('/b.md');
+});
+
 it('captures a mounted view before renaming its tab', () => {
   const unregister = registerDocumentViewState('preview', () => '/a.md', () => ({ top: 123 }));
   useEditorStore.getState().openFile({ path: '/a.md', name: 'a.md', content: '' });
@@ -87,13 +99,14 @@ it('captures a mounted view before renaming its tab', () => {
   unregister();
 });
 
-it('restores untitled identities and advances the name counter', async () => {
+it('restores legacy untitled identities and creates new drafts with the current localized name', async () => {
   save([{ id: 'untitled-old', name: 'Untitled-8', path: '', ext: 'md' }], 'untitled-old');
   const session = await import('./editorSession');
   await session.restoreEditorSession();
   expect(useEditorStore.getState().activeTabId).toBe('untitled-old');
   useEditorStore.getState().createUntitledTab();
-  expect(useEditorStore.getState().getActiveTab().name).toBe('Untitled-9');
+  const { untitledFileName } = await import('@utils/untitledFileName');
+  expect(useEditorStore.getState().getActiveTab().name).toBe(untitledFileName());
 });
 
 it('refreshes a legacy saved tab from disk instead of retaining its stale snapshot', async () => {

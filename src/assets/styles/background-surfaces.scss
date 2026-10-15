@@ -14,6 +14,18 @@ body.moki-has-background,
   // 雾化过渡使用半透明底色；下拉浮层独立绘制底图，不能透出正文。
   --moki-glass-popup: color-mix(in srgb, var(--surface) 12%, transparent);
 
+  .external-file-notice {
+    background: transparent;
+
+    button {
+      background: var(--moki-glass-surface);
+
+      &:hover {
+        background: var(--moki-glass-hover);
+      }
+    }
+  }
+
   .titlebar__search,
   .sidebar__tab-slider,
   .editor-content__run,

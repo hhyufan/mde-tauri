@@ -6,7 +6,12 @@ import { clearBuffer, getBuffer, setBuffer } from '@utils/editorBuffer';
 import TreeEditor from './TreeEditor';
 
 globalThis.React = ReactRuntime;
-vi.mock('react-i18next', () => ({ useTranslation: () => ({ t: (key) => key }) }));
+vi.mock('react-i18next', () => ({
+  useTranslation: () => ({ t: (key) => key }),
+  // @/i18n 初始化时要用它。缺了它，只要有依赖链把 @/i18n 拉进来
+  // （测试 → useEditorStore → untitledFileName → @/i18n）就会整体报错。
+  initReactI18next: { type: '3rdParty', init: () => {} },
+}));
 
 const tabId = 'tree-editor-test';
 function setup(source = 'Root\n  Child >js++\nOther\n', props = {}) {

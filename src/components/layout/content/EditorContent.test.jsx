@@ -7,7 +7,12 @@ import { openExternal } from '@utils/tauriApi';
 import EditorContent from './EditorContent';
 
 globalThis.React = React;
-vi.mock('react-i18next', () => ({ useTranslation: () => ({ t: (key) => key }) }));
+vi.mock('react-i18next', () => ({
+  useTranslation: () => ({ t: (key) => key }),
+  // @/i18n 初始化时要用它。缺了它，只要有依赖链把 @/i18n 拉进来
+  // （测试 → useEditorStore → untitledFileName → @/i18n）就会整体报错。
+  initReactI18next: { type: '3rdParty', init: () => {} },
+}));
 vi.mock('@utils/tauriApi', () => ({ openExternal: vi.fn(async () => {}) }));
 vi.mock('@hooks/useFileManager', () => ({ useFileManager: () => ({ triggerAutoSave: vi.fn() }) }));
 vi.mock('@hooks/useResponsiveLayout', () => ({ useResponsiveLayout: () => ({ isMobileLayout: false }) }));

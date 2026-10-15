@@ -15,7 +15,12 @@ vi.mock('antd', () => ({
   Alert: () => null,
   Typography: { Paragraph: ({ children }) => <p>{children}</p>, Text: ({ children }) => <span>{children}</span> },
 }));
-vi.mock('react-i18next', () => ({ useTranslation: () => ({ t: (key) => key }) }));
+vi.mock('react-i18next', () => ({
+  useTranslation: () => ({ t: (key) => key }),
+  // @/i18n 初始化时要用它。缺了它，只要有依赖链把 @/i18n 拉进来
+  // （测试 → useEditorStore → untitledFileName → @/i18n）就会整体报错。
+  initReactI18next: { type: '3rdParty', init: () => {} },
+}));
 vi.mock('@/monaco-worker', () => ({}));
 vi.mock('@utils/monacoShiki', () => ({
   initMonacoShiki: async () => {},

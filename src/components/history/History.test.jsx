@@ -17,7 +17,8 @@ vi.mock('@utils/tauriApi', () => ({
   historyCapture: vi.fn(async () => {}), historyList: vi.fn(), historyRead: vi.fn(),
   onHistoryChanged: vi.fn(async () => () => {}),
 }));
-vi.mock('react-i18next', () => ({ useTranslation: () => ({ t: (key, params) => ({
+vi.mock('react-i18next', () => ({
+  useTranslation: () => ({ t: (key, params) => ({
   'history.title': '本地历史', 'history.restore': '恢复此版本', 'history.closeDiff': '关闭对比',
   'history.rollback': '回滚记录', 'history.rollbackFrom': `已回滚至 ${params?.time} 的版本`,
   'history.restoreSelection': '恢复选中差异', 'history.applyChanges': '应用修改',
@@ -25,7 +26,11 @@ vi.mock('react-i18next', () => ({ useTranslation: () => ({ t: (key, params) => (
   'history.noChanges': '没有更改',
   'empty.historyDiff.title': '这个版本和现在一模一样呢～',
   'empty.historyDiff.hint': '没有更改。',
-}[key] || key) }) }));
+}[key] || key) }),
+  // @/i18n 初始化时要用它。缺了它，只要有依赖链把 @/i18n 拉进来
+  // （测试 → useEditorStore → untitledFileName → @/i18n）就会整体报错。
+  initReactI18next: { type: '3rdParty', init: () => {} },
+}));
 vi.mock('monaco-editor', () => ({ editor: {
   createDiffEditor: (...args) => mock.createDiff(...args),
   createModel: (initial) => {
