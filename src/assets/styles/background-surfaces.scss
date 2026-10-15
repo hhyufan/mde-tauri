@@ -33,9 +33,15 @@ body.moki-has-background,
   .editor-content__renderer-error button,
   .timeline__count,
   .moki-tree__input,
-  .moki-tree__top,
-  .moki-tree .moki-tree__chevron {
+  .moki-tree__top {
     background: var(--moki-glass-surface);
+  }
+
+  // 箭头保留常驻底色（靠它把参考线干净地断开），但底色不能是实色或玻璃灰，
+  // 那会在底图上留下一块错位的小方块。改用与面包屑下拉同一套 image-surface：
+  // 把工作区壁纸按同一坐标系重绘进来，看着就是底图本身。
+  .moki-tree .moki-tree__chevron {
+    @include background-popup.image-surface;
   }
 
   .sidebar__tabs,
@@ -115,8 +121,10 @@ body.moki-has-background,
   .moki-tree .ant-tree .ant-tree-node-content-wrapper:hover {
     background: var(--moki-glass-hover);
   }
+  // 箭头 hover 不能换底色：它常驻的是与壁纸对位的 image-surface，
+  // 换成玻璃色就会露出错位色块，同时把参考线又盖回去。
   .moki-tree .ant-tree .ant-tree-switcher:hover .moki-tree__chevron {
-    background: var(--moki-glass-selected);
+    color: var(--accent);
   }
 
   .output-console__settings input,

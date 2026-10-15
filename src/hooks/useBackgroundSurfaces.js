@@ -1,6 +1,8 @@
 import { useLayoutEffect } from 'react';
 
-const POPUPS = '.footer__dropdown, .sort-dropdown, .search-dropdown__panel, .ant-select-dropdown, .ant-dropdown-menu, .ant-picker-panel-container, .ft, .ft__heading-panel, .ft__table-panel, .monaco-context-menu';
+// 知识树的折叠箭头也在这里：它要一块和壁纸严格对位的底色来切断参考线，
+// 否则铺出来的是一块与底图错位的实色小方块，看着像箭头压着树枝。
+const POPUPS = '.footer__dropdown, .sort-dropdown, .search-dropdown__panel, .ant-select-dropdown, .ant-dropdown-menu, .ant-picker-panel-container, .ft, .ft__heading-panel, .ft__table-panel, .monaco-context-menu, .moki-tree__chevron';
 const POSITIONERS = '.ant-dropdown, .ant-picker-dropdown';
 
 // Portal popups need the same image, cover dimensions and viewport coordinates

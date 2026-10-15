@@ -81,7 +81,7 @@
     padding: 0;
     color: var(--text-sec);
     // Use the same connector for leaves and folders, including collapsed
-    // branches. The chevron covers only the centre of the intersection.
+    // branches. 参考线照旧穿过箭头栏，保持连续；箭头本身不铺底色，线从它透过去。
     &::before { left: 12px; top: 0; bottom: 0; width: 0; height: auto; border-left: 1px solid var(--border); border-radius: 0; background: none; }
     &::after { content: ''; position: absolute; left: 12px; right: 0; top: 17px; border-top: 1px solid var(--border); }
     &:not(.ant-tree-switcher-noop):hover::before { background: none; }
@@ -91,11 +91,16 @@
   // nowhere. Keep the chevron and the horizontal connector to the children.
   .ant-tree .ant-tree-treenode:not(:has(.ant-tree-indent-unit)) > .ant-tree-switcher::before { display: none; }
   .ant-tree .ant-tree-switcher-leaf-line { display: none; }
+  // 箭头保留常驻底色：参考线照旧穿过箭头栏以保持连续，中间由这块底色断开，
+  // 视觉上才像树枝被箭头「让开」而不是被压住。
+  // 底色在背景图模式下会换成与壁纸对位的 image-surface，见 background-surfaces.scss。
   .moki-tree__chevron { position: relative; z-index: 1; margin-top: 9px; width: 16px; height: 16px; line-height: 16px; background: var(--surface); border-radius: 4px; }
   .moki-tree__chevron svg { display: block; width: 16px; height: 16px; transition: transform 150ms ease; }
   .ant-tree .ant-tree-switcher_close .moki-tree__chevron svg { transform: rotate(0deg); }
   .ant-tree .ant-tree-switcher_open .moki-tree__chevron svg { transform: rotate(90deg); }
-  .ant-tree .ant-tree-switcher:hover .moki-tree__chevron { color: var(--accent); background: var(--accent-light); }
+  // hover 只改图标颜色，绝不动背景：一动背景，壁纸模式下就会露出那块
+  // 与底图错位的色块，反而比不 hover 更难看。
+  .ant-tree .ant-tree-switcher:hover .moki-tree__chevron { color: var(--accent); }
 }
 
 @media (hover: none) { .moki-tree__actions { opacity: 1; } }
