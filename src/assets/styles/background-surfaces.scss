@@ -204,6 +204,7 @@ body.moki-has-background {
   // 不改定位、滚动容器或子元素层级，保留 antd 的布局与虚拟列表行为。
   .ant-select-dropdown,
   .footer__dropdown,
+  .sort-dropdown,
   .ft,
   .ft__heading-panel,
   .monaco-context-menu,
@@ -214,7 +215,8 @@ body.moki-has-background {
 
   // 轮廓沿用轻边框与阴影。
   .ant-select-dropdown,
-  .footer__dropdown {
+  .footer__dropdown,
+  .sort-dropdown {
     border: 1px solid color-mix(in srgb, var(--text) 12%, transparent);
     box-shadow: 0 8px 32px color-mix(in srgb, #000 22%, transparent);
   }
