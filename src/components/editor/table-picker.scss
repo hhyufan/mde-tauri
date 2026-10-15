@@ -21,8 +21,13 @@
   }
   form { display: flex; align-items: flex-end; gap: 8px; }
   label { display: flex; flex-direction: column; gap: 3px; }
-  input { width: 60px; padding: 5px; border: 1px solid var(--border); border-radius: 4px; background: var(--bg); color: var(--text); font: inherit; }
-  button[type='submit'] { padding: 6px 10px; border: 0; border-radius: 4px; background: var(--accent); color: white; font: inherit; cursor: pointer; }
+  /*
+   * 行列数用 antd 的 InputNumber、提交用 antd 的 Button：
+   * 控件外观交给组件库统一处理（含深色主题、禁用态与焦点环），
+   * 这里只约束宽度，好让两个输入框加按钮正好排满面板。
+   * 此前直接写原生 <input type="number">，右侧会露出浏览器自带的白色微调箭头。
+   */
+  .ant-input-number { width: 72px; }
   p { color: var(--text-sec); margin: 10px 0 0; font-size: 11px; }
 }
 
