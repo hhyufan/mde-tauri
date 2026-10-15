@@ -2,16 +2,18 @@ import useThemeStore from '@store/useThemeStore';
 import bustAtlas from '@/assets/characters/moki-day-night-bust.png';
 import themeAtlas from '@/assets/characters/moki-themes.png';
 import statusAtlas from '@/assets/characters/moki-status-empty.png';
-import historyAtlas from '@/assets/characters/moki-history-empty.png';
+import historyLight from '@/assets/characters/history-empty-light.png';
+import historyDark from '@/assets/characters/history-empty-dark.png';
 import './moki.scss';
 
 /**
  * 人物立绘精灵。
  *
- * 两张素材都是「浅色在左、深色在右」的双格图集：
- * - bust  ：半身特写，用于欢迎页主视觉；
- * - themes：全身对图，用于主题切换卡片——卡片画布更大，全身比例更完整，
- *           也正好避开把近 1000px 的原图缩到几十像素导致的发糊。
+ * 素材有两种排布：
+ * - 双格图集（`src` 是单张图）：浅色在左、深色在右，靠 background-position 取半格。
+ *   用于 bust（欢迎页主视觉）与 themes（主题切换卡片）。
+ * - 独立两张（`single: true`，`src` 是 { light, dark }）：一态一张，直接铺满。
+ *   用于 history —— 它的两态构图不同（白天/夜晚两套场景），拼成一张会被中线切断。
  *
  * 服装明暗由传入的 theme 决定，未传时跟随界面主题。
  */
@@ -35,15 +37,15 @@ const ATLASES = {
       dark: { left: '0.85%', top: '-4.41%' },
     },
   },
-  // 本地历史为空时的立绘：Moki 趴在「文档 = 文档 ✓」的窗口上，
-  // 旁边是回环箭头与时钟，语义正好是「这里没有任何改动」。
-  // 规格与 themes 相同（1672×941，半格 836×941），偏移同样按实测重心换算：
-  // 浅色格重心 X=51.43%/Y=54.91%，深色格 X=49.76%/Y=55.58%，纵向只补一半。
+  // 本地历史为空时的立绘：Moki 趴在「文档 = 文档 ✓」的窗口上，旁边是回环箭头与时钟，
+  // 语义正好是「这里没有任何改动」。浅色/深色各一张独立素材（1448×1086，4:3），
+  // 偏移同样按实测重心换算：浅色 X=49.68%/Y=55.61%，深色 X=50.06%/Y=56.72%，纵向只补一半。
   history: {
-    src: historyAtlas,
+    single: true,
+    src: { light: historyLight, dark: historyDark },
     offset: {
-      light: { left: '-1.43%', top: '-2.45%' },
-      dark: { left: '0.24%', top: '-2.79%' },
+      light: { left: '0.32%', top: '-2.81%' },
+      dark: { left: '-0.06%', top: '-3.36%' },
     },
   },
 };
@@ -51,13 +53,12 @@ const ATLASES = {
 export default function MokiSprite({ theme: explicitTheme, art = 'bust' }) {
   const theme = useThemeStore((state) => state.theme);
   const mode = (explicitTheme || theme) === 'dark' ? 'dark' : 'light';
-  // 未收录的 art 回落到 bust；类名用兜底后的键，样式才能按图集比例对齐。
+  // 未收录的 art 回落到 bust；类名用兜底后的键，样式才能按素材比例对齐。
   const atlasKey = ATLASES[art] ? art : 'bust';
   const atlas = ATLASES[atlasKey];
   return (
     <span aria-hidden="true" className={`moki-sprite moki-sprite--${mode} moki-sprite--${atlasKey}`}>
-      {/* 两帧各占一层：切换主题时靠交叉淡入淡出完成"换装"，
-          比直接改 background-position 硬切更像人物状态变化（见 moki.scss）。 */}
+      {/* 两帧各占一层：切换主题时靠交叉淡入淡出完成"换装"，硬切会显得生硬（见 moki.scss）。 */}
       {['light', 'dark'].map((frame) => {
         const offset = atlas.offset[frame] || atlas.offset.light;
         return (
@@ -65,8 +66,9 @@ export default function MokiSprite({ theme: explicitTheme, art = 'bust' }) {
             key={frame}
             className={`moki-sprite__art moki-sprite__art--${frame}`}
             style={{
-              backgroundImage: `url(${atlas.src})`,
-              backgroundPosition: `${frame === 'dark' ? 100 : 0}% 0%`,
+              backgroundImage: `url(${atlas.single ? atlas.src[frame] : atlas.src})`,
+              // 双格图集靠定位取半格；独立素材直接从头铺满。
+              backgroundPosition: atlas.single ? '0% 0%' : `${frame === 'dark' ? 100 : 0}% 0%`,
               left: offset.left,
               top: offset.top,
             }}

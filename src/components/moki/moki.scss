@@ -11,13 +11,24 @@
   aspect-ratio: 1;
 
   /*
-   * 这两套图集的单格是 836×941（≈ 8:9，竖长），套基类的 1:1 会被纵向压扁约 12%。
+   * moki-themes.png 的单格是 836×941（≈ 8:9，竖长），套基类的 1:1 会被纵向压扁约 12%。
    * 使用处若自带画布比例（如主题卡的 8/9 + sprite 的 aspect-ratio: auto），
    * 那边的选择器更具体，会照常覆盖这里。
    */
-  &--themes,
-  &--history {
+  &--themes {
     aspect-ratio: 8 / 9;
+  }
+
+  /*
+   * 历史空态用的是两张独立素材（1448×1086，4:3），不是双格图集：
+   * 比例按素材给，背景改成铺满整张，不再横向取半格。
+   */
+  &--history {
+    aspect-ratio: 4 / 3;
+
+    > .moki-sprite__art {
+      background-size: 100% 100%;
+    }
   }
   &__art {
     position: absolute;

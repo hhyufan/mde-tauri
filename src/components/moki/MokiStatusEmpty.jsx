@@ -14,7 +14,7 @@ import './moki-status-empty.scss';
  * @param {object} props 组件属性。
  * @param {string} props.title 主句，建议一句 ACG 风格的口语。
  * @param {string} [props.hint] 底部说明，讲清“怎么做才能不空”。
- * @param {'bust'|'themes'|null} [props.art] 使用哪套立绘；传 null 表示这一处不出人物。
+ * @param {'bust'|'themes'|'status'|'history'|null} [props.art] 使用哪套立绘；传 null 表示这一处不出人物。
  * @param {boolean} [props.compact] 紧凑模式：用于搜索下拉这类高度受限的容器。
  */
 export default function MokiStatusEmpty({ title, hint, art = 'status', compact = false }) {
