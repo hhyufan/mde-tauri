@@ -200,6 +200,19 @@ export const milkdownTableView = $view(tableSchema.node, () => (initialNode, vie
     const pos = getPos();
     if (!view.editable || typeof pos !== 'number') return;
     if (editingTableContext(view.state)?.pos !== pos) ensureCell();
+    /*
+     * 面板高度是固定的（约 340px），表格靠下时向下会伸出编辑区被裁。
+     * 打开前按「按钮到裁剪边界底部」的余量写一个 CSS 变量，面板据此限高并在内部滚动。
+     */
+    let room = null;
+    for (let node = dom.parentElement; node; node = node.parentElement) {
+      const { overflowY } = getComputedStyle(node);
+      if (overflowY === 'auto' || overflowY === 'scroll' || overflowY === 'hidden') {
+        room = node.getBoundingClientRect().bottom - edit.getBoundingClientRect().bottom - 12;
+        break;
+      }
+    }
+    if (room !== null) dom.style.setProperty('--moki-table-picker-room', `${Math.max(180, Math.round(room))}px`);
     edit.setAttribute('aria-expanded', 'true');
     pickerRoot = createRoot(panel);
     pickerRoot.render(createElement(TablePicker, {

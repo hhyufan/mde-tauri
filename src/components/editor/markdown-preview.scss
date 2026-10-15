@@ -907,8 +907,13 @@
     &:hover { background: var(--accent-bg); border-color: var(--accent); color: var(--accent); }
     &:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
   }
+  /*
+   * 网格按钮固定在表格左上角的内侧。
+   * 此前放在表格上方（top: -30px），表格贴近编辑区顶部时会被滚动容器裁掉半截；
+   * 放到内侧就永远在表格范围内，不需要任何翻转判定，也不占版面。
+   */
   .moki-table__edit {
-    top: -30px; left: 0; width: 26px; height: 26px;
+    top: 6px; left: 6px; width: 26px; height: 26px;
     display: grid; place-items: center;
     svg { width: 16px; height: 16px; }
   }
@@ -923,12 +928,20 @@
   .moki-table__insert--row { right: -10px; }
   .moki-table__insert--column { top: -17px; }
   /*
-   * 面板浮在网格按钮的正下方（按钮 top: -30px、高 26px，所以按钮底边在 -4px）。
+   * 面板浮在网格按钮正下方（按钮 top/left 都是 6px、高 26px，所以面板从 36px 起）。
    * 它是浮层，不占版面——此前靠 .moki-table--resizing 给容器加三百多像素的
    * padding-top 把表格推下去腾地方，那才是「下拉挤压空间」的来源。
    */
-  .moki-table__picker { position: absolute; top: -4px; left: 0; pointer-events: auto; z-index: 20; }
-  .moki-table__picker .ft__table-panel { position: relative; top: auto; right: auto; bottom: auto; left: auto; transform: none; z-index: 10; }
+  .moki-table__picker { position: absolute; top: 36px; left: 6px; pointer-events: auto; z-index: 20; }
+  .moki-table__picker .ft__table-panel {
+    position: relative; top: auto; right: auto; bottom: auto; left: auto; transform: none; z-index: 10;
+    /*
+     * 高度按打开时算出的余量限死（--moki-table-picker-room，见 milkdownTables.js），
+     * 超出则面板内部滚动——固定 340px 的面板在表格靠下时会伸出编辑区被裁掉。
+     */
+    max-height: var(--moki-table-picker-room, 360px);
+    overflow-y: auto;
+  }
 }
 .md-preview .ProseMirror .moki-table table { margin: 0; }
 .md-preview__milkdown-mermaid {
