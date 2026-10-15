@@ -285,4 +285,15 @@
   padding: 24px;
   color: var(--text-sec);
   font-size: 13px;
+
+  /*
+   * 立绘放大到 260px。素材是 1448×1086（4:3），按默认的 168px 渲染要缩 8.5 倍，
+   * 会明显发糊（项目里 status 立绘的注释写着「108px 时缩 8 倍明显发糊」）；
+   * 260px 时约 5.6 倍，与 status 的 5.3 倍处在同一观感区间。
+   * 对比视图本身空间充足，放大不影响布局。
+   */
+  .moki-status-empty__art {
+    width: 260px;
+    margin-bottom: 12px;
+  }
 }

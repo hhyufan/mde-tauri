@@ -121,13 +121,14 @@ export default function Timeline() {
           <div className="timeline__placeholder">{t('history.empty')}</div>
         ) : entries.length === 0 ? (
           /*
-           * 没有任何历史版本时，用与文件树 / 大纲同一套空状态：
-           * 角色立绘 + 一句 ACG 口吻的主句 + 一行淡色说明。
-           * 传 compact 是因为这里的画布只有侧边栏宽、且高度受限。
+           * 没有任何历史版本时，用与文件树 / 大纲同一套空状态文案。
+           * 这里刻意不出人物：抽屉上限是 6 行（162px），而 4:3 的立绘要放进这个高度
+           * 只能缩到 168px 宽（8.6 倍缩放，实测明显发糊），整块还会超出 44px 被裁。
+           * 立绘留给空间充足的对比视图（见 history.scss 的 .history-diff__empty）。
            */
           <MokiStatusEmpty
             compact
-            art="history"
+            art={null}
             title={t('empty.history.title')}
             hint={t('empty.history.hint')}
           />
