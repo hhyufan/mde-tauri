@@ -186,15 +186,18 @@ jobs:
         run: |
           set -euo pipefail
           ENDPOINT="oss-${REGION}.aliyuncs.com"
+          # ossutil 不读 OSS_ACCESS_KEY_ID / OSS_ACCESS_KEY_SECRET 这类环境变量，
+          # 只认命令行参数或配置文件；不显式给凭据会报
+          # "accessKeyID and ecsUrl are both empty"。这里先写一份临时配置，
+          # 后面每条命令就不必重复传 -i/-k（配置落在 runner 的家目录，随环境销毁）。
+          ossutil64 config -e "$ENDPOINT" -i "$OSS_ACCESS_KEY_ID" -k "$OSS_ACCESS_KEY_SECRET" -L CH > /dev/null
           # 顺序很重要：先传更新包与签名，最后才传 latest.json。
           # 反过来的话，客户端可能先读到新版本号，却还下载不到对应的包。
-          ossutil64 cp "dist/${PKG}" "oss://${BUCKET}/updates/${PKG}" \
-            -e "$ENDPOINT" --update --force
-          ossutil64 cp "dist/${PKG}.sig" "oss://${BUCKET}/updates/${PKG}.sig" \
-            -e "$ENDPOINT" --update --force
+          ossutil64 cp "dist/${PKG}" "oss://${BUCKET}/updates/${PKG}" --update --force
+          ossutil64 cp "dist/${PKG}.sig" "oss://${BUCKET}/updates/${PKG}.sig" --update --force
           # latest.json 要禁缓存，否则客户端可能长时间看不到新版本。
           ossutil64 cp dist/latest.json "oss://${BUCKET}/updates/latest.json" \
-            -e "$ENDPOINT" --meta "Cache-Control:no-cache" --force
+            --meta "Cache-Control:no-cache" --force
 
       - name: 验证可匿名下载
         env:
