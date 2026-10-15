@@ -9,10 +9,13 @@ import { clearBuffer, setBuffer, registerEditorBufferFlusher } from '@utils/edit
 globalThis.React = React;
 const mocks = vi.hoisted(() => ({ createDiff: vi.fn(), dispose: vi.fn(), modelDispose: vi.fn(), contents: [] }));
 vi.mock('antd', () => ({
-  Modal: ({ children }) => <div>{children}</div>,
+  // 把 width 透出来，测试才能断言弹窗宽度随内容切换。
+  Modal: ({ children, width }) => <div data-testid="modal" data-width={width}>{children}</div>,
   Button: ({ children }) => <button>{children}</button>,
   Space: ({ children }) => <div>{children}</div>,
-  Alert: () => null,
+  Alert: ({ message, description }) => (
+    <div><span>{message}</span><span>{description}</span></div>
+  ),
   Typography: { Paragraph: ({ children }) => <p>{children}</p>, Text: ({ children }) => <span>{children}</span> },
 }));
 vi.mock('react-i18next', () => ({
@@ -91,6 +94,32 @@ it('cancels initialization when closed before the next frame', () => {
   view.unmount();
   for (const callback of frames.values()) callback();
   expect(mocks.createDiff).not.toHaveBeenCalled();
+});
+
+it('stays compact when the file was removed and there is no diff to show', () => {
+  useEditorStore.setState({ tabs: [{ id: 'conflict-removed', content: 'local' }] });
+  const view = render(
+    <ExternalFileConflictModal conflict={{ tabId: 'conflict-removed', path: 'C:/notes/gone.md', kind: 'removed' }} />
+  );
+  // 没有磁盘内容就没有并排差异视图，撑到 1180px 只会空出一大片。
+  expect(view.container.querySelector('.external-file-conflict__diff')).toBeNull();
+  expect(view.getByTestId('modal')).toHaveAttribute('data-width', 'min(520px, 94vw)');
+  expect(view.container).toHaveTextContent('原文件已被删除或移动');
+  view.unmount();
+  clearBuffer('conflict-removed');
+});
+
+it('goes wide only when the side-by-side diff is actually rendered', async () => {
+  const frames = setup();
+  useEditorStore.setState({ tabs: [{ id: 'conflict-wide', content: 'local' }] });
+  const view = render(
+    <ExternalFileConflictModal conflict={{ tabId: 'conflict-wide', path: 'C:/notes/file.md', diskContent: 'disk' }} />
+  );
+  await act(async () => { for (const callback of frames.values()) callback(); frames.clear(); });
+  expect(view.container.querySelector('.external-file-conflict__diff')).not.toBeNull();
+  expect(view.getByTestId('modal')).toHaveAttribute('data-width', 'min(1180px, 94vw)');
+  view.unmount();
+  clearBuffer('conflict-wide');
 });
 
 it('compares the flushed local buffer against the full disk file in read-only side-by-side panes', async () => {

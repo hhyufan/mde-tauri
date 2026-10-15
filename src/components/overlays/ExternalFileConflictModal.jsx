@@ -23,10 +23,16 @@ function ExternalFileConflictModal({ conflict, onKeep, onUseDisk, onSaveAs, onCl
   }, [conflict?.tabId, tab?.content]);
   if (!conflict) return null;
   const unavailable = typeof conflict.diskContent !== 'string';
+  /*
+   * 宽度按内容定。只有「本地改动 vs 磁盘内容」的并排 diff 需要那么宽；
+   * 「原文件已被删除或移动」没有 diff（下面 !unavailable 那段不渲染），
+   * 内容只剩一条提示加一行路径，撑在 1180px 里会空得离谱。
+   */
+  const width = unavailable ? 'min(520px, 94vw)' : 'min(1180px, 94vw)';
   return (
     <Modal
       open
-      width="min(1180px, 94vw)"
+      width={width}
       centered
       destroyOnHidden
       rootClassName="moki-external-file-conflict-root"
