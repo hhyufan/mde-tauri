@@ -56,8 +56,18 @@ const assertNoMonacoNls = {
 
 const host = process.env.TAURI_DEV_HOST;
 
+// 应用版本在构建期注入。版本号以 tauri.conf.json 为准，由 npm run version:sync
+// 同步到 package.json，所以这里读 package.json 是可靠的。
+// 用 import.meta.env.VITE_* 的形式而不是裸的全局常量：前者在 eslint 下天然合法，
+// 后者要额外声明 globals，而且在 vitest 里拿不到值。
+const appVersion = JSON.parse(readFileSync(resolve(__dirname, './package.json'), 'utf-8')).version;
+
 export default defineConfig(async () => ({
   plugins: [stripMonacoBrokenSourcemaps, assertNoMonacoNls, react()],
+
+  define: {
+    'import.meta.env.VITE_APP_VERSION': JSON.stringify(appVersion),
+  },
 
   resolve: {
     alias: {

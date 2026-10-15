@@ -168,7 +168,8 @@ export function attachMonacoLsp(monaco, model, tab) {
       filePath: tab.path || '', tabId: tab.id, fileName: tab.name, rootUri: document.rootUri });
     Object.assign(configuration, document.initializationOptions || {});
     const result = await connection.request('initialize', {
-      processId: null, clientInfo: { name: 'MokiDown', version: '0.1.0' },
+      // 版本取自构建期注入的常量（vite.config.js 的 define），别再写死字符串。
+      processId: null, clientInfo: { name: 'MokiDown', version: import.meta.env.VITE_APP_VERSION || '0.0.0' },
       rootUri: document.rootUri, workspaceFolders: [{ uri: document.rootUri, name: 'workspace' }],
       initializationOptions: configuration,
       capabilities: {
