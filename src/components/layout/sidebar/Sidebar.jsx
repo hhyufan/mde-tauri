@@ -25,6 +25,7 @@ import FileTypeIcon from '@components/ui/FileTypeIcon';
 import AppMark from '@components/ui/AppMark';
 import MokiStatusEmpty from '@components/moki/MokiStatusEmpty';
 import { openExternal } from '@utils/tauriApi';
+import { canCheckUpdates, checkAndInstallUpdate, relaunchApp } from '@utils/appUpdater';
 import { REPO_URL } from '@/configs/repository';
 import { cn } from '@utils/classNames';
 import './sidebar.scss';
@@ -389,6 +390,39 @@ function Sidebar({ onOpenSettings, onOpenStats, onOpenLogin }) {
   const syncEnabled = useConfigStore((state) => state.syncEnabled);
   const themeButtonRef = useRef(null);
   const notify = useNotificationStore.getState().notify;
+  const [checkingUpdate, setCheckingUpdate] = useState(false);
+
+  /**
+   * 检查更新：有新版本就下载安装，装完提示并重启。
+   * 原先这里只弹一句「已是最新」，等于按钮是摆设。
+   */
+  const handleCheckUpdates = useCallback(async () => {
+    if (checkingUpdate) return;
+    if (!canCheckUpdates()) { notify('info', t('notification.upToDate')); return; }
+    setCheckingUpdate(true);
+    try {
+      const result = await checkAndInstallUpdate((stage, detail) => {
+        if (stage === 'available') {
+          notify('info', t('notification.updateAvailable', { version: detail?.version }),
+            t('notification.updateDownloading'), 6000);
+        } else if (stage === 'installing') {
+          notify('info', t('notification.updateInstalling'));
+        }
+      });
+      if (result.status === 'up-to-date') {
+        notify('info', t('notification.upToDate'));
+      } else if (result.status === 'installed') {
+        notify('success', t('notification.updateReady', { version: result.version }),
+          t('notification.updateRestartHint'), 8000);
+        // 留一点时间让提示可见，再重启应用完成替换。
+        setTimeout(() => { relaunchApp().catch(() => {}); }, 1500);
+      }
+    } catch (error) {
+      notify('error', t('notification.updateFailed'), String(error?.message || error));
+    } finally {
+      setCheckingUpdate(false);
+    }
+  }, [checkingUpdate, notify, t]);
 
   const tabs = [
     { id: 'explorer', label: t('sidebar.tab.explorer') },
@@ -511,7 +545,8 @@ function Sidebar({ onOpenSettings, onOpenStats, onOpenLogin }) {
             <Button
               type="text"
               className="sidebar__footer-btn"
-              onClick={() => notify('info', t('notification.upToDate'))}
+              loading={checkingUpdate}
+              onClick={handleCheckUpdates}
               icon={<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="23 4 23 10 17 10" /><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10" /></svg>}
             />
           </Tooltip>

@@ -1689,7 +1689,8 @@ pub fn run() {
         .plugin(tauri_plugin_fs::init())
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_store::Builder::default().build())
-        .plugin(tauri_plugin_process::init());
+        .plugin(tauri_plugin_process::init())
+        .plugin(tauri_plugin_updater::Builder::new().build());
 
     // 启动期初始化：Windows 下补回关闭阴影后失去的窗口圆角，
     // 并确保 DWM 不绘制强调色边框。

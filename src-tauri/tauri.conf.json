@@ -63,11 +63,18 @@
       "requireLiteralLeadingDot": false
     },
     "dialog": null,
-    "store": null
+    "store": null,
+    "updater": {
+      "endpoints": [
+        "https://REPLACE_WITH_YOUR_BUCKET.oss-cn-hangzhou.aliyuncs.com/updates/latest.json"
+      ],
+      "pubkey": "REPLACE_WITH_TAURI_PUBLIC_KEY"
+    }
   },
   "bundle": {
     "active": true,
     "targets": ["nsis", "msi"],
+    "createUpdaterArtifacts": true,
     "icon": [
       "icons/32x32.png",
       "icons/128x128.png",

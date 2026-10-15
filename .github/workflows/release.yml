@@ -87,3 +87,92 @@ jobs:
             $signature = Get-AuthenticodeSignature -LiteralPath $path
             if ($signature.Status -ne 'Valid') { throw "Invalid Windows signature on $path`: $($signature.Status)" }
           }
+
+  # 构建完成后，把更新包与 latest.json 同步到阿里云 OSS。
+  # 客户端读的是 OSS 上那份 latest.json（见 tauri.conf.json 的 updater.endpoints），
+  # GitHub Release 这边作为源与备份保留。
+  # 需要先在仓库里配置：
+  #   Secrets   OSS_ACCESS_KEY_ID / OSS_ACCESS_KEY_SECRET（建议用只授权该 Bucket 的 RAM 子账号）
+  #   Variables OSS_BUCKET（如 mokidown-updates）、OSS_REGION（如 cn-hangzhou）
+  sync-oss:
+    needs: windows
+    runs-on: ubuntu-latest
+    steps:
+      - name: 下载 Release 附件
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          mkdir -p dist
+          gh release download "${{ github.ref_name }}" -D dist --repo "${{ github.repository }}"
+          ls -lh dist
+
+      - name: 生成指向 OSS 的 latest.json
+        env:
+          BUCKET: ${{ vars.OSS_BUCKET }}
+          REGION: ${{ vars.OSS_REGION }}
+        run: |
+          set -euo pipefail
+          cd dist
+          # createUpdaterArtifacts 只对 NSIS 产出更新包，所以取 *.nsis.zip 及其同名 .sig。
+          ZIP=$(ls *.nsis.zip | head -1)
+          if [ -z "$ZIP" ]; then echo "::error::没找到 .nsis.zip 更新包"; exit 1; fi
+          SIG=$(cat "${ZIP}.sig")
+          VERSION="${GITHUB_REF_NAME#v}"
+          jq -n \
+            --arg v "$VERSION" \
+            --arg sig "$SIG" \
+            --arg url "https://${BUCKET}.oss-${REGION}.aliyuncs.com/updates/${ZIP}" \
+            --arg date "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+            '{version: $v, notes: "", pub_date: $date,
+              platforms: {"windows-x86_64": {signature: $sig, url: $url}}}' \
+            > latest.json
+          # 把包名传给后续步骤
+          echo "PKG=${ZIP}" >> "$GITHUB_ENV"
+          cat latest.json
+
+      - name: 安装 ossutil
+        run: |
+          set -euo pipefail
+          curl -sSL -o ossutil.zip \
+            https://gosspublic.alicdn.com/ossutil/1.7.19/ossutil-v1.7.19-linux-amd64.zip
+          unzip -q ossutil.zip
+          find . -name 'ossutil64' -type f -exec mv {} /usr/local/bin/ossutil64 \;
+          chmod +x /usr/local/bin/ossutil64
+          ossutil64 --version
+
+      - name: 上传到 OSS
+        env:
+          OSS_ACCESS_KEY_ID: ${{ secrets.OSS_ACCESS_KEY_ID }}
+          OSS_ACCESS_KEY_SECRET: ${{ secrets.OSS_ACCESS_KEY_SECRET }}
+          BUCKET: ${{ vars.OSS_BUCKET }}
+          REGION: ${{ vars.OSS_REGION }}
+        run: |
+          set -euo pipefail
+          ENDPOINT="oss-${REGION}.aliyuncs.com"
+          # 顺序很重要：先传更新包与签名，最后才传 latest.json。
+          # 反过来的话，客户端可能先读到新版本号，却还下载不到对应的包。
+          ossutil64 cp "dist/${PKG}" "oss://${BUCKET}/updates/${PKG}" \
+            -e "$ENDPOINT" --update --force
+          ossutil64 cp "dist/${PKG}.sig" "oss://${BUCKET}/updates/${PKG}.sig" \
+            -e "$ENDPOINT" --update --force
+          # latest.json 要禁缓存，否则客户端可能长时间看不到新版本。
+          ossutil64 cp dist/latest.json "oss://${BUCKET}/updates/latest.json" \
+            -e "$ENDPOINT" --meta "Cache-Control:no-cache" --force
+
+      - name: 验证可匿名下载
+        env:
+          BUCKET: ${{ vars.OSS_BUCKET }}
+          REGION: ${{ vars.OSS_REGION }}
+        run: |
+          set -euo pipefail
+          URL="https://${BUCKET}.oss-${REGION}.aliyuncs.com/updates/latest.json"
+          CODE=$(curl -s -o /dev/null -w '%{http_code}' "$URL")
+          echo "$URL -> $CODE"
+          # 403 基本就是 Bucket 读写权限没设成公共读。
+          [ "$CODE" = "200" ] || {
+            echo "::error::latest.json 无法匿名访问（$CODE），请确认 Bucket 读写权限为「公共读」";
+            exit 1;
+          }
+          curl -s "$URL" | jq -e '.platforms["windows-x86_64"].url' > /dev/null
+          echo "latest.json 内容可解析，OSS 同步完成。"
