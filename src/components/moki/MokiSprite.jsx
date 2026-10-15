@@ -38,15 +38,11 @@ const ATLASES = {
     },
   },
   // 本地历史为空时的立绘：Moki 趴在「文档 = 文档 ✓」的窗口上，旁边是回环箭头与时钟，
-  // 语义正好是「这里没有任何改动」。浅色/深色各一张独立素材（1448×1086，4:3），
-  // 偏移同样按实测重心换算：浅色 X=49.68%/Y=55.61%，深色 X=50.06%/Y=56.72%，纵向只补一半。
+  // 语义正好是「这里没有任何改动」。浅色/深色各一张独立素材（1254×1254 正方形）。
+  // 这两张图本身就是完整构图的成品，直接整张显示即可，不做重心微调。
   history: {
     single: true,
     src: { light: historyLight, dark: historyDark },
-    offset: {
-      light: { left: '0.32%', top: '-2.81%' },
-      dark: { left: '-0.06%', top: '-3.36%' },
-    },
   },
 };
 
@@ -60,7 +56,8 @@ export default function MokiSprite({ theme: explicitTheme, art = 'bust' }) {
     <span aria-hidden="true" className={`moki-sprite moki-sprite--${mode} moki-sprite--${atlasKey}`}>
       {/* 两帧各占一层：切换主题时靠交叉淡入淡出完成"换装"，硬切会显得生硬（见 moki.scss）。 */}
       {['light', 'dark'].map((frame) => {
-        const offset = atlas.offset[frame] || atlas.offset.light;
+        // 没给偏移的素材（构图本身就是成品）就整张居中显示，不做微调。
+        const offset = atlas.offset?.[frame] || atlas.offset?.light || { left: '0%', top: '0%' };
         return (
           <span
             key={frame}
