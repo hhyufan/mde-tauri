@@ -155,6 +155,7 @@
   "notification.error": "Error",
   "notification.synced": "Synced",
   "notification.renameFailed": "Rename failed",
+  "notification.renamed": "Renamed",
   "notification.syncFailed": "Sync failed",
   "notification.cloudFileContentUnavailable": "Cloud file content is unavailable. Please sync again later.",
   "notification.upToDate": "Already up to date.",

@@ -1035,6 +1035,62 @@ export function useFileManager() {
     isAndroid,
   ]);
 
+  /**
+   * 重命名文件或目录，并同步所有引用。
+   *
+   * 改名远不止改磁盘上的名字：已打开的标签要跟着换路径、文件监听要重启、
+   * 最近文件与书签里的旧路径也要替换，否则重命名后这些地方会指向不存在的文件。
+   * Explorer 的行内重命名和拖入移动共用这一段逻辑。
+   *
+   * @param {string} sourcePath 原路径。
+   * @param {string} newName 新名字（仅名字，不含目录）。
+   * @returns {Promise<{ok: boolean, path?: string, message?: string}>} 结果。
+   */
+  const renameEntry = useCallback(async (sourcePath, newName) => {
+    const currentDir = useFileStore.getState().currentDir;
+    const trimmed = (newName || '').trim();
+    if (!trimmed || /[\\/]/.test(trimmed)) {
+      notify('error', t('notification.error'), t('sidebar.explorer.invalidFileName'));
+      return { ok: false };
+    }
+
+    const sourceName = sourcePath.split(/[\\/]/).pop();
+    if (trimmed === sourceName) return { ok: true, path: sourcePath };
+
+    const parentDir = currentDir || sourcePath.slice(0, Math.max(0, sourcePath.length - sourceName.length));
+    const targetPath = joinPath(parentDir, trimmed);
+
+    try {
+      if (await checkFileExists(targetPath)) {
+        notify('error', t('notification.error'), t('sidebar.explorer.fileExists'));
+        return { ok: false };
+      }
+
+      const result = await renameFile(sourcePath, targetPath);
+      if (!result.success) {
+        notify('error', t('notification.error'), result.message);
+        return { ok: false };
+      }
+
+      // 标签、监听、最近文件与书签都要从旧路径迁到新路径。
+      const existingTab = useEditorStore.getState().getTabByPath(sourcePath);
+      if (existingTab) {
+        updateTabPath(existingTab.id, targetPath, trimmed);
+        stopFileWatching(sourcePath).catch(() => {});
+        if (!isAndroid) startFileWatching(targetPath).catch(() => {});
+      }
+      replaceRecentFilePath(sourcePath, targetPath, trimmed);
+      replaceBookmarkPath(sourcePath, targetPath);
+
+      if (currentDir) await loadDirectory(currentDir);
+      notify('success', t('notification.renamed'), trimmed);
+      return { ok: true, path: targetPath };
+    } catch (error) {
+      notify('error', t('notification.error'), String(error));
+      return { ok: false };
+    }
+  }, [isAndroid, loadDirectory, notify, replaceBookmarkPath, replaceRecentFilePath, t, updateTabPath]);
+
   return {
     loadDirectory,
     loadFilesOnly,
@@ -1047,6 +1103,7 @@ export function useFileManager() {
     createNewFile,
     createFileWithDialog,
     createFileInCurrentDir,
+    renameEntry,
     openDroppedPathsInEditor,
     moveDroppedPathsToExplorer,
     triggerAutoSave,

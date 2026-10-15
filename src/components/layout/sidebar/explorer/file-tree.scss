@@ -368,11 +368,11 @@
 }
 
 /*
- * 新建文件那一行：文件名输入框 + 紧跟文字末尾的后缀选择器。
+ * 文件名输入行（新建与行内重命名共用）：文件名输入框 + 紧跟文字末尾的后缀选择器。
  * 后缀不固定在右端，而是随着输入的文字走——看起来就是「note.md」里的那个 .md。
- * 左偏移由 FileTree.jsx 用隐藏量尺算好后以内联 style 给出。
+ * 左偏移由 FileNameField.jsx 用隐藏量尺算好后以内联 style 给出。
  */
-.file-tree__create-field {
+.file-tree__name-field {
   position: relative;
   display: flex;
   flex: 1;
@@ -383,8 +383,9 @@
 /*
  * 量尺：不可见，但字体、字号、左起点都与真实输入框一致，
  * 这样 offsetWidth 就是已输入文字的实际宽度。
+ * 注意它必须保持不可见——类名改动而这里没跟着改，量尺会直接显示成文字。
  */
-.file-tree__create-measure {
+.file-tree__name-measure {
   position: absolute;
   left: 8px;
   top: 0;
@@ -395,14 +396,21 @@
   font-family: var(--font-app);
 }
 
-.file-tree__item-input--creating {
+// 只负责覆盖宽度与高度策略；边框、背景、圆角、字号都来自
+// .file-tree__item-input，别再重复一份，也别把它挤掉。
+.file-tree__name-input {
   // 基类带 flex: 1，会无视 JS 算出的 width 直接拉满容器；这里退出拉伸，
   // 让宽度完全由内容决定（刚好包住文件名 + 后缀），并随输入逐字变长。
   flex: 0 0 auto;
-  // 只留一个很小的下限（约三个字符宽），让宽度真正跟着内容走：
-  // 输入 note 时就是「note.md」那么宽，不留多余空白。
+  // 只留一个很小的下限，让宽度真正跟着内容走。
   min-width: 56px;
-  padding-right: 8px;
+  // 高度取 20px：外层仍是通用的 6px 上下内边距，6 + 20 + 6 = 32px，
+  // 与普通文件行严格等高。注意不要为了凑高度去改 .file-tree__item--creating
+  // 的 padding——那会让新建行的行内间距和别的行不一样，看着就是歪的。
+  box-sizing: border-box;
+  height: 20px;
+  padding: 1px 8px;
+  line-height: 16px;
 }
 
 .file-tree__ext-picker {

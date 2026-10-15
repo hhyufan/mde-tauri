@@ -155,6 +155,7 @@
   "notification.error": "错误",
   "notification.synced": "已同步",
   "notification.renameFailed": "重命名失败",
+  "notification.renamed": "已重命名",
   "notification.syncFailed": "同步失败",
   "notification.cloudFileContentUnavailable": "云端文件内容不可用，请稍后重试同步。",
   "notification.upToDate": "已是最新版本。",

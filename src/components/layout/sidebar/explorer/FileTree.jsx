@@ -4,9 +4,9 @@
  * 该文件负责展示当前目录的文件树、面包屑导航与行内新建文件流程，并承接
  * Explorer 视图中的目录切换、删除与快速打开等交互。
  */
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Tooltip, AutoComplete } from 'antd';
+import { Tooltip } from 'antd';
 import { confirm } from '@tauri-apps/plugin-dialog';
 import useFileStore from '@store/useFileStore';
 import useEditorStore from '@store/useEditorStore';
@@ -21,26 +21,10 @@ import { syncEngine } from '@/services/syncEngine';
 import { getExplorerFileSyncState } from '@/services/sync/syncPresentation';
 import { cn } from '@utils/classNames';
 import MokiStatusEmpty from '@components/moki/MokiStatusEmpty';
-import { isImeComposing } from '@utils/keyboard';
 import FileTypeIcon from '@components/ui/FileTypeIcon';
 import ChevronIcon from '@components/ui/ChevronIcon';
-
-/**
- * 新建文件时后缀下拉的可选值。
- *
- * 下拉是「可编辑」的（antd AutoComplete），用户可以挑一个，也可以直接敲任意后缀，
- * 所以这里只是一份常用项，不是白名单。
- */
-const FILE_EXTENSIONS = [
-  '.md', '.markdown', '.txt', '.json', '.yml', '.yaml', '.toml', '.ini',
-  '.html', '.css', '.js', '.ts', '.jsx', '.tsx', '.vue',
-  '.py', '.rs', '.go', '.java', '.cs', '.sh', '.bat', '.ps1',
-  '.csv', '.xml', '.log',
-];
-
-/** 新建文件的默认后缀：绝大多数场景就是写 Markdown。 */
-const DEFAULT_FILE_EXTENSION = '.md';
 import { isSafUri, safDisplayName } from '@utils/tauriApi';
+import FileNameField, { splitFileName, DEFAULT_FILE_EXTENSION } from './FileNameField';
 import './file-tree.scss';
 
 /**
@@ -113,24 +97,18 @@ function FileTree() {
     openFileFromPath,
     openInExplorer,
     createFileInCurrentDir,
+    renameEntry,
   } = useFileManager();
 
   const [creatingFileName, setCreatingFileName] = useState('');
   const [creatingFileExt, setCreatingFileExt] = useState(DEFAULT_FILE_EXTENSION);
   const [isCreatingFile, setIsCreatingFile] = useState(false);
+  // 行内重命名：记录正在改的那一项，以及拆开的主名与后缀
+  // （拆开是为了复用与新建完全相同的输入行——那里主名与后缀是两个控件）。
+  const [renamingPath, setRenamingPath] = useState(null);
+  const [renamingStem, setRenamingStem] = useState('');
+  const [renamingExt, setRenamingExt] = useState('');
   const [breadcrumbExpanded, setBreadcrumbExpanded] = useState(false);
-  const createInputRef = useRef(null);
-  // 量尺与容器：后缀选择器要贴着已输入文字的末尾，输入框宽度也要刚好吃下内容。
-  const createFieldRef = useRef(null);
-  const createMeasureRef = useRef(null);
-  const createExtMeasureRef = useRef(null);
-  const [creatingExtLeft, setCreatingExtLeft] = useState(8);
-  const [creatingExtWidth, setCreatingExtWidth] = useState(40);
-  const [creatingInputWidth, setCreatingInputWidth] = useState(null);
-  const [creatingInputPaddingRight, setCreatingInputPaddingRight] = useState(8);
-  // 后缀下拉是否展开。输入框的 onBlur 会先于下拉的点击触发，
-  // 靠它区分「用户去选后缀」和「用户真的离开了」。
-  const extDropdownOpenRef = useRef(false);
   const bcScrollRef = useRef(null);
   const bcThumbRef = useRef(null);
 
@@ -329,12 +307,11 @@ function FileTree() {
    * @returns {string} 完整文件名；名字为空时返回空串。
    */
   const composeFileName = useCallback(() => {
-    const name = creatingFileName.trim();
-    if (!name) return '';
+    const stem = creatingFileName.trim();
+    if (!stem) return '';
     const rawExt = creatingFileExt.trim();
-    if (!rawExt) return name;
-    const ext = rawExt.startsWith('.') ? rawExt : `.${rawExt}`;
-    return name.toLowerCase().endsWith(ext.toLowerCase()) ? name : `${name}${ext}`;
+    if (!rawExt) return stem;
+    return `${stem}${rawExt.startsWith('.') ? rawExt : `.${rawExt}`}`;
   }, [creatingFileName, creatingFileExt]);
 
   /**
@@ -353,63 +330,44 @@ function FileTree() {
   }, [cancelCreatingFile, composeFileName, createFileInCurrentDir]);
 
   /**
-   * 输入框失焦时的处理。
+   * 进入行内重命名态。
    *
-   * 不能直接提交：点后缀下拉会让输入框先失焦，若立刻提交，用户还没挑完后缀
-   * 文件就被建出来了。这里延后一拍再判断焦点是不是落进了下拉。
+   * @param {object} file 目标文件或目录。
+   * @param {Event} [event] 触发事件，用于拦住冒泡（否则会顺带打开文件）。
+   * @returns {void}
+   */
+  const startRenaming = useCallback((file, event) => {
+    event?.stopPropagation();
+    // 双击会先触发两次单击，其中一次可能已经把文件打开了；这里只关心进入编辑态。
+    const { stem, extension } = splitFileName(file.name);
+    setRenamingPath(file.path);
+    setRenamingStem(stem);
+    setRenamingExt(extension);
+  }, []);
+
+  /**
+   * 退出重命名态并丢弃草稿。
    *
    * @returns {void}
    */
-  const handleCreateFieldBlur = useCallback(() => {
-    window.setTimeout(() => {
-      if (extDropdownOpenRef.current) return;
-      commitCreatingFile();
-    }, 120);
-  }, [commitCreatingFile]);
+  const cancelRenaming = useCallback(() => {
+    setRenamingPath(null);
+    setRenamingStem('');
+    setRenamingExt('');
+  }, []);
 
-  useEffect(() => {
-    if (!isCreatingFile) return;
-    requestAnimationFrame(() => {
-      createInputRef.current?.focus();
-      createInputRef.current?.select();
-    });
-  }, [isCreatingFile]);
-
-  /*
-   * 量出「后缀该贴在哪」和「输入框该多宽」。
+  /**
+   * 提交重命名。
    *
-   * 后缀紧跟在文字末尾，看起来就是 note.md 里的那个 .md；输入框宽度则刚好
-   * 吃下「文件名 + 后缀」，不留多余空白，并随输入逐字拉长，到侧边栏右缘为止。
-   * 用 useLayoutEffect 而非 useEffect：要在绘制前算好，否则会先看到旧位置再跳。
+   * @returns {Promise<void>}
    */
-  useLayoutEffect(() => {
-    if (!isCreatingFile) return;
-    const nameMeasure = createMeasureRef.current;
-    const extMeasure = createExtMeasureRef.current;
-    const field = createFieldRef.current;
-    if (!nameMeasure || !extMeasure || !field) return;
-    const TEXT_PADDING = 8;   // 与 .file-tree__item-input 的左右内边距一致
-    const GAP = 2;            // 文字与后缀之间留一丝缝
-    const nameWidth = nameMeasure.offsetWidth;
-    const extWidth = extMeasure.offsetWidth;
-    const fieldWidth = field.clientWidth;
-    // 后缀区自身宽度跟着后缀文字走，右侧留一点给光标与点击热区。
-    const extBox = extWidth + 12;
-    setCreatingExtWidth(extBox);
-    // 后缀位置：贴着文字末尾；文字太长时压到右端，别被顶出可视区。
-    const maxLeft = Math.max(TEXT_PADDING, fieldWidth - extBox - TEXT_PADDING);
-    const extLeft = Math.min(TEXT_PADDING + nameWidth + GAP, maxLeft);
-    setCreatingExtLeft(extLeft);
-    // 输入框宽度：刚好包住内容，上限是容器本身。
-    const wanted = TEXT_PADDING + nameWidth + GAP + extBox;
-    const inputWidth = Math.min(wanted, fieldWidth);
-    setCreatingInputWidth(inputWidth);
-    /*
-     * 关键：右侧内边距必须让出后缀所占的那一段，否则长文件名会把文字滚到
-     * 后缀底下叠在一起。后缀紧贴文字时这段就等于后缀宽度，正好。
-     */
-    setCreatingInputPaddingRight(Math.max(TEXT_PADDING, Math.round(inputWidth - extLeft)));
-  }, [creatingFileName, creatingFileExt, isCreatingFile]);
+  const commitRenaming = useCallback(async () => {
+    if (!renamingPath) return;
+    const nextName = `${renamingStem}${renamingExt}`.trim();
+    if (!nextName) { cancelRenaming(); return; }
+    const result = await renameEntry(renamingPath, nextName);
+    if (result?.ok) cancelRenaming();
+  }, [cancelRenaming, renameEntry, renamingExt, renamingPath, renamingStem]);
 
   useEffect(() => {
     const handler = () => startCreatingFile();
@@ -655,7 +613,26 @@ function FileTree() {
                   ? <FileTypeIcon fileName={file.name} isFolder />
                   : <FileTypeIcon extension={ext} fileName={file.name} />}
               </span>
-              <span className="file-tree__item-name">{file.name}</span>
+              {renamingPath === file.path ? (
+                <FileNameField
+                  stem={renamingStem}
+                  extension={renamingExt}
+                  onStemChange={setRenamingStem}
+                  onExtensionChange={setRenamingExt}
+                  onCommit={commitRenaming}
+                  onCancel={cancelRenaming}
+                  autoFocus
+                />
+              ) : (
+                <span
+                  className="file-tree__item-name"
+                  // 双击名字进入重命名，与资源管理器一致；不用额外按钮占位。
+                  onDoubleClick={(e) => { startRenaming(file, e); }}
+                  title={file.name}
+                >
+                  {file.name}
+                </span>
+              )}
               {fileSyncState && (
                 <Tooltip
                   title={`${t('sidebar.cloud')} · ${t(`sync.status.${fileSyncState.status}`)}`}
@@ -672,7 +649,7 @@ function FileTree() {
                   </span>
                 </Tooltip>
               )}
-              {!file.is_dir && (
+              {!file.is_dir && renamingPath !== file.path && (
                 <Tooltip title={t('sidebar.explorer.deleteFile')} placement="top" mouseEnterDelay={0.3}>
                 <span
                   className="file-tree__item-del"
@@ -698,61 +675,17 @@ function FileTree() {
                 fileName={`${creatingFileName || 'untitled'}${creatingFileExt}`}
               />
             </span>
-            <div className="file-tree__create-field" ref={createFieldRef}>
-              {/*
-                隐藏的量尺：与输入框同字体、同左内边距，用来量出「当前占位文字的宽度」，
-                后缀选择器据此紧贴到它后面。没输入时量的是 placeholder 文本，
-                否则后缀会停在起点、和 placeholder 叠在一起。
-              */}
-              <span className="file-tree__create-measure" ref={createMeasureRef} aria-hidden="true">
-                {creatingFileName || t('sidebar.explorer.newFilePlaceholder')}
-              </span>
-              {/* 再一个量尺量后缀文字宽度，输入框总宽要「刚好吃下文件名 + 后缀」。 */}
-              <span className="file-tree__create-measure" ref={createExtMeasureRef} aria-hidden="true">
-                {creatingFileExt}
-              </span>
-              <input
-                ref={createInputRef}
-                className="file-tree__item-input file-tree__item-input--creating"
-                style={creatingInputWidth
-                  ? { width: `${creatingInputWidth}px`, paddingRight: `${creatingInputPaddingRight}px` }
-                  : undefined}
-                value={creatingFileName}
-                onChange={(e) => setCreatingFileName(e.target.value)}
-                onBlur={handleCreateFieldBlur}
-                onKeyDown={(e) => {
-                  e.stopPropagation();
-                  // 输入法组合期间回车上屏候选词，不能当成「提交文件名」处理，
-                  // 否则用拼音输入中文时会在半途就创建出拼音文件名。
-                  if (isImeComposing(e)) return;
-                  if (e.key === 'Enter') { e.preventDefault(); commitCreatingFile(); }
-                  if (e.key === 'Escape') { e.preventDefault(); cancelCreatingFile(); }
-                }}
-                placeholder={t('sidebar.explorer.newFilePlaceholder')}
-              />
-              {/*
-                后缀选择器：可编辑的下拉（AutoComplete），默认 .md。
-                左偏移由 JS 按文字宽度算，所以它始终贴着最后一个字符；
-                文字很长时会被压到右端，不至于跑出可视区。
-              */}
-              <div
-                className="file-tree__ext-picker"
-                style={{ left: `${creatingExtLeft}px`, width: `${creatingExtWidth}px` }}
-              >
-                <AutoComplete
-                  className="file-tree__ext-select"
-                  variant="borderless"
-                  size="small"
-                  value={creatingFileExt}
-                  options={FILE_EXTENSIONS.map((ext) => ({ value: ext }))}
-                  onChange={(value) => setCreatingFileExt(value ?? '')}
-                  onDropdownVisibleChange={(open) => { extDropdownOpenRef.current = open; }}
-                  onBlur={() => { extDropdownOpenRef.current = false; }}
-                  popupMatchSelectWidth={false}
-                  aria-label={t('sidebar.explorer.newFileExt')}
-                />
-              </div>
-            </div>
+            {/* 与重命名共用同一个输入行：主名 + 紧跟的后缀下拉。 */}
+            <FileNameField
+              stem={creatingFileName}
+              extension={creatingFileExt}
+              onStemChange={setCreatingFileName}
+              onExtensionChange={setCreatingFileExt}
+              onCommit={commitCreatingFile}
+              onCancel={cancelCreatingFile}
+              placeholder={t('sidebar.explorer.newFilePlaceholder')}
+              autoFocus
+            />
           </div>
         )}
       </div>
