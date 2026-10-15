@@ -114,21 +114,22 @@ jobs:
         run: |
           set -euo pipefail
           cd dist
-          # createUpdaterArtifacts 只对 NSIS 产出更新包，所以取 *.nsis.zip 及其同名 .sig。
-          ZIP=$(ls *.nsis.zip | head -1)
-          if [ -z "$ZIP" ]; then echo "::error::没找到 .nsis.zip 更新包"; exit 1; fi
-          SIG=$(cat "${ZIP}.sig")
+          # Tauri 2 的 NSIS 更新产物就是安装包本身加一个同名 .sig，
+          # 不是某些旧文档里写的 .nsis.zip（本地构建验证过：只有 .exe 和 .exe.sig）。
+          PKG=$(ls *-setup.exe | head -1)
+          if [ -z "$PKG" ]; then echo "::error::没找到 NSIS 安装包（*-setup.exe）"; exit 1; fi
+          if [ ! -f "${PKG}.sig" ]; then echo "::error::缺少签名文件 ${PKG}.sig，检查 createUpdaterArtifacts"; exit 1; fi
+          SIG=$(cat "${PKG}.sig")
           VERSION="${GITHUB_REF_NAME#v}"
           jq -n \
             --arg v "$VERSION" \
             --arg sig "$SIG" \
-            --arg url "https://${BUCKET}.oss-${REGION}.aliyuncs.com/updates/${ZIP}" \
+            --arg url "https://${BUCKET}.oss-${REGION}.aliyuncs.com/updates/${PKG}" \
             --arg date "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
             '{version: $v, notes: "", pub_date: $date,
               platforms: {"windows-x86_64": {signature: $sig, url: $url}}}' \
             > latest.json
-          # 把包名传给后续步骤
-          echo "PKG=${ZIP}" >> "$GITHUB_ENV"
+          echo "PKG=${PKG}" >> "$GITHUB_ENV"
           cat latest.json
 
       - name: 安装 ossutil
