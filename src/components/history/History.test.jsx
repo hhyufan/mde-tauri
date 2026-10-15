@@ -86,6 +86,45 @@ beforeEach(() => {
 });
 afterEach(() => { cleanup(); clearBuffer(path); vi.restoreAllMocks(); vi.unstubAllGlobals(); });
 
+it('keeps the current history rows visible while refreshing', async () => {
+  const view = render(<Timeline />);
+  fireEvent.click(screen.getByRole('button', { name: '本地历史' }));
+  await waitFor(() => expect(view.container.querySelectorAll('.timeline__item')).toHaveLength(2));
+  let resolve;
+  historyList.mockImplementationOnce(() => new Promise((done) => { resolve = done; }));
+  fireEvent.click(screen.getByRole('button', { name: 'history.refresh' }));
+  expect(view.container.querySelectorAll('.timeline__item')).toHaveLength(2);
+  expect(view.container.querySelector('.moki-status-empty')).toBeNull();
+  expect(view.container.querySelector('.timeline__body')).toHaveAttribute('aria-busy', 'true');
+  await act(async () => resolve([{ timestamp: 30, bytes: 9 }]));
+  expect(view.container.querySelectorAll('.timeline__item')).toHaveLength(1);
+  expect(view.container.querySelector('.timeline__size')).toHaveTextContent('9 B');
+});
+
+it('ignores an old file refresh when the active file changes', async () => {
+  const view = render(<Timeline />);
+  await waitFor(() => expect(view.container.querySelectorAll('.timeline__item')).toHaveLength(2));
+  let resolve;
+  historyList.mockImplementationOnce(() => new Promise((done) => { resolve = done; }));
+  fireEvent.click(screen.getByRole('button', { name: 'history.refresh' }));
+  historyList.mockResolvedValueOnce([{ timestamp: 40, bytes: 12 }]);
+  act(() => useEditorStore.getState().openFile({ path: 'C:/notes/other.md', name: 'other.md', content: '' }));
+  await waitFor(() => expect(view.container.querySelector('.timeline__size')).toHaveTextContent('12 B'));
+  await act(async () => resolve([{ timestamp: 30, bytes: 9 }]));
+  expect(view.container.querySelector('.timeline__size')).toHaveTextContent('12 B');
+});
+
+it('keeps an already confirmed empty history state visible while refreshing', async () => {
+  historyList.mockResolvedValueOnce([]);
+  const view = render(<Timeline />);
+  await waitFor(() => expect(view.container.querySelector('.moki-status-empty')).not.toBeNull());
+  let resolve;
+  historyList.mockImplementationOnce(() => new Promise((done) => { resolve = done; }));
+  fireEvent.click(screen.getByRole('button', { name: 'history.refresh' }));
+  expect(view.container.querySelector('.moki-status-empty')).not.toBeNull();
+  await act(async () => resolve([]));
+});
+
 it('starts collapsed so the file tree keeps the vertical space', async () => {
   render(<Timeline />);
   expect(screen.getByRole('button', { name: '本地历史' })).toHaveAttribute('aria-expanded', 'false');

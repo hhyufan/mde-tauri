@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Tooltip } from 'antd';
 import { HistoryOutlined, ReloadOutlined } from '@ant-design/icons';
@@ -43,6 +43,8 @@ export default function Timeline() {
   const [expanded, setExpanded] = useState(false);
   const [entries, setEntries] = useState([]);
   const [loading, setLoading] = useState(false);
+  const [loaded, setLoaded] = useState(false);
+  const requestRef = useRef(0);
 
   const tab = tabs.find((item) => item.id === activeTabId) || null;
   const eligible = tab
@@ -52,21 +54,28 @@ export default function Timeline() {
     && !tab.path.startsWith('content://');
 
   const load = useCallback(async () => {
+    const request = ++requestRef.current;
     if (!eligible || !tab.path) { setEntries([]); return; }
     setLoading(true);
     try {
-      setEntries((await historyList(tab.path)) || []);
+      const next = (await historyList(tab.path)) || [];
+      if (request === requestRef.current) setEntries(next);
     } catch {
-      setEntries([]);
+      // A failed refresh should leave the last successful list available.
     } finally {
-      setLoading(false);
+      if (request === requestRef.current) { setLoading(false); setLoaded(true); }
     }
   }, [eligible, tab?.path]);
 
+  const cancelLoad = useCallback(() => { requestRef.current++; }, []);
+
   useEffect(() => {
     setDiff(null);
+    setEntries([]);
+    setLoaded(false);
     load();
-  }, [activeTabId, load, setDiff]);
+    return cancelLoad;
+  }, [activeTabId, load, setDiff, cancelLoad]);
 
   // 保存后原生侧会发出 history-changed；匹配当前文件时刷新时间线，
   // 让新快照即时出现，而不是等到切换标签或手动刷新。
@@ -105,8 +114,8 @@ export default function Timeline() {
         <span className="timeline__label">{t('history.title')}</span>
         <span className="timeline__count">{entries.length}</span>
         <Tooltip title={t('history.refresh')} placement="top" mouseEnterDelay={0.3}>
-          <button type="button" className="timeline__refresh" aria-label={t('history.refresh')} onClick={load}>
-            <ReloadOutlined />
+          <button type="button" className="timeline__refresh" aria-label={t('history.refresh')} onClick={load} disabled={loading}>
+            <ReloadOutlined spin={loading} />
           </button>
         </Tooltip>
       </header>
@@ -116,10 +125,8 @@ export default function Timeline() {
         没有任何可过渡的高度。
         折叠时用 aria-hidden 让辅助技术跳过它（jsdom 下的 role 查询同样会忽略）。
       */}
-      <div className="timeline__body" aria-hidden={!expanded}>
-        {loading ? (
-          <div className="timeline__placeholder">{t('history.empty')}</div>
-        ) : entries.length === 0 ? (
+      <div className="timeline__body" aria-hidden={!expanded} aria-busy={loading}>
+        {entries.length === 0 ? (loading && !loaded ? null : (
           /*
            * 没有任何历史版本时，用与文件树 / 大纲同一套空状态文案。
            * 这里刻意不出人物：抽屉上限是 6 行（162px），而 4:3 的立绘要放进这个高度
@@ -132,7 +139,7 @@ export default function Timeline() {
             title={t('empty.history.title')}
             hint={t('empty.history.hint')}
           />
-        ) : (
+        )) : (
           <ul className="timeline__list">
             {entries.map((entry) => (
               <li key={entry.timestamp}>
