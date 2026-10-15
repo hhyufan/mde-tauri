@@ -52,8 +52,9 @@
     "store:allow-entries",
     "store:allow-length",
     "store:allow-load",
-    "store:allow-save"
-    
-    ,"process:allow-restart"
+    "store:allow-save",
+    "process:allow-restart",
+    "updater:allow-check",
+    "updater:allow-download-and-install"
   ]
 }
