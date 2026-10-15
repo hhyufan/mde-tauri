@@ -34,7 +34,10 @@ tauri-plugin-dialog = "2"
 tauri-plugin-store = "2"
 tauri-plugin-process = "2"
 # 自动更新：读 latest.json、校验签名、下载安装包。安装完用 process 插件重启。
-tauri-plugin-updater = "2"
+# 锁到 2.10：Tauri 要求插件的 Rust 与 JS 版本 minor 一致，而 tauri 本体是 2.10.3、
+# @tauri-apps/api 也用 2.10.x；写成 "2" 会被解析到 2.12，进而把 api 一并拉高而报
+# "Found version mismatched Tauri packages"。
+tauri-plugin-updater = "2.10"
 serde = { version = "1.0.0", features = ["derive"] }
 serde_json = "1.0.0"
 encoding_rs = "0.8"
