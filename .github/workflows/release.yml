@@ -34,7 +34,12 @@ jobs:
         run: |
           if ([string]::IsNullOrWhiteSpace($env:WINDOWS_CERTIFICATE) -or
               [string]::IsNullOrWhiteSpace($env:WINDOWS_CERTIFICATE_PASSWORD)) {
-            throw 'Windows release requires WINDOWS_CERTIFICATE (base64 PFX) and WINDOWS_CERTIFICATE_PASSWORD secrets.'
+            # 没有代码签名证书也允许发布：安装包依旧带 Tauri 的更新签名
+            # （那个用于校验更新包完整性，是另一回事），只是 Windows 安装时会提示
+            # "未知发布者"。把这两个 secret 配上就会自动启用签名。
+            Write-Warning '未配置 WINDOWS_CERTIFICATE，本次以未签名状态发布。'
+            Write-Output '::warning title=未配置代码签名证书::安装包将以未签名状态发布，Windows 会提示“未知发布者”。'
+            exit 0
           }
           $pfxPath = Join-Path $env:RUNNER_TEMP 'mokidown-code-signing.pfx'
           try {
@@ -67,11 +72,15 @@ jobs:
         with:
           tagName: v__VERSION__
           releaseName: MokiDown v__VERSION__
-          releaseDraft: true
+          # 直接发布而不是留草稿：sync-oss 紧接着就会把它推到 OSS，
+          # 若停在草稿状态会出现"Release 还没确认，客户端却能收到新版本"的错位。
+          releaseDraft: false
           prerelease: false
           args: --bundles nsis,msi
       - name: Verify Windows signatures
         shell: pwsh
+        env:
+          WINDOWS_CERTIFICATE: ${{ secrets.WINDOWS_CERTIFICATE }}
         run: |
           $paths = @('src-tauri/target/release/mokidown.exe')
           foreach ($bundle in @(
@@ -84,6 +93,14 @@ jobs:
           }
           foreach ($path in $paths) {
             if (!(Test-Path -LiteralPath $path)) { throw "Release artifact missing: $path" }
+          }
+          # 没配证书就是未签名发布，产物存在性上面已经确认过了，这里没必要再报错。
+          if ([string]::IsNullOrWhiteSpace($env:WINDOWS_CERTIFICATE)) {
+            Write-Warning '未配置代码签名证书，跳过 Authenticode 校验。'
+            Write-Output '::warning title=跳过签名校验::本次为未签名发布。'
+            exit 0
+          }
+          foreach ($path in $paths) {
             $signature = Get-AuthenticodeSignature -LiteralPath $path
             if ($signature.Status -ne 'Valid') { throw "Invalid Windows signature on $path`: $($signature.Status)" }
           }
