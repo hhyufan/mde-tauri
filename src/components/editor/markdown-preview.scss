@@ -870,7 +870,7 @@
 
 .md-preview .moki-table {
   position: relative;
-  margin: 1.6em 0;
+  margin: 1em 0;
   overflow: visible;
   max-width: 100%;
   .moki-table__scroll { overflow-x: auto; border-radius: var(--radius-sm); }
@@ -884,22 +884,9 @@
     user-select: none;
     &[hidden] { display: none; }
   }
-  /*
-   * 显隐由 JS 切换 .moki-table--tools-visible，而不是纯 :hover。
-   *
-   * 网格按钮定位在表格上方（top: -30px），与表格之间留有一条窄缝：鼠标穿过去的一瞬
-   * 既不在表格上也不在按钮上，:hover 会立即失效、工具收起，按钮几乎按不到。
-   * JS 用一小段延迟容忍这段穿越，因此不需要为按钮预留任何永久空间。
-   *
-   * 也不用 :focus-within —— 光标落在单元格里时表格自然带焦点，按钮会长期挂着。
-   */
+  &.moki-table--tools-visible { padding-top: 32px; }
   &.moki-table--tools-visible .moki-table__tools { opacity: 1; visibility: visible; }
-  /*
-   * 网格按钮、行列手柄与「+」圆点沿用面包屑路径段
-   * （.footer__breadcrumb-segment）的设计：平时不描边、不铺底，只在悬停时浮出
-   * --hover 底色与强调色。表格内部空间本就紧张，实心方块会压住表头文字。
-   */
-  .moki-table__edit, .moki-table__handle, .moki-table__insert {
+  .moki-table__edit, .moki-table__insert {
     position: absolute;
     pointer-events: auto;
     box-sizing: border-box;
@@ -909,36 +896,20 @@
     color: var(--text-sec);
     padding: 0;
     cursor: pointer;
-    transition: background 0.15s, color 0.15s;
-    &:hover { background: var(--hover); color: var(--accent); }
+    transition: color 0.15s;
+    &:hover { color: var(--accent); }
     &:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
   }
-  /*
-   * 网格按钮固定在表格左上角的内侧。
-   * 此前放在表格上方（top: -30px），表格贴近编辑区顶部时会被滚动容器裁掉半截；
-   * 放到内侧就永远在表格范围内，不需要任何翻转判定，也不占版面。
-   */
   .moki-table__edit {
-    top: 6px; left: 6px; width: 26px; height: 26px;
+    top: 0; left: 0; width: 26px; height: 26px;
     display: grid; place-items: center;
     svg { width: 16px; height: 16px; }
   }
-  /* 行列手柄贴在表格边缘，只需压掉圆角，悬停反馈沿用上面那套。 */
-  .moki-table__handle--row, .moki-table__handle--column {
-    border-radius: 2px;
-  }
-  .moki-table__handle--row { left: -12px; width: 10px; cursor: cell; }
-  .moki-table__handle--column { height: 10px; cursor: cell; }
   .moki-table__insert { width: 18px; height: 18px; border-radius: 50%; font: 16px/16px var(--font-app); z-index: 2; }
   .moki-table__insert[hidden] { display: none; }
   .moki-table__insert--row { right: -10px; }
   .moki-table__insert--column { top: -17px; }
-  /*
-   * 面板浮在网格按钮正下方（按钮 top/left 都是 6px、高 26px，所以面板从 36px 起）。
-   * 它是浮层，不占版面——此前靠 .moki-table--resizing 给容器加三百多像素的
-   * padding-top 把表格推下去腾地方，那才是「下拉挤压空间」的来源。
-   */
-  .moki-table__picker { position: absolute; top: 36px; left: 6px; pointer-events: auto; z-index: 20; }
+  .moki-table__picker { position: absolute; top: 32px; left: 0; pointer-events: auto; z-index: 20; }
   .moki-table__picker .ft__table-panel {
     position: relative; top: auto; right: auto; bottom: auto; left: auto; transform: none; z-index: 10;
     /*

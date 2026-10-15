@@ -11,8 +11,7 @@ import TablePicker from './TablePicker';
 /**
  * 鼠标离开表格后延迟收起工具的时长。
  *
- * 网格按钮定位在表格上方（top: -30px），与表格之间留有一条窄缝：鼠标穿过去的一瞬间
- * 既不在表格上也不在按钮上。靠这段延迟容忍穿越，按钮就不必占据任何版面空间。
+ * 短暂延迟避免鼠标擦过边缘时让布局反复收放。
  */
 const TOOL_HIDE_DELAY = 180;
 
@@ -166,15 +165,14 @@ export function configureEditingTables(ctx) {
 }
 
 export const milkdownTableView = $view(tableSchema.node, () => (initialNode, view, getPos) => {
-  let node = initialNode, frame = null, pickerRoot = null, hoverCell = null, disposed = false;
+  let node = initialNode, pickerRoot = null, hoverCell = null, disposed = false;
   const dom = document.createElement('div'); dom.className = 'moki-table tableWrapper';
   const scroll = document.createElement('div'); scroll.className = 'moki-table__scroll';
   const table = document.createElement('table'), contentDOM = document.createElement('tbody'); table.append(contentDOM); scroll.append(table);
   const controls = document.createElement('div'); controls.className = 'moki-table__tools'; controls.contentEditable = 'false';
   controls.hidden = !view.editable;
-  const handles = document.createElement('div'); handles.className = 'moki-table__handles';
   const panel = document.createElement('div'); panel.className = 'moki-table__picker';
-  dom.append(scroll, controls); controls.append(handles, panel);
+  dom.append(scroll, controls); controls.append(panel);
   const ensureCell = (row = 0, col = 0) => {
     const pos = getPos();
     if (!view.editable || typeof pos !== 'number') return false;
@@ -187,6 +185,7 @@ export const milkdownTableView = $view(tableSchema.node, () => (initialNode, vie
     edit.setAttribute('aria-expanded', 'false');
     queueMicrotask(() => root.unmount());
     document.removeEventListener('pointerdown', outside);
+    if (!disposed && !dom.matches(':hover')) hideToolsSoon();
   };
   const outside = (event) => { if (!controls.contains(event.target)) closePicker(); };
   const button = (label, className, action) => {
@@ -230,19 +229,6 @@ export const milkdownTableView = $view(tableSchema.node, () => (initialNode, vie
   edit.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M9 3v18M15 3v18M3 15h18"/></svg>';
   edit.setAttribute('aria-expanded', 'false');
   controls.append(edit);
-  const select = (axis, index, event) => {
-    const pos = getPos();
-    if (!view.editable || typeof pos !== 'number') return;
-    const map = TableMap.get(node), selection = view.state.selection;
-    let start = index;
-    if (event.shiftKey && selection instanceof CellSelection && editingTableContext(view.state)?.pos === pos) {
-      const anchor = map.findCell(selection.$anchorCell.pos - pos - 1);
-      start = axis === 'row' ? anchor.top : anchor.left;
-    }
-    const first = cellPosition(node, pos, axis === 'row' ? start : 0, axis === 'row' ? 0 : start);
-    const last = cellPosition(node, pos, axis === 'row' ? index : map.height - 1, axis === 'row' ? map.width - 1 : index);
-    view.dispatch(view.state.tr.setSelection(CellSelection.create(view.state.doc, first, last))); view.focus();
-  };
   const insert = (axis) => {
     if (!hoverCell) return;
     const { row, col } = hoverCell;
@@ -252,32 +238,6 @@ export const milkdownTableView = $view(tableSchema.node, () => (initialNode, vie
   const addRow = button(i18n.t('table.addRowAfter'), 'moki-table__insert moki-table__insert--row', () => insert('row'));
   const addCol = button(i18n.t('table.addColumnAfter'), 'moki-table__insert moki-table__insert--column', () => insert('column'));
   addRow.textContent = '+'; addCol.textContent = '+'; addRow.hidden = true; addCol.hidden = true; controls.append(addRow, addCol);
-  const layout = () => {
-    frame = null;
-    if (disposed || !dom.isConnected || !view.editable) return;
-    const box = dom.getBoundingClientRect(), viewport = scroll.getBoundingClientRect();
-    handles.replaceChildren();
-    const place = (axis, index, rect) => {
-      const handle = button(i18n.t(axis === 'row' ? 'table.selectRow' : 'table.selectColumn') + ` ${index + 1}`,
-        `moki-table__handle moki-table__handle--${axis}`, (event) => select(axis, index, event));
-      handle.dataset.index = String(index);
-      if (axis === 'row') { handle.style.top = `${rect.top - box.top + 2}px`; handle.style.height = `${Math.max(8, rect.height - 4)}px`; }
-      else {
-        const left = Math.max(rect.left, viewport.left), right = Math.min(rect.right, viewport.right);
-        if (right <= left) return;
-        handle.style.left = `${left - box.left + 2}px`; handle.style.width = `${Math.max(8, right - left - 4)}px`;
-        handle.style.top = `${rect.top - box.top - 12}px`;
-      }
-      handles.append(handle);
-    };
-    [...contentDOM.rows].forEach((row, index) => place('row', index, row.getBoundingClientRect()));
-    [...(contentDOM.rows[0]?.cells || [])].forEach((cell, index) => place('column', index, cell.getBoundingClientRect()));
-    addRow.hidden = true; addCol.hidden = true; hoverCell = null;
-  };
-  const schedule = () => { if (frame == null) frame = requestAnimationFrame(layout); };
-  const resize = new ResizeObserver(schedule); resize.observe(table);
-  resize.observe(dom);
-  scroll.addEventListener('scroll', schedule);
   contentDOM.addEventListener('pointermove', (event) => {
     const cell = event.target.closest('th,td');
     if (!cell || !view.editable) return;
@@ -289,14 +249,10 @@ export const milkdownTableView = $view(tableSchema.node, () => (initialNode, vie
     addCol.style.left = `${Math.min(rect.right - box.left - 9, box.width - 20)}px`;
     addCol.style.top = `${scroll.getBoundingClientRect().top - box.top - 17}px`;
   });
-  /*
-   * 工具条显隐：进入表格显示，离开后延迟一点再收起。
-   * 按钮在表格上方、与表格之间有一条窄缝，鼠标穿过时既不在表格上也不在按钮上——
-   * 没有这段延迟就会瞬间收起，按钮几乎按不到；有了它就不必为按钮预留版面空间。
-   * 按钮是 dom 的后代，所以指针落在按钮上时并不会触发 dom 的 pointerleave。
-   */
+  // Keep controls usable while the resize picker is open or receiving keyboard input.
   let hideTimer = null;
   const showTools = () => {
+    if (!view.editable) return;
     if (hideTimer) { clearTimeout(hideTimer); hideTimer = null; }
     dom.classList.add('moki-table--tools-visible');
   };
@@ -304,16 +260,17 @@ export const milkdownTableView = $view(tableSchema.node, () => (initialNode, vie
     if (hideTimer) clearTimeout(hideTimer);
     hideTimer = setTimeout(() => {
       hideTimer = null;
+      if (pickerRoot) return;
       dom.classList.remove('moki-table--tools-visible');
       addRow.hidden = true; addCol.hidden = true;
     }, TOOL_HIDE_DELAY);
   };
   dom.addEventListener('pointerenter', showTools);
   dom.addEventListener('pointerleave', hideToolsSoon);
-  schedule();
+
   return {
     dom, contentDOM,
-    update(next) { if (next.type !== node.type) return false; node = next; controls.hidden = !view.editable; schedule(); return true; },
+    update(next) { if (next.type !== node.type) return false; node = next; controls.hidden = !view.editable; addRow.hidden = true; addCol.hidden = true; hoverCell = null; return true; },
     stopEvent: (event) => controls.contains(event.target),
     ignoreMutation: (mutation) => controls.contains(mutation.target) || (mutation.type === 'attributes' && mutation.target === dom),
     destroy() {
@@ -321,8 +278,6 @@ export const milkdownTableView = $view(tableSchema.node, () => (initialNode, vie
       if (hideTimer) clearTimeout(hideTimer);
       dom.removeEventListener('pointerenter', showTools);
       dom.removeEventListener('pointerleave', hideToolsSoon);
-      resize.disconnect();
-      if (frame != null) cancelAnimationFrame(frame);
       closePicker();
     },
   };
