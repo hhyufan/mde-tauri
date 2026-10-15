@@ -894,17 +894,23 @@
    * 也不用 :focus-within —— 光标落在单元格里时表格自然带焦点，按钮会长期挂着。
    */
   &.moki-table--tools-visible .moki-table__tools { opacity: 1; visibility: visible; }
+  /*
+   * 网格按钮、行列手柄与「+」圆点沿用面包屑路径段
+   * （.footer__breadcrumb-segment）的设计：平时不描边、不铺底，只在悬停时浮出
+   * --hover 底色与强调色。表格内部空间本就紧张，实心方块会压住表头文字。
+   */
   .moki-table__edit, .moki-table__handle, .moki-table__insert {
     position: absolute;
     pointer-events: auto;
     box-sizing: border-box;
-    border: 1px solid var(--border);
-    border-radius: 4px;
-    background: var(--surface);
+    border: 0;
+    border-radius: 3px;
+    background: transparent;
     color: var(--text-sec);
     padding: 0;
     cursor: pointer;
-    &:hover { background: var(--accent-bg); border-color: var(--accent); color: var(--accent); }
+    transition: background 0.15s, color 0.15s;
+    &:hover { background: var(--hover); color: var(--accent); }
     &:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
   }
   /*
@@ -917,9 +923,9 @@
     display: grid; place-items: center;
     svg { width: 16px; height: 16px; }
   }
+  /* 行列手柄贴在表格边缘，只需压掉圆角，悬停反馈沿用上面那套。 */
   .moki-table__handle--row, .moki-table__handle--column {
-    border: 0; background: transparent; border-radius: 0;
-    &:hover { border: 0; background: transparent; }
+    border-radius: 2px;
   }
   .moki-table__handle--row { left: -12px; width: 10px; cursor: cell; }
   .moki-table__handle--column { height: 10px; cursor: cell; }
