@@ -1,0 +1,17 @@
+.moki-rename-input {
+  box-sizing: border-box;
+  min-width: 0;
+  height: 20px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  outline: none;
+  box-shadow: none;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  line-height: 20px;
+  &::selection { background: var(--selection-bg); }
+  &::placeholder { color: var(--text-dim); }
+}

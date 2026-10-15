@@ -4,14 +4,12 @@
  * 新建文件与行内重命名共用这一套——两处的交互应当完全一致，所以抽成组件，
  * 而不是在 FileTree 里各写一份。
  *
- * 布局上做了三件事，都是为了让「文件名 + 后缀」看起来像一个整体的输入框：
- *   1. 后缀紧跟已输入文字的末尾（量尺量宽），而不是钉在右端；
- *   2. 输入框宽度随内容伸缩，刚好包住「文件名 + 后缀」；
- *   3. 右侧内边距让出后缀那一段，长文件名才不至于把文字滚到后缀底下。
+ * 输入区宽度保持固定，后缀浮在文字末尾，输入时不改变整行布局。
  */
-import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useRef } from 'react';
 import { AutoComplete } from 'antd';
 import { isImeComposing } from '@utils/keyboard';
+import '@/assets/styles/rename-input.scss';
 
 /** 常用后缀。下拉可编辑，用户可以挑一个，也可以直接敲自定义后缀。 */
 export const FILE_EXTENSIONS = [
@@ -66,46 +64,27 @@ export default function FileNameField({
   inputRef: externalRef,
 }) {
   const fieldRef = useRef(null);
-  const measureRef = useRef(null);
+  const nameMeasureRef = useRef(null);
   const extMeasureRef = useRef(null);
+  useLayoutEffect(() => {
+    const field = fieldRef.current, name = nameMeasureRef.current, ext = extMeasureRef.current;
+    const measure = () => {
+      const extWidth = Math.min(field.clientWidth, ext.getBoundingClientRect().width + 12);
+      const left = Math.min(name.getBoundingClientRect().width + 1, Math.max(0, field.clientWidth - extWidth));
+      field.style.setProperty('--filename-extension-left', `${left}px`);
+      field.style.setProperty('--filename-extension-width', `${extWidth}px`);
+      field.style.setProperty('--filename-extension-space', `${field.clientWidth - left}px`);
+    };
+    measure();
+    const observer = new ResizeObserver(measure);
+    observer.observe(field); observer.observe(name); observer.observe(ext);
+    return () => observer.disconnect();
+  }, [stem, extension, placeholder]);
   const innerInputRef = useRef(null);
   const inputRef = externalRef || innerInputRef;
   // 后缀下拉的展开态：输入框的 onBlur 会先于下拉点击触发，靠它区分
   // 「用户去挑后缀」和「用户真的离开了」。
   const dropdownOpenRef = useRef(false);
-  const [extLeft, setExtLeft] = useState(8);
-  const [extWidth, setExtWidth] = useState(40);
-  const [inputWidth, setInputWidth] = useState(null);
-  const [inputPaddingRight, setInputPaddingRight] = useState(8);
-
-  /*
-   * 量出后缀该贴在哪、输入框该多宽。用 useLayoutEffect 而非 useEffect：
-   * 要在绘制前算好，否则会先看到旧位置再跳一下。
-   */
-  useLayoutEffect(() => {
-    const nameMeasure = measureRef.current;
-    const extMeasure = extMeasureRef.current;
-    const field = fieldRef.current;
-    if (!nameMeasure || !extMeasure || !field) return;
-    const TEXT_PADDING = 8;   // 与 .file-tree__name-input 的左右内边距一致
-    const GAP = 2;            // 文字与后缀之间留一丝缝
-    const nameWidth = nameMeasure.offsetWidth;
-    const extTextWidth = extMeasure.offsetWidth;
-    const fieldWidth = field.clientWidth;
-    // 后缀区自身宽度跟着后缀文字走，右侧留一点给光标与点击热区。
-    const extBox = extTextWidth + 12;
-    setExtWidth(extBox);
-    // 后缀位置：贴着文字末尾；文字太长时压到右端，别被顶出可视区。
-    const maxLeft = Math.max(TEXT_PADDING, fieldWidth - extBox - TEXT_PADDING);
-    const nextExtLeft = Math.min(TEXT_PADDING + nameWidth + GAP, maxLeft);
-    setExtLeft(nextExtLeft);
-    // 输入框宽度：刚好包住内容，上限是容器本身。
-    const nextInputWidth = Math.min(TEXT_PADDING + nameWidth + GAP + extBox, fieldWidth);
-    setInputWidth(nextInputWidth);
-    // 关键：右侧内边距让出后缀所占那一段，否则长文件名会把文字滚到后缀底下叠住。
-    setInputPaddingRight(Math.max(TEXT_PADDING, Math.round(nextInputWidth - nextExtLeft)));
-  }, [stem, extension]);
-
   /**
    * 挂载后聚焦并全选。
    *
@@ -140,19 +119,11 @@ export default function FileNameField({
 
   return (
     <div className="file-tree__name-field" ref={fieldRef}>
-      {/* 量尺：与输入框同字体同左起点，空输入时量 placeholder，避免后缀叠上去。 */}
-      <span className="file-tree__name-measure" ref={measureRef} aria-hidden="true">
-        {stem || placeholder}
-      </span>
-      <span className="file-tree__name-measure" ref={extMeasureRef} aria-hidden="true">
-        {extension}
-      </span>
+      <span className="file-tree__name-measure" ref={nameMeasureRef} aria-hidden="true">{stem || placeholder}</span>
+      <span className="file-tree__name-measure file-tree__extension-measure" ref={extMeasureRef} aria-hidden="true">{extension}</span>
       <input
         ref={inputRef}
-        className="file-tree__item-input file-tree__name-input"
-        style={inputWidth
-          ? { width: `${inputWidth}px`, paddingRight: `${inputPaddingRight}px` }
-          : undefined}
+        className="moki-rename-input file-tree__item-input file-tree__name-input"
         value={stem}
         onChange={(e) => onStemChange(e.target.value)}
         onBlur={handleBlur}
@@ -166,7 +137,7 @@ export default function FileNameField({
         }}
         placeholder={placeholder}
       />
-      <div className="file-tree__ext-picker" style={{ left: `${extLeft}px`, width: `${extWidth}px` }}>
+      <div className="file-tree__ext-picker">
         <AutoComplete
           className="file-tree__ext-select"
           variant="borderless"
