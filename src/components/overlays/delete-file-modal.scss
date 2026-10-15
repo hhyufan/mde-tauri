@@ -1,0 +1,25 @@
+.moki-delete-modal-root .ant-btn.ant-btn-primary.ant-btn-dangerous:not(:disabled) {
+  background: var(--error);
+  border-color: var(--error);
+  color: #fff;
+  &:hover:not(:disabled) { background: color-mix(in srgb, var(--error) 85%, var(--surface)); border-color: var(--error); color: #fff; }
+}
+
+.delete-file-modal {
+  color: var(--text);
+  font-size: 13px;
+  line-height: 1.6;
+  &__file {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 12px;
+    margin-bottom: 12px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    background: var(--surface);
+    span { min-width: 0; overflow-wrap: anywhere; }
+    svg { flex-shrink: 0; }
+  }
+  p { margin: 0; color: var(--text-sec); }
+}

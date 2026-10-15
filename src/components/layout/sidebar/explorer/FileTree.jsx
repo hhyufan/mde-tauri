@@ -7,7 +7,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Tooltip } from 'antd';
-import { confirm } from '@tauri-apps/plugin-dialog';
+import DeleteFileModal from '@components/overlays/DeleteFileModal';
 import useFileStore from '@store/useFileStore';
 import useEditorStore from '@store/useEditorStore';
 import { useFileManager } from '@hooks/useFileManager';
@@ -109,6 +109,9 @@ function FileTree() {
   const [renamingStem, setRenamingStem] = useState('');
   const [renamingExt, setRenamingExt] = useState('');
   const [breadcrumbExpanded, setBreadcrumbExpanded] = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState(null);
+  const [deleting, setDeleting] = useState(false);
+  const deletingRef = useRef(false);
   const bcScrollRef = useRef(null);
   const bcThumbRef = useRef(null);
 
@@ -119,12 +122,16 @@ function FileTree() {
    * @param {import('react').MouseEvent<HTMLElement>} [event] 原始点击事件
    * @returns {Promise<void>}
    */
-  const handleDeleteFile = useCallback(async (file, event) => {
+  const handleDeleteFile = useCallback((file, event) => {
     event?.stopPropagation?.();
-    const confirmed = await confirm(
-      t('sidebar.explorer.deleteFileConfirm', { name: file.name })
-    );
-    if (!confirmed) return;
+    setDeleteTarget(file);
+  }, []);
+
+  const confirmDeletion = useCallback(async () => {
+    const file = deleteTarget;
+    if (!file || deletingRef.current) return;
+    deletingRef.current = true;
+    setDeleting(true);
 
     let localDeleted = false;
     let preparedDeletion = null;
@@ -166,9 +173,14 @@ function FileTree() {
       }
       useNotificationStore.getState().notify('error', t('notification.error'), String(err));
     } finally {
-      if (localDeleted) await loadDirectory(currentDir).catch(() => {});
+      if (localDeleted) {
+        setDeleteTarget(null);
+        await loadDirectory(currentDir).catch(() => {});
+      }
+      deletingRef.current = false;
+      setDeleting(false);
     }
-  }, [currentDir, loadDirectory, t]);
+  }, [deleteTarget, currentDir, loadDirectory, t]);
 
   // 面包屑横向滚动与自定义滚动条联动。
   /**
@@ -596,6 +608,7 @@ function FileTree() {
         )}
       </div>
 
+      <DeleteFileModal file={deleteTarget} loading={deleting} onConfirm={confirmDeletion} onCancel={() => { if (!deletingRef.current) setDeleteTarget(null); }} />
       {/* 文件列表主体。 */}
       <div className="file-tree__list">
         {sortedFiles.map((file) => {
