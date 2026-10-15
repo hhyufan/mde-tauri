@@ -16,6 +16,7 @@
     "check": "npm run lint && npm run test && npm run test:build-tools && npm run check:i18n && npm run build && npm run check:bundle",
     "check:i18n": "node scripts/check-i18n-keys.mjs",
     "check:rust": "node scripts/rust.mjs",
+    "test:rust": "node scripts/rust.mjs test --manifest-path src-tauri/Cargo.toml --lib --locked",
     "check:hotkey-probe": "node scripts/rust.mjs run --manifest-path src-tauri/Cargo.toml --example hotkey_probe_check",
     "preview": "vite preview",
     "preview:editor:production": "node scripts/preview-production-editor.mjs",

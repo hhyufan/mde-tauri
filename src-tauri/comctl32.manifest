@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<!--
+  给 Rust 测试二进制补上 Common-Controls v6 依赖。
+
+  背景：Tauri 的 common-controls-v6 feature 会经 tauri-build 给**主程序**嵌入
+  manifest，但 cargo 生成的**测试二进制**不受影响，而它同样静态导入了
+  comctl32 的 TaskDialogIndirect。该导出只存在于 ComCtl32 v6（WinSxS），
+  System32 下的是 v5，于是测试进程一启动就 STATUS_ENTRYPOINT_NOT_FOUND
+  (0xC0000139)，55 个单元测试一个都跑不起来。
+
+  由 scripts/rust.mjs 在 test 子命令下通过
+  RUSTFLAGS="-C link-arg=/MANIFESTINPUT:<此文件>" 合并进内嵌 manifest。
+  外部同名 .manifest 文件不起作用：Rust 已经内嵌了一份，Windows 会忽略外部那份。
+-->
+<assembly xmlns="urn:schemas-microsoft-com:asm.v1" manifestVersion="1.0">
+  <dependency>
+    <dependentAssembly>
+      <assemblyIdentity
+        type="win32"
+        name="Microsoft.Windows.Common-Controls"
+        version="6.0.0.0"
+        processorArchitecture="*"
+        publicKeyToken="6595b64144ccf1df"
+        language="*"
+      />
+    </dependentAssembly>
+  </dependency>
+</assembly>
