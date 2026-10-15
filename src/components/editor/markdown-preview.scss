@@ -475,6 +475,8 @@
   .md-preview__html-block {
     position: relative;
     display: block;
+    box-sizing: border-box;
+    min-height: 40px;
     margin: 0 0 0.75em;
     max-width: 100%;
 
@@ -498,6 +500,7 @@
       z-index: 2;
       width: 28px;
       height: 28px;
+      box-sizing: border-box;
       padding: 5px;
       display: inline-flex;
       align-items: center;
