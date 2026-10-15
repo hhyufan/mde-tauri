@@ -4,7 +4,7 @@
  * 该文件组织 Explorer、Outline、Recent 三种侧边栏视图，以及底部主题、
  * 用户和设置等全局入口，是编辑器左侧工作流的主装配层。
  */
-import { useState, useRef, useCallback, useMemo } from 'react';
+import { useState, useRef, useCallback, useMemo, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Dropdown, Tooltip, Button, Tag } from 'antd';
 import useEditorStore from '@store/useEditorStore';
@@ -26,6 +26,7 @@ import AppMark from '@components/ui/AppMark';
 import MokiStatusEmpty from '@components/moki/MokiStatusEmpty';
 import { openExternal } from '@utils/tauriApi';
 import { canCheckUpdates, checkAndInstallUpdate, relaunchApp } from '@utils/appUpdater';
+import { getVersion } from '@tauri-apps/api/app';
 import { REPO_URL } from '@/configs/repository';
 import { cn } from '@utils/classNames';
 import './sidebar.scss';
@@ -391,6 +392,18 @@ function Sidebar({ onOpenSettings, onOpenStats, onOpenLogin }) {
   const themeButtonRef = useRef(null);
   const notify = useNotificationStore.getState().notify;
   const [checkingUpdate, setCheckingUpdate] = useState(false);
+  const [appVersion, setAppVersion] = useState('');
+
+  // 底栏版本号取运行时的实际版本（tauri.conf.json 的 version），
+  // 而不是源码里写死的字符串——否则升级后界面仍显示旧号。
+  useEffect(() => {
+    if (!canCheckUpdates()) return undefined;
+    let cancelled = false;
+    getVersion()
+      .then((version) => { if (!cancelled) setAppVersion(version); })
+      .catch(() => {});
+    return () => { cancelled = true; };
+  }, []);
 
   /**
    * 检查更新：有新版本就下载安装，装完提示并重启。
@@ -524,7 +537,9 @@ function Sidebar({ onOpenSettings, onOpenStats, onOpenLogin }) {
           </Tooltip>
         )}
         <UserMenu onOpenLogin={onOpenLogin} />
-        <Tag className="sidebar__version" bordered={false}>v0.1.0</Tag>
+        {/* 版本号从运行时读，别再写死：写死后升级了界面还显示旧版本，
+            而且很容易和 tauri.conf.json 里的真实版本对不上。 */}
+        <Tag className="sidebar__version" bordered={false}>{appVersion ? `v${appVersion}` : ''}</Tag>
         <div style={{ marginLeft: 'auto', display: 'flex', gap: 2, alignItems: 'center' }}>
           <Tooltip title={t('sidebar.footer.themeSwitch')} placement="top" mouseEnterDelay={0.3}>
             <Button
