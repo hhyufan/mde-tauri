@@ -43,6 +43,9 @@ import { isAndroidRuntime } from '@utils/platform';
 import { rememberDiskBaseline } from '@/services/localFileGuard';
 import { saveExistingFile } from '@/services/localFileOperations';
 import i18n from '@/i18n';
+import { untitledFileName } from '@utils/untitledFileName';
+
+let newMarkdownTabQueue = Promise.resolve();
 
 /**
  * 文件管理核心 Hook。
@@ -317,6 +320,8 @@ export function useFileManager() {
       return;
     }
     if (!tab.path) {
+      // Desktop drafts stay in memory until an explicit Save / Save As action.
+      if (!isAndroid) return;
       const canSaveToExplorerDir = hasOpenExplorerDirectory();
       if (!canSaveToExplorerDir && dismissedAutoSavePromptRef.current.has(tab.id)) return;
       persistUntitledTab(tab, { allowDialog: !canSaveToExplorerDir, source: 'auto-save' });
@@ -327,7 +332,7 @@ export function useFileManager() {
       ext: tab.ext,
       lineEnding: tab.lineEnding,
     });
-  }, [debouncedAutoSave, debouncedExternalSync]);
+  }, [debouncedAutoSave, debouncedExternalSync, isAndroid]);
 
   /**
    * 加载指定目录，并同步更新当前目录与文件列表。
@@ -529,7 +534,7 @@ export function useFileManager() {
       const canSaveToExplorerDir = hasOpenExplorerDirectory();
       let targetPath = '';
 
-      if (currentDir && canSaveToExplorerDir) {
+      if (isAndroid && currentDir && canSaveToExplorerDir) {
         const suggestedName = ensureSuggestedFileName(tab);
         targetPath = await buildUniqueUntitledPath(currentDir, suggestedName);
       } else if (isAndroid) {
@@ -651,8 +656,8 @@ export function useFileManager() {
    * @param {string} fileName 用户输入的目标文件名。
    * @returns {Promise<{ok: boolean, path?: string}>} 创建结果。
    */
-  const createFileInCurrentDir = useCallback(async (fileName) => {
-    const currentDir = useFileStore.getState().currentDir;
+  const createFileInCurrentDir = useCallback(async (fileName, directory = useFileStore.getState().currentDir) => {
+    const currentDir = directory;
     const trimmed = (fileName || '').trim();
     if (!currentDir) {
       notify('error', t('notification.error'), t('sidebar.explorer.openFolder'));
@@ -676,7 +681,7 @@ export function useFileManager() {
           notify('error', t('notification.error'), t('sidebar.explorer.invalidFileName'));
           return { ok: false };
         }
-        await loadDirectory(currentDir);
+        if (useFileStore.getState().currentDir === currentDir) await loadDirectory(currentDir);
         await openFileFromPath(childUri, trimmed);
         notify('success', t('notification.fileCreated'), trimmed);
         return { ok: true, path: childUri };
@@ -688,7 +693,7 @@ export function useFileManager() {
         return { ok: false };
       }
       await writeFileContent(targetPath, '');
-      await loadDirectory(currentDir);
+      if (useFileStore.getState().currentDir === currentDir) await loadDirectory(currentDir);
       await openFileFromPath(targetPath, trimmed);
       notify('success', t('notification.fileCreated'), trimmed);
       return { ok: true, path: targetPath };
@@ -697,6 +702,25 @@ export function useFileManager() {
       return { ok: false };
     }
   }, [loadDirectory, notify, openFileFromPath, t]);
+
+  // The tab-bar + creates immediately; Explorer's New File keeps its naming field.
+  const createNewTab = useCallback(() => {
+    const directory = useFileStore.getState().currentDir;
+    if (!directory) { createUntitledTab(); return Promise.resolve({ ok: true }); }
+    const task = newMarkdownTabQueue.then(async () => {
+      let index = 1;
+      let fileName = untitledFileName();
+      while (isSafUri(directory) ? safChildExists(directory, fileName) : await checkFileExists(joinPath(directory, fileName))) {
+        fileName = untitledFileName(++index);
+      }
+      return createFileInCurrentDir(fileName, directory);
+    });
+    newMarkdownTabQueue = task.catch(() => {});
+    return task.catch((error) => {
+      notify('error', t('notification.error'), String(error));
+      return { ok: false };
+    });
+  }, [createFileInCurrentDir, createUntitledTab, notify, t]);
 
   /**
    * 打开文件选择对话框，并将选中的文件载入编辑器。
@@ -1101,6 +1125,7 @@ export function useFileManager() {
     saveAsDialog,
     openInExplorer,
     createNewFile,
+    createNewTab,
     createFileWithDialog,
     createFileInCurrentDir,
     renameEntry,

@@ -14,6 +14,7 @@ import {
 } from '@utils/editorBuffer';
 import { historyCapture } from '@utils/tauriApi';
 import { renameDocumentViewState } from '@utils/documentViewState';
+import { untitledFileName } from '@utils/untitledFileName';
 
 let untitledCounter = 1;
 
@@ -133,8 +134,11 @@ const useEditorStore = create(
        */
       createUntitledTab: () => {
         const { tabs } = get();
-        const id = `untitled-${Date.now()}`;
-        const name = `Untitled-${untitledCounter++}`;
+        const sequence = untitledCounter++;
+        const id = `untitled-${Date.now()}-${sequence}`;
+        let index = 1;
+        let name = untitledFileName();
+        while (tabs.some((tab) => tab.name === name)) name = untitledFileName(++index);
         const newTab = {
           id,
           name,
@@ -153,6 +157,18 @@ const useEditorStore = create(
         });
       },
 
+      /** Reorder both document snapshots and tab metadata without changing identity or buffers. */
+      reorderTabs: (draggedId, targetId, after = false) => {
+        const state = get();
+        if (draggedId === targetId || !state.tabs.some((tab) => tab.id === draggedId) || !state.tabs.some((tab) => tab.id === targetId)) return;
+        const order = state.tabRenderList.map((tab) => tab.id).filter((id) => id !== draggedId);
+        order.splice(order.indexOf(targetId) + (after ? 1 : 0), 0, draggedId);
+        if (order.every((id, index) => state.tabRenderList[index].id === id)) return;
+        const tabsById = new Map(state.tabs.map((tab) => [tab.id, tab]));
+        const metaById = new Map(state.tabRenderList.map((tab) => [tab.id, tab]));
+        set({ tabs: order.map((id) => tabsById.get(id)), tabRenderList: order.map((id) => metaById.get(id)) });
+      },
+
       /** Restore a session in one update; files opened meanwhile retain priority. */
       restoreSessionTabs: (restoredTabs, activeId, initialTabs = null) => {
         const current = get();
@@ -166,7 +182,7 @@ const useEditorStore = create(
           activeTabId: (tabsToKeep.length && current.activeTabId) || (unique.has(activeId) ? activeId : tabs[0]?.id || null),
           tabsRevision: current.tabsRevision + 1 });
         for (const tab of tabs) {
-          const number = /^Untitled-(\d+)$/.exec(tab.name)?.[1];
+          const number = /^Untitled-(\d+)(?:\.md)?$/.exec(tab.name)?.[1];
           if (number) untitledCounter = Math.max(untitledCounter, Number(number) + 1);
         }
       },
