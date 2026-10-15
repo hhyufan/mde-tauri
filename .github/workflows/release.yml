@@ -98,13 +98,26 @@ jobs:
     needs: windows
     runs-on: ubuntu-latest
     steps:
+      - uses: actions/checkout@v4
+
+      # tag 统一从 tauri.conf.json 的版本推出：tauri-action 就是用 __VERSION__ 建 tag 的，
+      # 这样 push tag 和手动触发（此时 github.ref_name 是分支名）走的是同一套逻辑。
+      - name: 解析版本与 tag
+        id: meta
+        run: |
+          set -euo pipefail
+          VERSION=$(node -p "require('./src-tauri/tauri.conf.json').version")
+          echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
+          echo "tag=v${VERSION}" >> "$GITHUB_OUTPUT"
+          echo "版本 ${VERSION} → tag v${VERSION}"
+
       - name: 下载 Release 附件
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -euo pipefail
           mkdir -p dist
-          gh release download "${{ github.ref_name }}" -D dist --repo "${{ github.repository }}"
+          gh release download "${{ steps.meta.outputs.tag }}" -D dist --repo "${{ github.repository }}"
           ls -lh dist
 
       - name: 生成指向 OSS 的 latest.json
@@ -120,7 +133,7 @@ jobs:
           if [ -z "$PKG" ]; then echo "::error::没找到 NSIS 安装包（*-setup.exe）"; exit 1; fi
           if [ ! -f "${PKG}.sig" ]; then echo "::error::缺少签名文件 ${PKG}.sig，检查 createUpdaterArtifacts"; exit 1; fi
           SIG=$(cat "${PKG}.sig")
-          VERSION="${GITHUB_REF_NAME#v}"
+          VERSION="${{ steps.meta.outputs.version }}"
           jq -n \
             --arg v "$VERSION" \
             --arg sig "$SIG" \
