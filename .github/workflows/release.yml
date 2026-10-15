@@ -69,6 +69,11 @@ jobs:
       - uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # 必须显式传进来：createUpdaterArtifacts 会要求签名，
+          # 只把私钥放进 GitHub Secrets 而不在这里引用，构建会以
+          # "A public key has been found, but no private key" 失败。
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         with:
           tagName: v__VERSION__
           releaseName: MokiDown v__VERSION__
