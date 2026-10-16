@@ -11,7 +11,6 @@ import useEditorStore from '@store/useEditorStore';
 import useAuthStore from '@store/useAuthStore';
 import useThemeStore from '@store/useThemeStore';
 import useFileStore, { getScopedRecentFiles } from '@store/useFileStore';
-import useNotificationStore from '@store/useNotificationStore';
 import useExternalDocsStore, { getScopedExternalDocsMap } from '@store/useExternalDocsStore';
 import useSyncStore from '@store/useSyncStore';
 import useConfigStore from '@store/useConfigStore';
@@ -25,7 +24,8 @@ import FileTypeIcon from '@components/ui/FileTypeIcon';
 import AppMark from '@components/ui/AppMark';
 import MokiStatusEmpty from '@components/moki/MokiStatusEmpty';
 import { openExternal } from '@utils/tauriApi';
-import { canCheckUpdates, checkAndInstallUpdate, relaunchApp } from '@utils/appUpdater';
+import { canCheckUpdates } from '@utils/appUpdater';
+import useUpdateStore from '@store/useUpdateStore';
 import { getVersion } from '@tauri-apps/api/app';
 import { REPO_URL } from '@/configs/repository';
 import { cn } from '@utils/classNames';
@@ -390,8 +390,8 @@ function Sidebar({ onOpenSettings, onOpenStats, onOpenLogin }) {
   // 云同步开启时登录入口会占回底栏首位，GitHub 入口要让位（两者互斥）。
   const syncEnabled = useConfigStore((state) => state.syncEnabled);
   const themeButtonRef = useRef(null);
-  const notify = useNotificationStore.getState().notify;
-  const [checkingUpdate, setCheckingUpdate] = useState(false);
+  const checkingUpdate = useUpdateStore((s) => ['checking', 'downloading', 'installing'].includes(s.stage));
+  const handleCheckUpdates = () => useUpdateStore.getState().check();
   const [appVersion, setAppVersion] = useState('');
 
   // 底栏版本号取运行时的实际版本（tauri.conf.json 的 version），
@@ -404,38 +404,6 @@ function Sidebar({ onOpenSettings, onOpenStats, onOpenLogin }) {
       .catch(() => {});
     return () => { cancelled = true; };
   }, []);
-
-  /**
-   * 检查更新：有新版本就下载安装，装完提示并重启。
-   * 原先这里只弹一句「已是最新」，等于按钮是摆设。
-   */
-  const handleCheckUpdates = useCallback(async () => {
-    if (checkingUpdate) return;
-    if (!canCheckUpdates()) { notify('info', t('notification.upToDate')); return; }
-    setCheckingUpdate(true);
-    try {
-      const result = await checkAndInstallUpdate((stage, detail) => {
-        if (stage === 'available') {
-          notify('info', t('notification.updateAvailable', { version: detail?.version }),
-            t('notification.updateDownloading'), 6000);
-        } else if (stage === 'installing') {
-          notify('info', t('notification.updateInstalling'));
-        }
-      });
-      if (result.status === 'up-to-date') {
-        notify('info', t('notification.upToDate'));
-      } else if (result.status === 'installed') {
-        notify('success', t('notification.updateReady', { version: result.version }),
-          t('notification.updateRestartHint'), 8000);
-        // 留一点时间让提示可见，再重启应用完成替换。
-        setTimeout(() => { relaunchApp().catch(() => {}); }, 1500);
-      }
-    } catch (error) {
-      notify('error', t('notification.updateFailed'), String(error?.message || error));
-    } finally {
-      setCheckingUpdate(false);
-    }
-  }, [checkingUpdate, notify, t]);
 
   const tabs = [
     { id: 'explorer', label: t('sidebar.tab.explorer') },

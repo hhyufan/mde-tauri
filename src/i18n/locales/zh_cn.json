@@ -559,5 +559,20 @@
   "editor.menu.heading2": "二级标题",
   "editor.menu.actionFailed": "操作未完成，请重试或使用键盘快捷键",
   "moki.icon": "Moki 图标",
-  "moki.iconDesc": "开启后，左上角的 M 标识换成 Moki 形象徽章。"
+  "moki.iconDesc": "开启后，左上角的 M 标识换成 Moki 形象徽章。",
+  "update.title": "MokiDown 更新",
+  "update.later": "稍后再说",
+  "update.install": "下载并安装",
+  "update.restart": "立即重启",
+  "update.retry": "重新检查",
+  "update.idle": "",
+  "update.checking": "正在检查更新…",
+  "update.available": "发现新版本 v{{version}}",
+  "update.consent": "是否下载并安装此版本？安装可能关闭应用，请先保存文档。",
+  "update.downloading": "正在下载更新…",
+  "update.installing": "正在安装更新，请稍候…",
+  "update.installed": "更新已安装。准备好后重启应用以完成更新。",
+  "update.up-to-date": "当前已是最新版本。",
+  "update.error": "更新未完成，请重试。",
+  "update.saveFirst": "请先关闭此弹窗并保存所有文档，再进行安装或重启。"
 }

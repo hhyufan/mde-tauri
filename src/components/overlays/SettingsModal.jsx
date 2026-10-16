@@ -32,6 +32,8 @@ import { readTextFile, writeTextFile } from '@tauri-apps/plugin-fs';
 import { getVersion } from '@tauri-apps/api/app';
 import { openExternal } from '@utils/tauriApi';
 import { useTranslation } from 'react-i18next';
+import { canCheckUpdates } from '@utils/appUpdater';
+import useUpdateStore from '@store/useUpdateStore';
 import useConfigStore from '@store/useConfigStore';
 import useAuthStore from '@store/useAuthStore';
 import useNotificationStore from '@store/useNotificationStore';
@@ -76,6 +78,7 @@ function SettingsModal({ open: openProp, onClose }) {
   const [cloudBusy, setCloudBusy] = useState(false);
   const [appVersion, setAppVersion] = useState('');
   const config = useConfigStore();
+  const updateStage = useUpdateStore((s) => s.stage);
   const { isLoggedIn, user, logout } = useAuthStore();
   const notify = useNotificationStore((s) => s.notify);
   const { isMobileLayout, isPortrait } = useResponsiveLayout();
@@ -542,6 +545,7 @@ function SettingsModal({ open: openProp, onClose }) {
                       </div>
                     </div>
                     <p className="settings-about__tagline">{t('settings.about.tagline')}</p>
+                    {canCheckUpdates() && <div><Button icon={<CloudDownloadOutlined />} loading={['checking', 'downloading', 'installing'].includes(updateStage)} onClick={() => useUpdateStore.getState().check()}>{t('sidebar.footer.checkUpdates')}</Button></div>}
                     <dl className="settings-about__meta">
                       <dt>{t('settings.about.author')}</dt>
                       <dd>{t('settings.about.authorDesc')}</dd>

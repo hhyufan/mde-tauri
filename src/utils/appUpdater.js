@@ -9,28 +9,18 @@
  */
 import { check } from '@tauri-apps/plugin-updater';
 import { relaunch } from '@tauri-apps/plugin-process';
+import { isAndroidRuntime } from './platform';
 
 /** 是否运行在 Tauri 桌面壳内。 */
 export function canCheckUpdates() {
-  return typeof window !== 'undefined' && Boolean(window.__TAURI_INTERNALS__);
+  return typeof window !== 'undefined' && Boolean(window.__TAURI_INTERNALS__)
+    && !isAndroidRuntime() && !/iPhone|iPad|iPod/i.test(navigator.userAgent || '');
 }
 
-/**
- * 检查更新；有则下载安装。
- *
- * @param {(stage: string, detail?: {version?: string, downloaded?: number, total?: number}) => void} onStage
- *   阶段回调，stage 取值：checking / up-to-date / available / downloading / installing
- * @returns {Promise<{status: 'up-to-date' | 'installed', version?: string}>}
- */
-export async function checkAndInstallUpdate(onStage = () => {}) {
-  onStage('checking');
-  const update = await check();
-  if (!update) {
-    onStage('up-to-date');
-    return { status: 'up-to-date' };
-  }
+// Checking never downloads or installs; installation requires explicit consent.
+export const checkForUpdate = () => check({ timeout: 15000 });
 
-  onStage('available', { version: update.version });
+export async function installUpdate(update, onStage = () => {}) {
   let downloaded = 0;
   let total = 0;
   await update.downloadAndInstall((event) => {
@@ -44,7 +34,6 @@ export async function checkAndInstallUpdate(onStage = () => {}) {
       onStage('installing');
     }
   });
-  return { status: 'installed', version: update.version };
 }
 
 /** 重启应用以应用已安装的更新。 */

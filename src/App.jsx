@@ -45,6 +45,7 @@ import { useHotkeys } from '@hooks/useHotkeys';
 import { HOTKEY_COMMAND_EVENT } from '@utils/hotkeyCommands';
 import { isCapturingShortcut } from '@/configs/hotkeys';
 import ExternalFileConflictNotice from '@components/overlays/ExternalFileConflictNotice';
+import UpdateDialog from '@components/overlays/UpdateDialog';
 import NotificationContainer from '@components/notification/NotificationContainer';
 import useSyncStore from '@store/useSyncStore';
 import { GUEST_USER_SCOPE, isOwnedByUser } from '@store/userScope';
@@ -927,6 +928,7 @@ function App() {
 
       </Suspense>
       <NotificationContainer />
+      <UpdateDialog />
     </>
   );
 }

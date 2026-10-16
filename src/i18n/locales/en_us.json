@@ -559,5 +559,20 @@
   "editor.menu.heading2": "Heading 2",
   "editor.menu.actionFailed": "The action could not be completed. Try again or use a keyboard shortcut.",
   "moki.icon": "Moki icon",
-  "moki.iconDesc": "When on, the M mark at the top-left is replaced by Moki's emblem."
+  "moki.iconDesc": "When on, the M mark at the top-left is replaced by Moki's emblem.",
+  "update.title": "MokiDown updates",
+  "update.later": "Later",
+  "update.install": "Download and install",
+  "update.restart": "Restart now",
+  "update.retry": "Check again",
+  "update.idle": "",
+  "update.checking": "Checking for updates…",
+  "update.available": "Version {{version}} is available",
+  "update.consent": "Download and install this version? Installation may close the app. Save your documents first.",
+  "update.downloading": "Downloading update…",
+  "update.installing": "Installing update. Please wait…",
+  "update.installed": "Update installed. Restart when you are ready to finish updating.",
+  "update.up-to-date": "You are up to date.",
+  "update.error": "The update could not be completed. Please try again.",
+  "update.saveFirst": "Close this dialog and save all documents before installing or restarting."
 }
