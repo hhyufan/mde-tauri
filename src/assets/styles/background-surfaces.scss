@@ -241,6 +241,30 @@ body.moki-has-background {
     @include background-popup.image-surface;
   }
 
+  // 欢迎页那三个操作卡片（新建文档 / 打开文件 / 打开文件夹）在背景模式下走半透明，
+  // 但**按各自原本的底色**透，不是一律换成表面色玻璃：
+  // 次级两个本色就是 var(--surface)，与 --moki-glass-surface 同档；
+  // 主按钮本色是强调蓝，若也套表面色玻璃，蓝色就整个没了（只剩一层近乎透明的白）。
+  .moki-action {
+    background: var(--moki-glass-surface);
+
+    &:hover {
+      background: color-mix(in srgb, var(--accent-light) 38%, transparent);
+    }
+  }
+
+  .moki-action--primary {
+    background: color-mix(in srgb, var(--accent) 38%, transparent);
+
+    // 半透明之后底色是淡蓝，原来压在实蓝上的白字就看不清了；
+    // 改成淡蓝底配强调色文字。图标、说明与快捷键原本各自带色，
+    // 所以这里连它们一起改，只改按钮本身的话箭头还是白的。
+    &,
+    :where(.anticon, strong, small, kbd) {
+      color: var(--accent);
+    }
+  }
+
   // 两套 toast 与面包屑下拉同一套（image-surface）打底：按本元素视口坐标重绘壁纸，
   // 所以底图透出来、又不会把中间的编辑器组件透出来。
   //
