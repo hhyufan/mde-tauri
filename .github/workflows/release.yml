@@ -339,3 +339,37 @@ jobs:
             echo "::warning title=加速域名不可达::${ACCEL} 返回 ${ACCEL_CODE}，客户端会继续退到下一候选。"
           fi
           echo "OSS 镜像完成：latest.json 与安装包均可匿名下载。"
+
+      # 每发一版都会在 OSS 上多留一份安装器与签名，久了越积越多。
+      # 保留当前版本与 latest.json，其余 MokiDown_*_x64-setup.exe(.sig) 一并删除。
+      # 放在最后一步是刻意的：万一前面的上传或校验失败，旧包还在，
+      # 不至于让线上那份 latest.json 指向一个已经不存在的文件。
+      - name: 清理 OSS 上的旧安装包
+        env:
+          OSS_ACCESS_KEY_ID: ${{ secrets.OSS_ACCESS_KEY_ID }}
+          OSS_ACCESS_KEY_SECRET: ${{ secrets.OSS_ACCESS_KEY_SECRET }}
+          BUCKET: ${{ vars.OSS_BUCKET }}
+          REGION: ${{ vars.OSS_REGION }}
+          VERSION: ${{ steps.meta.outputs.version }}
+        run: |
+          ENDPOINT="oss-${REGION}.aliyuncs.com"
+          ossutil64 config -e "$ENDPOINT" -i "$OSS_ACCESS_KEY_ID" -k "$OSS_ACCESS_KEY_SECRET" -L CH > /dev/null
+
+          # 只挑安装器对象：正则锚在结尾，latest.json 永远不会命中。
+          # 再用 grep -v 排掉当前版本，避免把自己刚传上去的删掉。
+          STALE=$(ossutil64 ls "oss://${BUCKET}/updates/" | awk '{print $NF}' \
+            | grep -E '/MokiDown_.*_x64-setup\.exe(\.sig)?$' | grep -v "_${VERSION}_" || true)
+
+          if [ -z "$STALE" ]; then
+            echo "没有需要清理的旧安装包。"
+            exit 0
+          fi
+
+          echo "$STALE" | while read -r object; do
+            [ -n "$object" ] || continue
+            echo "删除旧安装包：${object}"
+            ossutil64 rm "$object" --force
+          done
+
+          echo "清理后 updates/ 下的对象："
+          ossutil64 ls "oss://${BUCKET}/updates/"
