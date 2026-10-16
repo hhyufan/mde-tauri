@@ -47,6 +47,34 @@ it('keeps automatic success and network failure quiet; manual checks show result
   expect(store.getState()).toMatchObject({ stage: 'error', open: true, error: 'offline' });
 });
 
+it('手动检查发现已是最新时不留弹窗，只在右上角给一条会自动消失的通知', async () => {
+  const notificationStore = (await import('@store/useNotificationStore')).default;
+  notificationStore.setState({ notifications: [] });
+  api.checkForUpdate.mockResolvedValueOnce(null);
+
+  await store.getState().check();
+
+  expect(store.getState()).toMatchObject({ stage: 'up-to-date', open: false });
+  expect(notificationStore.getState().notifications).toHaveLength(1);
+});
+
+it('检查过程中不开弹窗，避免闪一下再关掉', async () => {
+  // 用一个受控的 promise 把检查卡在"进行中"，再断言此刻的状态。
+  // 注意不要用 mockImplementationOnce 之后再去取 resolve：check() 里
+  // await releaseResource() 会让 checkForUpdate 晚一个微任务才被调用。
+  let resolveUpdate;
+  const gate = new Promise((resolve) => {
+    resolveUpdate = resolve;
+  });
+  api.checkForUpdate.mockImplementationOnce(() => gate);
+
+  const pending = store.getState().check();
+  expect(store.getState()).toMatchObject({ stage: 'checking', open: false });
+
+  resolveUpdate(null);
+  await pending;
+});
+
 it('keeps startup failure quiet and permits a later manual retry', async () => {
   api.checkForUpdate.mockRejectedValueOnce(new Error('offline'));
   await store.getState().check({ startup: true });
