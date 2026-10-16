@@ -93,3 +93,8 @@ installer/dist/
 installer/payload/*.exe
 installer/src-tauri/target/
 installer/src-tauri/gen/
+
+# 本地试用手记与验证产物：内容是随手动编辑器改动的样例文件（还会被"新建文件"、
+# 改写链接之类的操作留下残留），不适合当版本化内容，各人本地保留即可。
+examples/
+artifacts/
