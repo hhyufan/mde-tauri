@@ -176,21 +176,23 @@
   }
 
   li.task-list-item {
-    display: grid;
-    grid-template-columns: 14px minmax(0, 1fr);
-    column-gap: 8px;
-    align-items: start;
+    // 交给布局居中：勾选框与文字是同一行的两个 flex 项，align-items: center
+    // 让方框落在这一行的中线上。不用 calc((1lh - 14px)/2) 那类算式——它依赖
+    // 行高，字号一改就偏；也不用量出偏差再补 px。
+    display: flex;
+    align-items: center;
+    gap: 0.5em;
     list-style: none;
 
     > input[type='checkbox'] {
       flex: 0 0 auto;
       width: 14px;
       height: 14px;
-      margin: calc((1lh - 14px) / 2) 0 0;
+      margin: 0;
     }
 
     > p:first-child {
-      margin-top: 0;
+      margin: 0;
     }
   }
 
@@ -222,19 +224,15 @@
 
     &[data-checked='true']::before {
       border-color: var(--accent);
-      background: var(--accent);
+      // 勾用居中的背景图画，而不是拿 ::after 画一个方块再旋转：
+      // 后者靠 left/top 手算落点，外接尺寸又随字体行高变化，容易压出框外。
+      background: var(--accent) center / 10px 10px no-repeat
+        url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12'%3E%3Cpath d='M2 6.2 4.6 8.8 10 3.4' fill='none' stroke='%23fff' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
     }
 
+    // 勾已改为 ::before 的居中背景图，这里不再另画一个方块旋转出来的勾。
     &[data-checked='true']::after {
-      content: '';
-      position: absolute;
-      top: calc((1lh - 9px) / 2);
-      left: 5px;
-      width: 4px;
-      height: 8px;
-      border: solid var(--surface);
-      border-width: 0 2px 2px 0;
-      transform: rotate(45deg);
+      content: none;
     }
   }
 
@@ -245,9 +243,26 @@
     margin-top: calc((1lh - 14px) / 2);
   }
 
+  // 与所见即所得那侧（li[data-item-type='task'] 的 ::before/::after）保持同一套外观。
+  // 预览由 remark-gfm 产出真 input，原先只给了 accent-color：它只管勾选态，
+  // 未勾选仍是浏览器原生方框，于是同一份文档在两个视图里一个蓝、一个黑。
+  // input 没有伪元素可用，对勾只能用背景图，颜色随主题给两份。
   input[type='checkbox'] {
+    appearance: none;
+    width: 14px;
+    height: 14px;
     margin-right: 6px;
-    accent-color: var(--accent);
+    border: 1.5px solid var(--border);
+    border-radius: 3px;
+    background: var(--surface);
+    box-sizing: border-box;
+    vertical-align: middle;
+
+    &:checked {
+      border-color: var(--accent);
+      background: var(--accent) center / 11px 11px no-repeat
+        url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12'%3E%3Cpath d='M2 6.2 4.6 8.8 10 3.4' fill='none' stroke='%23fff' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+    }
   }
 
   // vitality：勾选后的待办整行划掉并变淡。
