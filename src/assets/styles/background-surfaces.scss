@@ -241,17 +241,33 @@ body.moki-has-background {
     @include background-popup.image-surface;
   }
 
-  // 两套 toast 与面包屑下拉走同一套（重绘壁纸，因此看不到中间那些组件），
-  // 但提示还需要一点"纸面"感，于是在壁纸之上再叠一层淡白：
-  // 它是不透明的整块底色，不是靠半透明透出正文，所以观感与按钮那一档呼应，
-  // 又不会把编辑器内容透进来。
+  // 两套 toast 与面包屑下拉同一套（image-surface）打底：按本元素视口坐标重绘壁纸，
+  // 所以底图透出来、又不会把中间的编辑器组件透出来。
+  //
+  // 在此之上再加一层白雾（与「运行」这类按钮同一条令牌）。关键点是
+  // background-image / background-size / background-position 必须**同层数**：
+  // 只加图层不同步后两项，壁纸那层就会去用属于白雾那一层的位置与尺寸，整块铺歪。
+  // 因此这里三处都写全，依序是：白雾、mixin 原本的 wash、壁纸。
   .notif,
   .toast {
+    @include background-popup.image-surface;
+
     background-image:
       linear-gradient(var(--moki-glass-surface), var(--moki-glass-surface)),
       linear-gradient(var(--moki-background-wash), var(--moki-background-wash)),
       var(--moki-background-image, none);
+    background-size: auto, auto, var(--moki-background-size, cover);
+    background-position: center, center,
+      calc(var(--moki-background-x, 0px) - var(--moki-popup-x, 0px))
+        calc(var(--moki-background-y, 0px) - var(--moki-popup-y, 0px));
   }
+
+  // 壁纸层锚在世界坐标上，卡片一动，它的窗口就该跟着移——这是"透底图"的正确行为，
+  // 所以这里刻意**不**冻结动画（冻结会让卡片瞬移、背景不动，观感是背景在滑）。
+  // 对齐要靠 useBackgroundSurfaces：它在 ResizeObserver 里同步坐标，而该回调
+  // 在绘制前执行，因此布局变化（含上面消失、下面上移）能在这一帧就重新对位。
+  // 前提是位置变化走**布局**；若位置由 transform 动画驱动，回调不会触发，
+  // 那一帧就会错开。
 
   // 轮廓沿用轻边框与阴影。
   .ant-select-dropdown,
