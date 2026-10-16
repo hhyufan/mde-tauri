@@ -221,6 +221,30 @@ function FloatingToolbar({ onInsert }) {
     return () => window.removeEventListener('resize', handleResize);
   }, []);
 
+  /*
+   * 每次唤出时都要把位置夹回可视区。
+   *
+   * 位置是持久化的，而窗口尺寸会变（最大化→还原、换显示器、系统缩放变化）。
+   * 只靠「拖拽结束」和「resize 事件」夹取是不够的：resize 之后没再触发过的旧坐标
+   * 会一直留着，工具栏被唤出也落在视口外——用户看到的现象就是"工具栏唤不出来"。
+   *
+   * 放在 requestAnimationFrame 里测量：--show 会加上 translateX(-50%)，
+   * 同一帧内读到的还是位移前的矩形，会偏掉半个宽度。
+   */
+  useEffect(() => {
+    if (!visible) return undefined;
+    const frame = requestAnimationFrame(() => {
+      setPosition((current) => {
+        const clamped = clampPosition(current, toolbarRef.current?.getBoundingClientRect());
+        if (!clamped) return current;
+        if (current && clamped.x === current.x && clamped.y === current.y) return current;
+        localStorage.setItem(TOOLBAR_POSITION_KEY, JSON.stringify(clamped));
+        return clamped;
+      });
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [visible]);
+
   return (
     <>
       <div
