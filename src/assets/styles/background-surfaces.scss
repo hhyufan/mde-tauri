@@ -222,7 +222,10 @@ body.moki-has-background {
 
   // 背景色完全遮住下层组件，图片及透明度与工作区一致。
   // 不改定位、滚动容器或子元素层级，保留 antd 的布局与虚拟列表行为。
-  .ant-select-dropdown,
+  //
+  // 这里**不含** .ant-select-dropdown：设置里的下拉框要求不透背景，而应用里的
+  // antd 下拉基本都出自设置（其余下拉各有自己的类名），所以让它不参与这套。
+  // 两套 toast（右上 .notif、居中 .toast）反过来要求透背景，因此加进来。
   .footer__dropdown,
   .sort-dropdown,
   .ft,
@@ -230,6 +233,8 @@ body.moki-has-background {
   .ft__table-panel,
   .monaco-context-menu,
   .task-panel,
+  .notif,
+  .toast,
   .md-preview--milkdown .milkdown-media-tools,
   .milkdown-media-preview-editor,
   .ant-dropdown .ant-dropdown-menu,
