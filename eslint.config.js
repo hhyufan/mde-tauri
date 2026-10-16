@@ -53,7 +53,13 @@ export default [
     languageOptions: { globals: globals.browser },
   },
   {
-    files: ['src/**/*.{js,jsx}', 'installer/src/**/*.{js,jsx}', 'installer/*.mjs', 'vite.config.js', 'scripts/**/*.mjs'],
+    files: [
+      'src/**/*.{js,jsx}',
+      'installer/src/**/*.{js,jsx}',
+      'installer/*.mjs',
+      'vite.config.js',
+      'scripts/**/*.mjs',
+    ],
     languageOptions: {
       ecmaVersion: 'latest',
       sourceType: 'module',
