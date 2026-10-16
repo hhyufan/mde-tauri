@@ -1904,7 +1904,7 @@ class MilkdownErrorBoundary extends Component {
     if (this.state.error) {
       return (
         <div className={`md-preview md-preview--milkdown md-preview--error ${this.props.className || ''}`}>
-          <p>Markdown 所见即所得编辑器加载失败。</p>
+          <p>{i18n.t('editor.loadFailed')}</p>
           <pre>{String(this.state.error?.message || this.state.error)}</pre>
         </div>
       );

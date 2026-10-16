@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react';
 import { Alert, Button, Checkbox, Modal, Space, Typography } from 'antd';
+import i18n from '@/i18n';
 
 const { Paragraph, Text, Title } = Typography;
 
@@ -26,10 +27,10 @@ function RecoveryModal({ open, drafts, onRestore, onDiscard }) {
       maskClosable={false}
       keyboard={false}
       width={720}
-      title="恢复未保存内容"
+      title={i18n.t('unsaved.recoveryTitle')}
       footer={(
         <Space>
-          <Button danger onClick={onDiscard}>全部丢弃</Button>
+          <Button danger onClick={onDiscard}>{i18n.t('unsaved.discardAll')}</Button>
           <Button
             type="primary"
             disabled={selectedDrafts.length === 0}
@@ -43,8 +44,8 @@ function RecoveryModal({ open, drafts, onRestore, onDiscard }) {
       <Alert
         type="warning"
         showIcon
-        message="检测到上次会话的未保存草稿"
-        description="恢复只会重新打开为未保存标签，不会自动覆盖磁盘文件。"
+        message={i18n.t('unsaved.recoveryMessage')}
+        description={i18n.t('unsaved.recoveryHint')}
       />
       <div style={{ maxHeight: 420, overflow: 'auto', marginTop: 16 }}>
         {drafts.map((draft) => (

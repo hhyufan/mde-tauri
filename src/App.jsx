@@ -867,7 +867,7 @@ function App() {
           {conflicts.length > 0 && (
             <div className="external-file-notice" role="status">
               <span>{t('sync.conflict.title')} · {conflicts.length}</span>
-              <button type="button" onClick={() => setSyncConflictReviewOpen(true)}>查看并处理</button>
+              <button type="button" onClick={() => setSyncConflictReviewOpen(true)}>{t('sync.conflict.review')}</button>
             </div>
           )}
           {externalConflict && (

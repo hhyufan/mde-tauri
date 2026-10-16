@@ -6,6 +6,7 @@ import useConfigStore from '@store/useConfigStore';
 import { flushEditorBuffer, getBuffer, subscribe } from '@utils/editorBuffer';
 import MonacoConflictDiff from './MonacoConflictDiff';
 import './conflict-dialog.scss';
+import i18n from '@/i18n';
 
 const { Paragraph, Text } = Typography;
 
@@ -42,13 +43,13 @@ function ExternalFileConflictModal({ conflict, onKeep, onUseDisk, onSaveAs, onCl
         footer: { marginTop: 16 },
       }}
       onCancel={onClose}
-      title="文件已在外部发生变化"
+      title={i18n.t('sync.conflict.changedTitle')}
       footer={(
         <Space wrap>
-          <Button onClick={onClose}>稍后处理</Button>
-          <Button onClick={onKeep}>保留编辑内容</Button>
-          <Button disabled={unavailable} onClick={onUseDisk}>采用磁盘内容</Button>
-          <Button type="primary" onClick={onSaveAs}>另存为</Button>
+          <Button onClick={onClose}>{i18n.t('sync.conflict.later')}</Button>
+          <Button onClick={onKeep}>{i18n.t('sync.conflict.keepEdits')}</Button>
+          <Button disabled={unavailable} onClick={onUseDisk}>{i18n.t('sync.conflict.useDisk')}</Button>
+          <Button type="primary" onClick={onSaveAs}>{i18n.t('sync.conflict.saveAs')}</Button>
         </Space>
       )}
     >
@@ -56,7 +57,7 @@ function ExternalFileConflictModal({ conflict, onKeep, onUseDisk, onSaveAs, onCl
         type="warning"
         showIcon
         message={conflict.kind === 'removed' ? '原文件已被删除或移动' : '磁盘内容与本地编辑内容冲突'}
-        description="MokiDown 没有覆盖任何一方，请明确选择要保留的版本。"
+        description={i18n.t('sync.conflict.changedHint')}
       />
       <Paragraph ellipsis={{ rows: 2 }} style={{ marginTop: 16 }}>
         <Text type="secondary">{conflict.path}</Text>

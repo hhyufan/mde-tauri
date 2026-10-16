@@ -49,7 +49,7 @@ function ConflictDialog({ open, conflicts, onResolve, onClose }) {
             <p className="conflict-dialog__path">{pathLabel}</p>
           </div>
           <div className="conflict-dialog__header-right">
-            <span className="conflict-dialog__hint">仅显示变更及上下文</span>
+            <span className="conflict-dialog__hint">{t('sync.conflict.changesOnly')}</span>
           </div>
         </div>
 
@@ -70,7 +70,7 @@ function ConflictDialog({ open, conflicts, onResolve, onClose }) {
 
         <div className="conflict-dialog__actions">
           <Space>
-            <Button onClick={onClose}>稍后处理</Button>
+            <Button onClick={onClose}>{t('sync.conflict.later')}</Button>
             <Button onClick={() => onResolve(current.fileId, 'local')}>
               {t('sync.conflict.keepLocal')}
             </Button>
