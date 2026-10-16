@@ -496,6 +496,20 @@ html[data-theme='dark'] {
   }
 }
 
+// 背景模式：提示框要透出底图。上面两条是按主题写死的实色，令牌改不动它们
+// （antd 的令牌只决定它自己生成的样式，样式表里的显式规则优先），只能在这里覆盖。
+// 提示 portal 到 body，所以用 body 级选择器；箭头同样带 !important，需一并覆盖。
+body.moki-has-background {
+  .ant-tooltip .ant-tooltip-inner {
+    background: color-mix(in srgb, var(--moki-background-base) 55%, transparent);
+    border-color: color-mix(in srgb, var(--border) 55%, transparent);
+    box-shadow: 0 2px 10px color-mix(in srgb, #000 18%, transparent);
+  }
+  .ant-tooltip .ant-tooltip-arrow::before,
+  .ant-tooltip .ant-tooltip-arrow::after {
+    background: color-mix(in srgb, var(--moki-background-base) 55%, transparent) !important;
+  }
+}
 // ── 标签页 ─────────────────────────────────────────────────────────────────
 .ant-tabs {
   color: var(--text);

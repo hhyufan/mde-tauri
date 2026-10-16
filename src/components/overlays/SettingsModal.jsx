@@ -282,8 +282,8 @@ function SettingsModal({ open: openProp, onClose }) {
                     value={config.language}
                     onChange={(v) => handleChange('language', v)}
                     options={[
-                      { value: 'en', label: 'English' },
-                      { value: 'zh', label: '中文' },
+                      { value: 'en', label: <span>English</span> },
+                      { value: 'zh', label: <span>中文</span> },
                     ]}
                   />
                 </SettingRow>
@@ -363,11 +363,11 @@ function SettingsModal({ open: openProp, onClose }) {
                     value={config.fontFamily}
                     onChange={(v) => handleChange('fontFamily', v)}
                     options={[
-                      { value: 'JetBrains Mono', label: 'JetBrains Mono' },
-                      { value: 'Fira Code', label: 'Fira Code' },
-                      { value: 'Cascadia Code', label: 'Cascadia Code' },
-                      { value: 'Consolas', label: 'Consolas' },
-                      { value: 'monospace', label: 'Monospace' },
+                      { value: 'JetBrains Mono', label: <span>JetBrains Mono</span> },
+                      { value: 'Fira Code', label: <span>Fira Code</span> },
+                      { value: 'Cascadia Code', label: <span>Cascadia Code</span> },
+                      { value: 'Consolas', label: <span>Consolas</span> },
+                      { value: 'monospace', label: <span>Monospace</span> },
                     ]}
                   />
                 </SettingRow>
@@ -381,9 +381,9 @@ function SettingsModal({ open: openProp, onClose }) {
                     value={config.tabSize}
                     onChange={(v) => handleChange('tabSize', Number(v))}
                     options={[
-                      { value: 2, label: '2' },
-                      { value: 4, label: '4' },
-                      { value: 8, label: '8' },
+                      { value: 2, label: <span>2</span> },
+                      { value: 4, label: <span>4</span> },
+                      { value: 8, label: <span>8</span> },
                     ]}
                   />
                 </SettingRow>

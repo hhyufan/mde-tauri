@@ -66,7 +66,7 @@ function parseRadius(v, fallback) {
  *
  * @returns {Record<string, string | number>} antd 主题 token 映射
  */
-function buildTokens() {
+function buildTokens(hasBackground = false) {
   return {
     colorPrimary: readCssVar('--accent', '#4091ff'),
     colorInfo: readCssVar('--info', '#4091ff'),
@@ -77,9 +77,9 @@ function buildTokens() {
     colorTextSecondary: readCssVar('--text-sec', '#6d6d6f'),
     colorTextTertiary: readCssVar('--text-dim', '#c4c4c6'),
     colorBgBase: readCssVar('--bg', '#f5f5f7'),
-    colorBgContainer: readCssVar('--surface', '#ffffff'),
-    colorBgElevated: readCssVar('--surface', '#ffffff'),
-    colorBgLayout: readCssVar('--bg', '#f5f5f7'),
+    colorBgContainer: hasBackground ? 'transparent' : readCssVar('--surface', '#ffffff'),
+    colorBgElevated: hasBackground ? 'transparent' : readCssVar('--surface', '#ffffff'),
+    colorBgLayout: hasBackground ? 'transparent' : readCssVar('--bg', '#f5f5f7'),
     colorBorder: readCssVar('--border', '#e5e5e7'),
     colorBorderSecondary: readCssVar('--border-light', '#efefef'),
     borderRadius: parseRadius(readCssVar('--radius-sm', '6px'), 6),
@@ -100,6 +100,11 @@ function buildTokens() {
 export default function ThemedConfigProvider({ children }) {
   const theme = useThemeStore((s) => s.theme);
   const language = useConfigStore((s) => s.language);
+  // 背景模式：antd 组件不读应用的 CSS 变量，它们的底色是下面 buildTokens 读一次值后
+  // 烘焙进 CSS-in-JS 的。所以要让它透，只能在这里改令牌，改 CSS 变量对它无效。
+  const backgroundEnabled = useConfigStore((s) => s.backgroundEnabled);
+  const backgroundImage = useConfigStore((s) => s.backgroundImage);
+  const hasBackground = backgroundEnabled && Boolean(backgroundImage);
   const [tokenVersion, setTokenVersion] = useState(0);
   const [zhLoaded, setZhLoaded] = useState(() => Boolean(zhCnLocale));
 
@@ -125,7 +130,11 @@ export default function ThemedConfigProvider({ children }) {
     return () => { cancelled = true; };
   }, [language]);
 
-  const tokens = useMemo(buildTokens, [theme, tokenVersion]);
+  // hasBackground 进依赖：切换背景模式时要重建令牌，否则 antd 还留着上一次的实色。
+  // buildTokens 读的是主题 CSS 变量，语义上依赖 theme 与 tokenVersion；
+  // 静态检查看不出这层依赖，故显式保留并抑制该规则。
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const tokens = useMemo(() => buildTokens(hasBackground), [theme, tokenVersion, hasBackground]);
 
   const algorithm = theme === 'dark'
     ? antdTheme.darkAlgorithm
@@ -147,7 +156,11 @@ export default function ThemedConfigProvider({ children }) {
             colorIcon: tokens.colorTextSecondary,
           },
           Tooltip: {
-            colorBgSpotlight: theme === 'dark'
+            // 背景模式下提示要透出底图：它同样出自令牌，改 CSS 变量无效。
+            // 留 55% 表面色保证文字可读，其余透掉。
+            colorBgSpotlight: hasBackground
+              ? `color-mix(in srgb, ${readCssVar('--surface', '#ffffff')} 55%, transparent)`
+              : theme === 'dark'
               ? readCssVar('--surface', '#1e1e1e')
               : '#ffffff',
             colorTextLightSolid: theme === 'dark'

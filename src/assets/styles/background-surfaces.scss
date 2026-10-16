@@ -28,7 +28,7 @@ body.moki-has-background,
 
   .titlebar__search,
   .sidebar__tab-slider,
-  .editor-content__run,
+
   .editor-content__renderer-error,
   .editor-content__renderer-error button,
   .timeline__count,
@@ -205,6 +205,28 @@ html[data-theme='dark'] .app--background .md-preview {
 // antd 浮层 portal 到 body：变量与底色都必须在 body 级适配，
 // 否则下拉/菜单会是一块与背景模式割裂的实色面板。
 body.moki-has-background {
+  // 设置弹窗：本体重绘壁纸（即所谓透背景），内部组件改半透明。
+  // 它是 portal 到 body 的，所以只能写在 body 级这块里——挂在 .app 上对它无效。
+  // antd 开关：底色同样出自它运行时注入的样式，普通选择器压不稳，所以用 !important。
+  // 未开启走玻璃面；开启态用强调色的半透明版——保留"开着"的语义，但不做成实色块。
+  .ant-switch {
+    background: color-mix(in srgb, var(--surface) 16%, transparent) !important;
+
+    &.ant-switch-checked {
+      background: color-mix(in srgb, var(--accent) 42%, transparent) !important;
+    }
+  }
+  .moki-settings-modal-root .ant-modal-content {
+    @include background-popup.image-surface;
+  }
+  // 内部组件一律半透明：设置面板的底色都出自 --surface / --bg / --hover 三个令牌，
+  // 在这里把它们重绑一次，所有控件（卡片、输入框、下拉、分段、开关、按钮）一起跟随，
+  // 不必逐个补规则。用 --moki-background-base 而非自身，避免自定义属性自引用成环。
+  .moki-settings-modal-root .settings-modal {
+    --bg: color-mix(in srgb, var(--moki-background-base) 38%, transparent);
+    --surface: color-mix(in srgb, var(--moki-background-base) 38%, transparent);
+    --hover: var(--moki-glass-hover);
+  }
   .ft { transition: none; }
   .monaco-context-menu { animation: none; }
   // Scaling the popup during entry also scales its wallpaper and exposes the
@@ -228,6 +250,7 @@ body.moki-has-background {
   // antd 的 Select 弹层（改名后缀、搜索范围、设置等）与面包屑下拉同一套：
   // 它 portal 到 body，所以必须写在 body 级这一份清单里，挂在 .app 上的那份对它无效。
   .ant-select-dropdown,
+  .editor-content__run,
   .footer__dropdown,
   .sort-dropdown,
   .ft,
@@ -298,6 +321,7 @@ body.moki-has-background {
 
   // 轮廓沿用轻边框与阴影。
   .ant-select-dropdown,
+
   .footer__dropdown,
   .sort-dropdown {
     border: 1px solid color-mix(in srgb, var(--text) 12%, transparent);
@@ -318,4 +342,19 @@ body.moki-has-background {
 html[data-theme='dark'] body.moki-has-background,
 html[data-theme='dark'] .app--background {
   --moki-glass-popup: color-mix(in srgb, var(--surface) 8%, transparent);
+}
+
+// 提示框（浮在上层）：与面包屑下拉同一套——按本元素坐标重绘壁纸。
+// 这样只透出"背景"，不会把下层组件的内容透进来；backdrop-filter 做不到这点，
+// 它会把下面的文字一起采样。权重与按主题写死的那两条相同，故用 html 抬高一档。
+html body.moki-has-background {
+  .ant-tooltip .ant-tooltip-inner {
+    @include background-popup.image-surface;
+    border-color: color-mix(in srgb, var(--border) 55%, transparent);
+  }
+  // 箭头上重绘壁纸不现实（它是个 8px 的三角），取底色近似。
+  .ant-tooltip .ant-tooltip-arrow::before,
+  .ant-tooltip .ant-tooltip-arrow::after {
+    background: var(--moki-background-base) !important;
+  }
 }
