@@ -578,6 +578,7 @@
   "update.restarting": "Opening the installer. MokiDown will reopen automatically when finished.",
   "settings.about.installer": "Download installer",
   "tasks.title": "Task List",
+  "tasks.empty": "No tasks in progress",
   "tasks.checking": "Checking for updates",
   "tasks.downloading": "Downloading",
   "tasks.installing": "Installing",

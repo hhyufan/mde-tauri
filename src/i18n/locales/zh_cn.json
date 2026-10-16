@@ -578,6 +578,7 @@
   "update.restarting": "正在交接到安装器，完成后将自动打开 MokiDown…",
   "settings.about.installer": "下载安装包",
   "tasks.title": "任务列表",
+  "tasks.empty": "没有进行中的任务",
   "tasks.checking": "正在检测更新",
   "tasks.downloading": "正在下载",
   "tasks.installing": "正在安装",
