@@ -34,7 +34,9 @@ it('checks once across startup remounts and never downloads without consent', as
   });
   expect(api.installUpdate).not.toHaveBeenCalled();
   store.getState().dismiss();
-  expect(resource.close).toHaveBeenCalledTimes(1);
+  expect(resource.close).not.toHaveBeenCalled();
+  store.getState().showTasks();
+  expect(store.getState().open).toBe(true);
   expect(api.installUpdate).not.toHaveBeenCalled();
 });
 
@@ -58,7 +60,7 @@ it('手动检查发现已是最新时不留弹窗，只在右上角给一条会�
   expect(notificationStore.getState().notifications).toHaveLength(1);
 });
 
-it('检查过程中不开弹窗，避免闪一下再关掉', async () => {
+it('手动检查时任务列表要打开，好让"正在检测更新"看得见', async () => {
   // 用一个受控的 promise 把检查卡在"进行中"，再断言此刻的状态。
   // 注意不要用 mockImplementationOnce 之后再去取 resolve：check() 里
   // await releaseResource() 会让 checkForUpdate 晚一个微任务才被调用。
@@ -69,6 +71,21 @@ it('检查过程中不开弹窗，避免闪一下再关掉', async () => {
   api.checkForUpdate.mockImplementationOnce(() => gate);
 
   const pending = store.getState().check();
+  expect(store.getState()).toMatchObject({ stage: 'checking', open: true });
+
+  resolveUpdate(null);
+  await pending;
+});
+
+it('启动时的静默检查不打开任务列表', async () => {
+  let resolveUpdate;
+  const gate = new Promise((resolve) => {
+    resolveUpdate = resolve;
+  });
+  api.checkForUpdate.mockImplementationOnce(() => gate);
+
+  // 每个用例都重新 import 模块，startupChecked 是模块级变量，所以这里能真的跑起来
+  const pending = store.getState().check({ startup: true });
   expect(store.getState()).toMatchObject({ stage: 'checking', open: false });
 
   resolveUpdate(null);
@@ -96,12 +113,15 @@ it('installs only on consent, ignores double clicks and hands off automatically'
   await store.getState().install();
   store.getState().dismiss();
   expect(store.getState()).toMatchObject({
-    open: true,
+    open: false,
     stage: 'downloading',
     downloaded: 50,
     total: 100,
   });
   expect(api.installUpdate).toHaveBeenCalledTimes(1);
+  expect(resource.close).not.toHaveBeenCalled();
+  store.getState().showTasks();
+  expect(store.getState().open).toBe(true);
   finish();
   await installing;
   expect(store.getState().stage).toBe('restarting');

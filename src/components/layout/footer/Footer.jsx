@@ -4,11 +4,13 @@ import { useTranslation } from 'react-i18next';
 import { Dropdown, Tooltip } from 'antd';
 import useEditorStore from '@store/useEditorStore';
 import useConfigStore from '@store/useConfigStore';
+import useUpdateStore from '@store/useUpdateStore';
 import { useFileManager } from '@hooks/useFileManager';
 import { getDirectoryContents, isSafUri, safDisplayName, showInExplorer } from '@utils/tauriApi';
 import { splitPath, buildFullPath } from '@utils/pathUtils';
 import SyncStatusIndicator from '@components/ui/SyncStatusIndicator';
 import FileTypeIcon from '@components/ui/FileTypeIcon';
+import TaskStatusIndicator from '@components/ui/TaskStatusIndicator';
 import { isAndroidRuntime } from '@utils/platform';
 import './footer.scss';
 
@@ -63,6 +65,8 @@ function Footer() {
   const cursorPosition = useEditorStore((s) => s.cursorPosition);
   const characterCount = useEditorStore((s) => s.characterCount);
   const syncEnabled = useConfigStore((s) => s.syncEnabled);
+  const updateStage = useUpdateStore((s) => s.stage);
+  const tasksOpen = useUpdateStore((s) => s.open);
   const { openFileFromPath } = useFileManager();
   const activeTab = useMemo(
     () => tabs.find((item) => item.id === activeTabId) || null,
@@ -292,6 +296,10 @@ function Footer() {
       </div>
 
       <div className="footer__right">
+        {['checking', 'available', 'downloading', 'installing', 'restarting', 'error'].includes(updateStage) && (
+          <TaskStatusIndicator stage={updateStage} expanded={tasksOpen}
+            onClick={() => tasksOpen ? useUpdateStore.getState().dismiss() : useUpdateStore.getState().showTasks()} />
+        )}
         {activeTab && (
           <>
             <span>{t('footer.line')} {cursorPosition.lineNumber}, {t('footer.column')} {cursorPosition.column}</span>

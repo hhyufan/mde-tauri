@@ -45,7 +45,7 @@ import { useHotkeys } from '@hooks/useHotkeys';
 import { HOTKEY_COMMAND_EVENT } from '@utils/hotkeyCommands';
 import { isCapturingShortcut } from '@/configs/hotkeys';
 import ExternalFileConflictNotice from '@components/overlays/ExternalFileConflictNotice';
-import UpdateDialog from '@components/overlays/UpdateDialog';
+import TaskList from '@components/overlays/TaskList';
 import CrtBoot from '@components/overlays/CrtBoot';
 import NotificationContainer from '@components/notification/NotificationContainer';
 import useSyncStore from '@store/useSyncStore';
@@ -940,7 +940,7 @@ function App() {
 
       </Suspense>
       <NotificationContainer />
-      <UpdateDialog />
+      <TaskList />
       {/* 更新后的入场动画盖在所有内容之上，播完自行卸载 */}
       {crtBoot && <CrtBoot onDone={finishWorkspaceEntry} />}
     </>

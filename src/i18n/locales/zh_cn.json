@@ -574,7 +574,14 @@
   "update.installed": "更新已安装。准备好后重启应用以完成更新。",
   "update.up-to-date": "当前已是最新版本。",
   "update.error": "更新未完成，请重试。",
-  "update.saveFirst": "请先关闭此弹窗并保存所有文档，再进行安装或重启。",
+  "update.saveFirst": "请先保存所有文档，再进行安装或重启。",
   "update.restarting": "正在交接到安装器，完成后将自动打开 MokiDown…",
-  "settings.about.installer": "下载安装包"
+  "settings.about.installer": "下载安装包",
+  "tasks.title": "任务列表",
+  "tasks.checking": "正在检测更新",
+  "tasks.downloading": "正在下载",
+  "tasks.installing": "正在安装",
+  "tasks.restarting": "正在启动",
+  "tasks.hide": "收起任务列表",
+  "tasks.releaseNotes": "更新说明"
 }

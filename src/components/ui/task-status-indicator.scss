@@ -1,0 +1,38 @@
+.task-status-indicator {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 4px;
+  border: 0;
+  border-radius: 3px;
+  background: transparent;
+  color: var(--accent);
+  font: inherit;
+  white-space: nowrap;
+  cursor: pointer;
+  svg {
+    width: 12px;
+    height: 12px;
+    flex-shrink: 0;
+  }
+  &:hover {
+    background: var(--hover);
+  }
+  &:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+  }
+  &__spinner {
+    animation: task-status-spin 1s linear infinite;
+  }
+}
+@keyframes task-status-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .task-status-indicator__spinner {
+    animation: none;
+  }
+}

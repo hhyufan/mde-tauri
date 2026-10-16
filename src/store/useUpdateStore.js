@@ -33,9 +33,9 @@ const useUpdateStore = create((set, get) => ({
     }
     set({
       stage: 'checking',
-      // 检查过程中先不开窗：手动检查通常一两秒就出结果，
-      // 先闪一个"正在检查更新"再关掉，比直接给结果更烦。
-      open: false,
+      // 手动检查也要在任务列表里看得见——它已经是非模态面板，不是弹窗，
+      // 所以不用担心"闪一下再关掉"。启动时的静默检查不打扰用户。
+      open: manual,
       error: '',
       version: '',
       body: '',
@@ -65,20 +65,20 @@ const useUpdateStore = create((set, get) => ({
     }
   },
   dismiss: () => {
-    if (busy(get().stage)) return;
     set({ open: false });
-    void releaseResource();
+    // Keep the available update usable when the task list is reopened.
   },
+  showTasks: () => set({ open: true }),
   install: async () => {
     if (get().stage !== 'available' || !updateResource) return;
-    set({ stage: 'downloading', error: '' });
+    set({ stage: 'downloading', open: true, error: '' });
     try {
       await installUpdate(updateResource, (stage, detail = {}) => set({ stage, ...detail }));
       set({ stage: 'restarting' });
       await releaseResource();
       await relaunchApp();
     } catch (error) {
-      set({ stage: 'error', error: String(error?.message || error) });
+      set({ stage: 'error', open: true, error: String(error?.message || error) });
       await releaseResource();
     }
   },

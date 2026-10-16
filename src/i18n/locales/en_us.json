@@ -574,7 +574,14 @@
   "update.installed": "Update installed. Restart when you are ready to finish updating.",
   "update.up-to-date": "You are up to date.",
   "update.error": "The update could not be completed. Please try again.",
-  "update.saveFirst": "Close this dialog and save all documents before installing or restarting.",
+  "update.saveFirst": "Save all documents before installing or restarting.",
   "update.restarting": "Opening the installer. MokiDown will reopen automatically when finished.",
-  "settings.about.installer": "Download installer"
+  "settings.about.installer": "Download installer",
+  "tasks.title": "Task List",
+  "tasks.checking": "Checking for updates",
+  "tasks.downloading": "Downloading",
+  "tasks.installing": "Installing",
+  "tasks.restarting": "Restarting",
+  "tasks.hide": "Hide task list",
+  "tasks.releaseNotes": "Release notes"
 }
