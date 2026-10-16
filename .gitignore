@@ -87,3 +87,9 @@ baka.md3
 *.md3
 /src/showcase
 /.codex-mde-server-editor
+
+# React installer build artifacts
+installer/dist/
+installer/payload/*.exe
+installer/src-tauri/target/
+installer/src-tauri/gen/

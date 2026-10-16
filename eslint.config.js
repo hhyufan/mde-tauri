@@ -10,6 +10,8 @@ export default [
       'dist/**',
       'node_modules/**',
       'src-tauri/target/**',
+      'installer/dist/**',
+      'installer/src-tauri/gen/**',
       // 额外命名的 Cargo 目标目录（例如 target-monaco-fix）同样是构建产物。
       'src-tauri/target-*/**',
       'src-tauri/gen/**',
@@ -51,7 +53,7 @@ export default [
     languageOptions: { globals: globals.browser },
   },
   {
-    files: ['src/**/*.{js,jsx}', 'vite.config.js', 'scripts/**/*.mjs'],
+    files: ['src/**/*.{js,jsx}', 'installer/src/**/*.{js,jsx}', 'installer/*.mjs', 'vite.config.js', 'scripts/**/*.mjs'],
     languageOptions: {
       ecmaVersion: 'latest',
       sourceType: 'module',

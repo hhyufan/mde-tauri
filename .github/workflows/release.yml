@@ -82,6 +82,28 @@ jobs:
           releaseDraft: false
           prerelease: false
           args: --bundles nsis,msi
+      - name: Build React installer
+        env:
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+        run: node scripts/build-react-installer.mjs --reuse-app
+      - name: Sign React installer
+        shell: pwsh
+        env:
+          WINDOWS_CERTIFICATE: ${{ secrets.WINDOWS_CERTIFICATE }}
+        run: |
+          if ([string]::IsNullOrWhiteSpace($env:WINDOWS_CERTIFICATE)) { exit 0 }
+          $config = $env:TAURI_CONFIG | ConvertFrom-Json
+          $thumbprint = $config.bundle.windows.certificateThumbprint
+          if (!$thumbprint) { throw 'Missing Windows signing certificate thumbprint.' }
+          $sdkRoot = Join-Path ${env:ProgramFiles(x86)} 'Windows Kits/10/bin'
+          $signTool = Get-ChildItem -LiteralPath $sdkRoot -Filter signtool.exe -Recurse -File |
+            Where-Object { $_.Directory.Name -eq 'x64' } | Sort-Object FullName -Descending | Select-Object -First 1
+          if (!$signTool) { throw 'signtool.exe not found.' }
+          $installer = Get-ChildItem -LiteralPath 'src-tauri/target/release/bundle/react' -Filter '*.exe' -File
+          if (@($installer).Count -ne 1) { throw 'Expected one React installer.' }
+          & $signTool.FullName sign /sha1 $thumbprint /fd SHA256 /tr http://timestamp.digicert.com /td SHA256 $installer.FullName
+          if ($LASTEXITCODE -ne 0) { throw 'React installer signing failed.' }
       - name: Verify Windows signatures
         shell: pwsh
         env:
@@ -90,7 +112,8 @@ jobs:
           $paths = @('src-tauri/target/release/mokidown.exe')
           foreach ($bundle in @(
             @{ Directory = 'src-tauri/target/release/bundle/nsis'; Filter = 'mokidown_*_x64-setup.exe' },
-            @{ Directory = 'src-tauri/target/release/bundle/msi'; Filter = 'mokidown_*_x64_en-US.msi' }
+            @{ Directory = 'src-tauri/target/release/bundle/msi'; Filter = 'mokidown_*_x64_en-US.msi' },
+            @{ Directory = 'src-tauri/target/release/bundle/react'; Filter = 'MokiDown_*_x64-setup.exe' }
           )) {
             $artifacts = @(Get-ChildItem -LiteralPath $bundle.Directory -Filter $bundle.Filter -File)
             if ($artifacts.Count -ne 1) { throw "Expected exactly one artifact in $($bundle.Directory), found $($artifacts.Count)." }
@@ -109,6 +132,15 @@ jobs:
             $signature = Get-AuthenticodeSignature -LiteralPath $path
             if ($signature.Status -ne 'Valid') { throw "Invalid Windows signature on $path`: $($signature.Status)" }
           }
+      - name: Upload React installer
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          $version = (Get-Content -LiteralPath src-tauri/tauri.conf.json -Raw | ConvertFrom-Json).version
+          $installer = Get-ChildItem -LiteralPath 'src-tauri/target/release/bundle/react' -Filter '*.exe' -File
+          gh release upload "v$version" $installer.FullName --repo '${{ github.repository }}' --clobber
+          if ($LASTEXITCODE -ne 0) { throw 'React installer upload failed.' }
 
   # 构建完成后，把更新包与 latest.json 同步到阿里云 OSS。
   # 客户端读的是 OSS 上那份 latest.json（见 tauri.conf.json 的 updater.endpoints），

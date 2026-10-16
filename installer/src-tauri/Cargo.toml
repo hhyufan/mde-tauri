@@ -1,0 +1,19 @@
+[package]
+name = "mokidown-installer"
+version = "0.1.1"
+edition = "2021"
+description = "React installer for MokiDown"
+
+[build-dependencies]
+tauri-build = { version = "2.0.0", features = [] }
+
+[dependencies]
+tauri = { version = "2.10", features = [] }
+tauri-plugin-dialog = "2"
+serde = { version = "1", features = ["derive"] }
+tempfile = "3"
+
+[profile.release]
+opt-level = "s"
+lto = "thin"
+strip = true
