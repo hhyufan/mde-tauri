@@ -30,6 +30,13 @@ it('空闲时不列出任何任务，状态栏也没有可显示的任务', () =
   expect(result.current.active).toBeNull();
 });
 
+it('已是最新版本是完成态，不再占一条任务', () => {
+  useUpdateStore.setState({ stage: 'up-to-date' });
+  const { result } = renderHook(() => useTasks());
+  expect(result.current.tasks).toHaveLength(0);
+  expect(result.current.active).toBeNull();
+});
+
 it('更新下载中：带确定百分比，并优先于语言服务占据状态栏', () => {
   useUpdateStore.setState({ stage: 'downloading', version: '0.1.4', downloaded: 512, total: 1024 });
   useLspStore.setState({

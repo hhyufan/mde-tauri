@@ -19,6 +19,16 @@ export const TRANSFER_STAGES = new Set(['downloading', 'installing', 'restarting
 const ACTIVE_STAGES = new Set(['checking', 'downloading', 'installing', 'restarting']);
 // 状态栏需要露出提示、但并非进行中的阶段。
 const NOTICE_STAGES = new Set(['available', 'error']);
+// 会作为一条任务列出来的阶段。"已是最新版本"是完成态：它已经被那条自动消失的
+// 通知交代过了，再占一条任务只会让人以为还有事没做完。
+const LISTED_STAGES = new Set([
+  'checking',
+  'available',
+  'downloading',
+  'installing',
+  'restarting',
+  'error',
+]);
 
 /**
  * 全局任务清单：更新与语言服务安装/卸载统一成同一形状。
@@ -42,7 +52,7 @@ export default function useTasks() {
   const tasks = useMemo(() => {
     const list = [];
 
-    if (stage !== 'idle') {
+    if (LISTED_STAGES.has(stage)) {
       const percent =
         stage === 'downloading'
           ? total > 0
@@ -62,7 +72,7 @@ export default function useTasks() {
         showBar: TRANSFER_STAGES.has(stage),
         // 正在下载/安装/重启的更新中止不了（Tauri 的 downloadAndInstall 没有暴露
         // 中止入口），所以这些阶段不给关闭按钮；其余阶段关闭即回到空闲。
-        close: ['available', 'error', 'up-to-date'].includes(stage) ? 'reset' : null,
+        close: ['available', 'error'].includes(stage) ? 'reset' : null,
         meta:
           stage === 'downloading'
             ? `${(downloaded / MB).toFixed(1)}${total > 0 ? ` / ${(total / MB).toFixed(1)}` : ''} MB`
