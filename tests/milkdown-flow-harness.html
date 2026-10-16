@@ -25,6 +25,7 @@ root.render(React.createElement('div',
   { className: 'app', style: { height: '100vh', display: 'flex' } }, React.createElement(Editor, { ref, readOnly: params.has('readonly'), onAutoSave: () => saves++ })));
 const view = () => ref.current.getEditor().action((ctx) => ctx.get(editorViewCtx));
 window.trial = {
+  toolbar: (command) => ref.current.handleToolbarAction({ command }),
   markdown: () => ref.current.getCurrentValue(),
   buffer: () => getBuffer('flow.md'),
   saves: () => saves,

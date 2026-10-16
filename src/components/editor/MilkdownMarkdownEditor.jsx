@@ -25,7 +25,6 @@ import {
   emphasisSchema,
   imageSchema,
   insertHrCommand,
-  insertImageCommand,
   listItemSchema,
   paragraphSchema,
   toggleStrongCommand,
@@ -129,6 +128,9 @@ import { htmlBlockSchema, htmlBlockView, sanitizeMilkdownHtml } from './milkdown
 import { configureEditingWhitespace, initialEditingSelection } from './milkdownWhitespace';
 import { configureEditingTables, milkdownTableKeys, milkdownTableView } from './milkdownTables';
 import { isAndroidRuntime } from '@utils/platform';
+import MilkdownMediaTools from './MilkdownMediaTools';
+import { milkdownMediaEditor, milkdownMediaImageView } from './milkdownMedia';
+import { openExternal } from '@utils/tauriApi';
 import './markdown-preview.scss';
 
 /**
@@ -1109,6 +1111,7 @@ function isNonEditablePreviewTarget(target) {
  */
 function createNonEditablePreviewSelectionHandler(getEditor) {
   return function stopNonEditablePreviewSelection(event) {
+    if (event.target.closest?.('img[src], .milkdown-media-inline')) return;
     if (event.target.closest?.('[data-type="html_block"]')) return;
     if (!isNonEditablePreviewTarget(event.target)) return;
 
@@ -1371,6 +1374,11 @@ function MilkdownInner({
   const publishedMarkdownRef = useRef(null);
   const mermaidRootsRef = useRef(new Map());
   const imageCleanupsRef = useRef([]);
+  const mediaToolsRef = useRef(null);
+  const getMediaView = useCallback(() => {
+    try { return editorRef.current?.action((ctx) => ctx.get(editorViewCtx)); }
+    catch { return null; }
+  }, []);
   const [renderTick, setRenderTick] = useState(0);
   const { menu, openMenu, closeMenu } = useEditorContextMenu(`${activeTabId}:${renderTick}`);
   const handleContextMenu = (event) => {
@@ -1487,6 +1495,8 @@ function MilkdownInner({
       .use(taskListCheckboxPlugin)
       .use(mathPlugins)
       .use(history)
+      .use(milkdownMediaEditor)
+      .use(milkdownMediaImageView)
       .use(codeBlockComponent)
       .use(listener);
 
@@ -1566,20 +1576,9 @@ function MilkdownInner({
             run(createCodeBlockCommand, '');
             break;
           case 'link':
-            {
-              const { from, to, empty } = view.state.selection;
-              if (empty) {
-                insert('[link](url)', true)(ctx);
-              } else {
-                const selected = getMarkdown({ from, to })(ctx) || 'link';
-                replaceRange(`[${selected}](url)`, { from, to })(ctx);
-              }
-              handled = true;
-              view.focus();
-            }
-            break;
           case 'image':
-            run(insertImageCommand, { src: 'url', alt: 'alt', title: '' });
+            mediaToolsRef.current?.open(action.command);
+            handled = true;
             break;
           case 'taskList':
             {
@@ -1647,7 +1646,10 @@ function MilkdownInner({
     if (!wrapper) return undefined;
 
     const run = () => {
-      if (wrapper.querySelector('img[src]:not([data-moki-resolved-src])')) {
+      if ([...wrapper.querySelectorAll('.milkdown-editor img[src]')].some((img) => {
+        const src = img.getAttribute('src');
+        return src && src !== img.dataset.mokiResolvedSrc && src !== img.dataset.mokiObjectUrl;
+      })) {
         imageCleanupsRef.current.push(hydrateMarkdownImages(wrapper, documentPath));
       }
       renderMilkdownHtml(wrapper);
@@ -1683,12 +1685,21 @@ function MilkdownInner({
     if (!wrapper) return undefined;
 
     const handleLinkClick = (event) => {
+      if (getEventTargetElement(event.target)?.closest('.milkdown-media-inline')) return;
+      if (getEventTargetElement(event.target)?.closest('img')) return;
       const anchor = getEventTargetElement(event.target)?.closest('a[href]');
       const href = anchor?.getAttribute('href') || '';
       if (!anchor || !href || href.startsWith('#')) return;
 
       const target = resolveMarkdownLinkPath(href, documentPath);
-      if (!target.internal || !target.path) return;
+      if (!target.internal || !target.path) {
+        if (/^(https?:|mailto:|tel:|sms:)/i.test(href)) {
+          event.preventDefault();
+          if (window.__TAURI_INTERNALS__) void openExternal(href);
+          else window.open(href, '_blank', 'noopener,noreferrer');
+        } else if (/^(javascript:|data:|vbscript:)/i.test(href)) event.preventDefault();
+        return;
+      }
 
       event.preventDefault();
       event.stopPropagation();
@@ -1844,6 +1855,8 @@ function MilkdownInner({
       }}
     >
       <Milkdown />
+      <MilkdownMediaTools key={activeTabId} ref={mediaToolsRef} rootRef={wrapperRef} getView={getMediaView}
+        ready={!editorInfo.loading} readOnly={readOnly} />
       <EditorContextMenu menu={menu} onClose={closeMenu} />
     </div>
   );

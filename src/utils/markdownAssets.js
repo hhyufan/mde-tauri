@@ -218,14 +218,17 @@ export function hydrateMarkdownImages(container, documentPath) {
 
   container.querySelectorAll('img[src]').forEach((img) => {
     const currentSrc = img.getAttribute('src');
-    const rawSrc = img.dataset.mokiOriginalSrc || currentSrc;
+    // ProseMirror may reuse the same img after an address edit. A changed src is
+    // a new source, unless it is the object URL produced by this hydrator.
+    const rawSrc = currentSrc !== img.dataset.mokiObjectUrl && currentSrc !== img.dataset.mokiResolvedSrc
+      ? currentSrc : img.dataset.mokiOriginalSrc || currentSrc;
     // 使用原始 src 作为去重键，避免同一张图反复创建 object URL。
     if (!rawSrc || img.dataset.mokiResolvedSrc === rawSrc) return;
     img.dataset.mokiOriginalSrc = rawSrc;
     img.dataset.mokiResolvedSrc = rawSrc;
 
     loadMarkdownImageSrc(rawSrc, documentPath).then(({ src, objectUrl }) => {
-      if (cancelled || !src) {
+      if (cancelled || !src || img.dataset.mokiResolvedSrc !== rawSrc || !img.isConnected) {
         if (objectUrl) URL.revokeObjectURL(objectUrl);
         return;
       }
