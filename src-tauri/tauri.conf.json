@@ -66,7 +66,7 @@
     "store": null,
     "updater": {
       "endpoints": [
-        "https://mokidown-updates.oss-cn-hangzhou.aliyuncs.com/updates/latest.json"
+        "https://mokidown-updates.oss-accelerate.aliyuncs.com/updates/latest.json"
       ],
       "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDQyRjE4MTI3RjEzNDc1QkMKUldTOGRUVHhKNEh4UW8rVDBOU1QzS1c2a29nZTlsY2VyTjRSM3hWQ1A2WW5jV0RoLzBOVzRXa2EK"
     }

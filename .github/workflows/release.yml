@@ -145,13 +145,17 @@ jobs:
       - name: 生成指向 OSS 的 latest.json
         env:
           BUCKET: ${{ vars.OSS_BUCKET }}
-          REGION: ${{ vars.OSS_REGION }}
         run: |
           set -euo pipefail
           cd dist
+          # 对外给出的地址一律用传输加速域名：很多用户挂着代理，地域域名
+          # （oss-cn-*）在他们那儿经常连不上或很慢。加速域名与地域域名指向
+          # 同一个 Bucket，所以这里只影响「我们公布出去的 URL」，不必重新上传。
+          # 注意上传本身仍走地域域名（见「上传到 OSS」），那是 CI 到 Bucket 的通道。
+          HOST="${BUCKET}.oss-accelerate.aliyuncs.com"
           # Tauri 2 的 NSIS 更新产物就是安装包本身加一个同名 .sig，
           # 不是某些旧文档里写的 .nsis.zip（本地构建验证过：只有 .exe 和 .exe.sig）。
-          PKG=$(ls *-setup.exe | head -1)
+          PKG=$(ls mokidown_*-setup.exe | head -1)
           if [ -z "$PKG" ]; then echo "::error::没找到 NSIS 安装包（*-setup.exe）"; exit 1; fi
           if [ ! -f "${PKG}.sig" ]; then echo "::error::缺少签名文件 ${PKG}.sig，检查 createUpdaterArtifacts"; exit 1; fi
           SIG=$(cat "${PKG}.sig")
@@ -159,7 +163,7 @@ jobs:
           jq -n \
             --arg v "$VERSION" \
             --arg sig "$SIG" \
-            --arg url "https://${BUCKET}.oss-${REGION}.aliyuncs.com/updates/${PKG}" \
+            --arg url "https://${HOST}/updates/${PKG}" \
             --arg date "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
             '{version: $v, notes: "", pub_date: $date,
               platforms: {"windows-x86_64": {signature: $sig, url: $url}}}' \
@@ -202,10 +206,11 @@ jobs:
       - name: 验证可匿名下载
         env:
           BUCKET: ${{ vars.OSS_BUCKET }}
-          REGION: ${{ vars.OSS_REGION }}
         run: |
           set -euo pipefail
-          URL="https://${BUCKET}.oss-${REGION}.aliyuncs.com/updates/latest.json"
+          # 验证客户端真正会访问的那个域名（加速域名），地域域名只是上传通道。
+          HOST="${BUCKET}.oss-accelerate.aliyuncs.com"
+          URL="https://${HOST}/updates/latest.json"
           CODE=$(curl -s -o /dev/null -w '%{http_code}' "$URL")
           echo "$URL -> $CODE"
           # 403 基本就是 Bucket 读写权限没设成公共读。
@@ -213,5 +218,19 @@ jobs:
             echo "::error::latest.json 无法匿名访问（$CODE），请确认 Bucket 读写权限为「公共读」";
             exit 1;
           }
-          curl -s "$URL" | jq -e '.platforms["windows-x86_64"].url' > /dev/null
-          echo "latest.json 内容可解析，OSS 同步完成。"
+          PKG_URL=$(curl -s "$URL" | jq -r '.platforms["windows-x86_64"].url')
+          # 必须真的挂在加速域名上。只断言字段存在是不够的——地址还指着地域
+          # 域名的话，等于只加速了 679 B 的元数据，22 MB 的包依旧走慢的那条路。
+          # 这里只做「含加速域名」的包含判断，故意不写复杂通配，避免自检本身出错。
+          case "$PKG_URL" in
+            *oss-accelerate.aliyuncs.com*) ;;
+            *) echo "::error::latest.json 里的下载地址没走加速域名：$PKG_URL"; exit 1 ;;
+          esac
+          # 只取首字节，别在 CI 里真下 22 MB；范围请求返回 206，一并接受。
+          PKG_CODE=$(curl -s -o /dev/null -w '%{http_code}' -r 0-0 "$PKG_URL")
+          echo "$PKG_URL -> $PKG_CODE"
+          case "$PKG_CODE" in
+            200 | 206) ;;
+            *) echo "::error::安装包无法匿名下载（$PKG_CODE）：$PKG_URL"; exit 1 ;;
+          esac
+          echo "latest.json 与安装包均可匿名下载，OSS 同步完成。"
