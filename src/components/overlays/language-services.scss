@@ -8,6 +8,10 @@
   &__heading p { color: var(--text-sec); line-height: 1.6; max-width: 360px; }
   &__search { display: flex; gap: 6px; }
   &__search .ant-input-affix-wrapper { flex: 1; min-width: 0; }
+  // 已配置加速前缀时把按钮点亮，省得点开才知道有没有设。
+  &__search .ant-btn.is-active { color: var(--accent); border-color: var(--accent); }
+  &__accelerator { margin-top: 8px; }
+  &__accelerator p { margin: 6px 0 0; font-size: 11px; line-height: 1.6; color: var(--text-dim); }
   &__tabs { display: flex; gap: 18px; border-bottom: 1px solid var(--border); margin: 12px 0 2px; }
   &__tabs button { display: flex; align-items: center; gap: 6px; background: none; border: none; border-bottom: 2px solid transparent; padding: 9px 0; color: var(--text-sec); cursor: pointer; font-size: 12px; }
   &__tabs button.is-active { color: var(--accent); border-bottom-color: var(--accent); }

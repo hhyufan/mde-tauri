@@ -58,6 +58,7 @@ export default function LanguageServices() {
   const [source, setSource] = useState('');
   const [manifestText, setManifestText] = useState(example);
   const [addBusy, setAddBusy] = useState(false);
+  const [showAccelerator, setShowAccelerator] = useState(false);
   const [error, setError] = useState('');
   const [iconModule, setIconModule] = useState(() => getMaterialIcons());
   const desktop = Boolean(window.__TAURI_INTERNALS__) && !window.AndroidBridge;
@@ -161,7 +162,21 @@ export default function LanguageServices() {
               await state.refresh();
             })} />
         </Tooltip>
+        <Tooltip title={t('languageServices.accelerator')} placement="top" mouseEnterDelay={0.3}>
+          <Button icon={<LinkOutlined />} aria-label={t('languageServices.accelerator')}
+            className={state.githubAccelerator ? 'is-active' : ''} disabled={!desktop}
+            onClick={() => setShowAccelerator((visible) => !visible)} />
+        </Tooltip>
       </div>
+      {showAccelerator && (
+        <div className="language-services__accelerator">
+          <Input allowClear value={state.githubAccelerator}
+            placeholder={t('languageServices.acceleratorPlaceholder')}
+            aria-label={t('languageServices.accelerator')}
+            onChange={(event) => state.setGithubAccelerator(event.target.value)} />
+          <p>{t('languageServices.acceleratorHint')}</p>
+        </div>
+      )}
       <div className="language-services__tabs" role="tablist">
         {['marketplace', 'installed'].map((key) => <button key={key} type="button" role="tab" aria-selected={filter === key}
           className={filter === key ? 'is-active' : ''} onClick={() => setFilter(key)}>

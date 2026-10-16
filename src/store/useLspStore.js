@@ -12,6 +12,10 @@ const toggling = new Set();
 function desktop() { return typeof window !== 'undefined' && Boolean(window.__TAURI_INTERNALS__); }
 async function events() {
   if (!subscription) subscription = listen('language-plugin-progress', ({ payload }) => {
+    // 用户主动取消的安装会以 "Installation cancelled" 的错误收尾，那是预期结果。
+    // 这里认下取消标记，不再把后续进度（尤其最后那条 error）写回去，
+    // 否则任务列表会冒出一条"安装失败"，插件市场也会跟着显示错误行。
+    if (useLspStore.getState().operations?.[payload.id]?.phase === 'cancelled') return;
     useLspStore.setState((state) => ({ operations: { ...state.operations, [payload.id]: {
       ...state.operations[payload.id], ...payload, text: String(payload.text || '').slice(-8192),
     } } }));
@@ -43,6 +47,10 @@ export function validatePluginManifest(manifest) {
 const useLspStore = create(persist((set, get) => ({
   enabled: true, catalog: [], sources: [], preferred: {}, installed: [], operations: {}, statuses: {}, revision: 0,
   loading: false, loadError: '',
+  // 可选的 GitHub 加速前缀（如 https://ghfast.top/）。国内直连 releases 会重定向到
+  // 时常不可达的 CDN 主机，这里让用户自备镜像；留空即直连。
+  githubAccelerator: '',
+  setGithubAccelerator: (githubAccelerator) => set({ githubAccelerator }),
   setEnabled: (enabled) => {
     if (!enabled) useProblemsStore.getState().clearOwner('lsp');
     set((state) => ({ enabled, revision: state.revision + 1 }));
@@ -78,11 +86,26 @@ const useLspStore = create(persist((set, get) => ({
     set((state) => ({ operations: { ...state.operations, [id]: { phase: 'preparing', text: '' } } }));
     try {
       await events();
-      const plugin = await invoke('install_language_plugin', { manifest });
+      // 把用户配置的加速前缀一并交给 Rust：它在拼 GitHub 直链时套上去。
+      const accelerator = get().githubAccelerator.trim();
+      const payload = accelerator
+        ? { ...manifest, install: { ...manifest.install, accelerator } }
+        : manifest;
+      const plugin = await invoke('install_language_plugin', { manifest: payload });
       set((state) => ({ installed: [...state.installed.filter((entry) => entry.manifest.id !== id), plugin], operations: { ...state.operations, [id]: { phase: 'complete' } }, revision: state.revision + 1 }));
-    } catch (error) { set((state) => ({ operations: { ...state.operations, [id]: { phase: 'error', text: String(error?.message || error) } } })); }
+    } catch (error) {
+      // 主动取消不算失败：把记录摘掉，任务列表与插件市场都当没发生过。
+      if (get().operations?.[id]?.phase === 'cancelled') { get().dismissOperation(id); return; }
+      set((state) => ({ operations: { ...state.operations, [id]: { phase: 'error', text: String(error?.message || error) } } }));
+    }
   },
-  cancelInstall: async (id) => invoke('cancel_language_plugin_install', { id }),
+  cancelInstall: async (id) => {
+    // 先落一个 cancelled 标记再让 Rust 取消：取消到结果返回之间有窗口期，
+    // 期间的进度事件与最终的 "Installation cancelled" 都要按"已取消"对待。
+    set((state) => ({ operations: { ...state.operations, [id]: { ...state.operations[id], phase: 'cancelled' } } }));
+    try { await invoke('cancel_language_plugin_install', { id }); }
+    catch (error) { get().dismissOperation(id); throw error; }
+  },
   // 关掉一条任务：把该操作记录从 store 里去掉。失败态的任务靠它从任务列表消失
   // （失败的任务没有"取消"可言，用关闭更自然）。
   dismissOperation: (id) =>
@@ -121,6 +144,6 @@ const useLspStore = create(persist((set, get) => ({
         statuses: { ...state.statuses, [id]: { status: 'idle', message: '' } }, revision: state.revision + 1 }));
     } catch (error) { set((state) => ({ operations: { ...state.operations, [id]: { phase: 'error', text: String(error?.message || error) } }, revision: state.revision + 1 })); }
   },
-}), { name: 'mokidown-language-plugins', partialize: ({ enabled, catalog, sources, preferred }) => ({ enabled, catalog, sources, preferred }) }));
+}), { name: 'mokidown-language-plugins', partialize: ({ enabled, catalog, sources, preferred, githubAccelerator }) => ({ enabled, catalog, sources, preferred, githubAccelerator }) }));
 export default useLspStore;
 if (import.meta.hot) import.meta.hot.dispose(() => { subscription?.then((stop) => stop()); });

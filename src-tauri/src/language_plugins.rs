@@ -71,6 +71,13 @@ pub struct InstallRecipe {
     pub url: String,
     #[serde(default)]
     pub sha256: String,
+    /// 可选的 GitHub 加速前缀（例如 https://ghfast.top/）。
+    ///
+    /// 国内直连 releases 会重定向到时常不可达的 CDN 主机，这里允许用户自备镜像。
+    /// 约定为"前缀 + 完整原始 URL"（各家加速服务都是这个形式）。空表示直连；
+    /// 最终 URL 仍会经过 https 校验，所以 http 前缀会被拒绝。
+    #[serde(default)]
+    pub accelerator: String,
 }
 #[derive(Clone, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -307,7 +314,23 @@ fn size_text(received: u64, total: Option<u64>) -> String {
         None => amount(received),
     }
 }
-fn download(
+/// 给 GitHub 直链套上用户配置的加速前缀。
+///
+/// 各家加速服务的约定是"前缀 + 完整原始 URL"，前缀带不带结尾斜杠都要能用。
+/// 没配前缀时原样返回，行为与从前完全一致。
+fn accelerate(recipe: &InstallRecipe, url: String) -> String {
+    let prefix = recipe.accelerator.trim();
+    if prefix.is_empty() {
+        url
+    } else if prefix.ends_with('/') {
+        format!("{prefix}{url}")
+    } else {
+        format!("{prefix}/{url}")
+    }
+}
+
+/// 下载一次。网络类失败由 [`download`] 负责重试。
+fn download_once(
     client: &reqwest::blocking::Client,
     url: &str,
     destination: &Path,
@@ -367,6 +390,50 @@ fn download(
         return Err("Download checksum mismatch".into());
     }
     Ok(final_url)
+}
+
+/// 下载，带重试。
+///
+/// GitHub 的 `releases/latest/download/...` 会重定向到 CDN 主机，国内常见的情况是
+/// github.com 能通、CDN 主机时通时不通，于是同一批插件有的成、有的败。单次尝试
+/// 遇到这种抖动就直接把整个安装判死，代价太大，所以网络类失败退避重试几次。
+///
+/// 校验和不符、超过体积上限、用户取消都不重试：那些重试也不会变好。
+fn download(
+    client: &reqwest::blocking::Client,
+    url: &str,
+    destination: &Path,
+    checksum: &str,
+    app: &Reporter,
+    id: &str,
+    cancel: &AtomicBool,
+) -> Result<String, String> {
+    const ATTEMPTS: usize = 3;
+    let mut last_error = String::new();
+    for attempt in 1..=ATTEMPTS {
+        cancelled(cancel)?;
+        match download_once(client, url, destination, checksum, app, id, cancel) {
+            Ok(final_url) => return Ok(final_url),
+            Err(error) => {
+                let retryable = !["cancelled", "checksum", "exceeds"]
+                    .iter()
+                    .any(|marker| error.to_lowercase().contains(marker));
+                if !retryable || attempt == ATTEMPTS {
+                    return Err(error);
+                }
+                last_error = error;
+                progress(
+                    app,
+                    id,
+                    "downloading",
+                    None,
+                    &format!("network error, retrying ({attempt}/{ATTEMPTS})"),
+                );
+                std::thread::sleep(Duration::from_millis(800 * attempt as u64));
+            }
+        }
+    }
+    Err(last_error)
 }
 fn unpack(
     archive: &Path,
@@ -676,9 +743,12 @@ fn install_payload(
                     format!("download/{}", manifest.version)
                 };
                 (
-                    format!(
-                        "https://github.com/{}/releases/{release_path}/{asset_name}",
-                        recipe.repository
+                    accelerate(
+                        recipe,
+                        format!(
+                            "https://github.com/{}/releases/{release_path}/{asset_name}",
+                            recipe.repository
+                        ),
                     ),
                     format.to_string(),
                     recipe.sha256.clone(),
@@ -1011,6 +1081,36 @@ pub async fn uninstall_language_plugin(app: AppHandle, id: String) -> Result<(),
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn accelerator_prefix_wraps_the_original_github_url() {
+        let mut recipe = InstallRecipe {
+            kind: "github".into(),
+            packages: vec![],
+            executable: String::new(),
+            repository: "fwcd/kotlin-language-server".into(),
+            asset: String::new(),
+            assets: HashMap::new(),
+            format: "zip".into(),
+            url: String::new(),
+            sha256: String::new(),
+            accelerator: String::new(),
+        };
+        let original = "https://github.com/x/y/releases/latest/download/z.zip".to_string();
+        // 没配前缀：原样直连，行为与从前一致。
+        assert_eq!(accelerate(&recipe, original.clone()), original);
+        // 前缀带不带结尾斜杠都要拼对，且不能吃掉原始 URL 的 https://
+        recipe.accelerator = "https://ghfast.top/".into();
+        assert_eq!(
+            accelerate(&recipe, original.clone()),
+            "https://ghfast.top/https://github.com/x/y/releases/latest/download/z.zip"
+        );
+        recipe.accelerator = "https://ghfast.top".into();
+        assert_eq!(
+            accelerate(&recipe, original),
+            "https://ghfast.top/https://github.com/x/y/releases/latest/download/z.zip"
+        );
+    }
 
     #[test]
     fn download_size_text_shows_total_when_known() {
