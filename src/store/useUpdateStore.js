@@ -28,14 +28,15 @@ const useUpdateStore = create((set, get) => ({
       startupChecked = true;
     }
     if (busy(get().stage)) {
+      // 已经在跑了：只把面板打开让用户看到进度，不重复发起检查。
       if (manual) set({ open: true });
       return;
     }
     set({
       stage: 'checking',
-      // 手动检查也要在任务列表里看得见——它已经是非模态面板，不是弹窗，
-      // 所以不用担心"闪一下再关掉"。启动时的静默检查不打扰用户。
-      open: manual,
+      // 任务列表默认隐藏，只有用户点击状态栏才展开：这里不自动 open。
+      // 检查过程中的进展由状态栏那个圆环转圈体现。
+      open: false,
       error: '',
       version: '',
       body: '',
@@ -46,9 +47,11 @@ const useUpdateStore = create((set, get) => ({
       await releaseResource();
       updateResource = await checkForUpdate();
       if (updateResource) {
+        // 发现新版本同样不自动展开面板，由状态栏露出"有可用更新"，
+        // 用户点开就能看到版本对比、更新说明与安装按钮。
         set({
           stage: 'available',
-          open: true,
+          open: false,
           version: updateResource.version,
           body: updateResource.body || '',
         });
@@ -60,8 +63,12 @@ const useUpdateStore = create((set, get) => ({
         if (manual) useNotificationStore.getState().notify('info', i18n.t('notification.upToDate'));
       }
     } catch (error) {
-      // 手动检查的失败要让人看见；启动时的静默检查保持安静。
-      set({ stage: 'error', open: manual, error: String(error?.message || error) });
+      // 同样不自动展开面板。手动检查失败必须让人知道，所以给一条会自动消失的
+      // 通知（重试按钮在任务列表里，点状态栏即可打开）；启动时的静默检查保持安静。
+      set({ stage: 'error', open: false, error: String(error?.message || error) });
+      if (manual) {
+        useNotificationStore.getState().notify('error', i18n.t('notification.updateFailed'), String(error?.message || error));
+      }
     }
   },
   dismiss: () => {

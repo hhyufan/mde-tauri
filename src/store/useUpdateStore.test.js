@@ -28,7 +28,8 @@ it('checks once across startup remounts and never downloads without consent', as
   expect(api.checkForUpdate).toHaveBeenCalledTimes(1);
   expect(store.getState()).toMatchObject({
     stage: 'available',
-    open: true,
+    // 任务列表默认隐藏：发现新版本也不自动展开，由状态栏露出提示，点击才展开。
+    open: false,
     version: '1.2.3',
     body: 'Release notes',
   });
@@ -44,9 +45,15 @@ it('keeps automatic success and network failure quiet; manual checks show result
   api.checkForUpdate.mockResolvedValueOnce(null);
   await store.getState().check({ startup: true });
   expect(store.getState()).toMatchObject({ stage: 'up-to-date', open: false });
+
+  // 手动检查失败要让人知道，但不能靠自动弹面板，改给一条会自动消失的通知。
+  const notificationStore = (await import('@store/useNotificationStore')).default;
+  notificationStore.setState({ notifications: [] });
   api.checkForUpdate.mockRejectedValueOnce(new Error('offline'));
   await store.getState().check();
-  expect(store.getState()).toMatchObject({ stage: 'error', open: true, error: 'offline' });
+  expect(store.getState()).toMatchObject({ stage: 'error', open: false, error: 'offline' });
+  expect(notificationStore.getState().notifications).toHaveLength(1);
+  expect(notificationStore.getState().notifications[0].type).toBe('error');
 });
 
 it('手动检查发现已是最新时不留弹窗，只在右上角给一条会自动消失的通知', async () => {
@@ -60,7 +67,7 @@ it('手动检查发现已是最新时不留弹窗，只在右上角给一条会�
   expect(notificationStore.getState().notifications).toHaveLength(1);
 });
 
-it('手动检查时任务列表要打开，好让"正在检测更新"看得见', async () => {
+it('手动检查过程中也不自动展开任务列表', async () => {
   // 用一个受控的 promise 把检查卡在"进行中"，再断言此刻的状态。
   // 注意不要用 mockImplementationOnce 之后再去取 resolve：check() 里
   // await releaseResource() 会让 checkForUpdate 晚一个微任务才被调用。
@@ -71,7 +78,11 @@ it('手动检查时任务列表要打开，好让"正在检测更新"看得见',
   api.checkForUpdate.mockImplementationOnce(() => gate);
 
   const pending = store.getState().check();
-  expect(store.getState()).toMatchObject({ stage: 'checking', open: true });
+  // 进度改由状态栏的圆环体现；面板保持隐藏，等用户点击才展开。
+  expect(store.getState()).toMatchObject({ stage: 'checking', open: false });
+  expect(store.getState().showTasks).toBeTypeOf('function');
+  store.getState().showTasks();
+  expect(store.getState().open).toBe(true);
 
   resolveUpdate(null);
   await pending;
@@ -97,7 +108,7 @@ it('keeps startup failure quiet and permits a later manual retry', async () => {
   await store.getState().check({ startup: true });
   expect(store.getState()).toMatchObject({ stage: 'error', open: false });
   await store.getState().check();
-  expect(store.getState()).toMatchObject({ stage: 'available', open: true });
+  expect(store.getState()).toMatchObject({ stage: 'available', open: false });
 });
 
 it('installs only on consent, ignores double clicks and hands off automatically', async () => {
