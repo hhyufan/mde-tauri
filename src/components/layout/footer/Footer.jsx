@@ -6,6 +6,7 @@ import useEditorStore from '@store/useEditorStore';
 import useConfigStore from '@store/useConfigStore';
 import useUpdateStore from '@store/useUpdateStore';
 import { useFileManager } from '@hooks/useFileManager';
+import useTasks from '@hooks/useTasks';
 import { getDirectoryContents, isSafUri, safDisplayName, showInExplorer } from '@utils/tauriApi';
 import { splitPath, buildFullPath } from '@utils/pathUtils';
 import SyncStatusIndicator from '@components/ui/SyncStatusIndicator';
@@ -65,8 +66,9 @@ function Footer() {
   const cursorPosition = useEditorStore((s) => s.cursorPosition);
   const characterCount = useEditorStore((s) => s.characterCount);
   const syncEnabled = useConfigStore((s) => s.syncEnabled);
-  const updateStage = useUpdateStore((s) => s.stage);
   const tasksOpen = useUpdateStore((s) => s.open);
+  // 当前该在状态栏露出的任务（更新或语言服务安装），以及它的确定进度（没有则为 undefined）。
+  const { active: activeTask } = useTasks();
   const { openFileFromPath } = useFileManager();
   const activeTab = useMemo(
     () => tabs.find((item) => item.id === activeTabId) || null,
@@ -296,9 +298,14 @@ function Footer() {
       </div>
 
       <div className="footer__right">
-        {['checking', 'available', 'downloading', 'installing', 'restarting', 'error'].includes(updateStage) && (
-          <TaskStatusIndicator stage={updateStage} expanded={tasksOpen}
-            onClick={() => tasksOpen ? useUpdateStore.getState().dismiss() : useUpdateStore.getState().showTasks()} />
+        {activeTask && (
+          <TaskStatusIndicator
+            stage={activeTask.stage}
+            label={`${activeTask.status}${Number.isFinite(activeTask.percent) ? ` ${activeTask.percent}%` : ''}`}
+            progress={activeTask.percent}
+            expanded={tasksOpen}
+            onClick={() => tasksOpen ? useUpdateStore.getState().dismiss() : useUpdateStore.getState().showTasks()}
+          />
         )}
         {activeTab && (
           <>

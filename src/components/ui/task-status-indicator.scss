@@ -22,8 +22,27 @@
     outline: 2px solid var(--accent);
     outline-offset: 2px;
   }
-  &__spinner {
-    animation: task-status-spin 1s linear infinite;
+  // 加载图标改为圆环进度：有确定百分比时进度弧按比例收缩，
+  // 没有百分比时弧长固定、整体旋转（即"圆环转圈"）。
+  &__ring {
+    .ring-track {
+      fill: none;
+      stroke: var(--border-light);
+      stroke-width: 3;
+    }
+    .ring-value {
+      fill: none;
+      stroke: var(--accent);
+      stroke-width: 3;
+      stroke-linecap: round;
+      transition: stroke-dashoffset 0.3s ease;
+    }
+    &.is-indeterminate {
+      animation: task-status-spin 1s linear infinite;
+      .ring-value {
+        transition: none;
+      }
+    }
   }
 }
 @keyframes task-status-spin {
@@ -32,7 +51,10 @@
   }
 }
 @media (prefers-reduced-motion: reduce) {
-  .task-status-indicator__spinner {
+  .task-status-indicator__ring {
     animation: none;
+    .ring-value {
+      transition: none;
+    }
   }
 }
