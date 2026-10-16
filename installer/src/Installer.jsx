@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { invoke, isTauri } from '@tauri-apps/api/core';
 import { listen } from '@tauri-apps/api/event';
 import { getCurrentWindow } from '@tauri-apps/api/window';
@@ -24,7 +24,6 @@ const scenes = [
       </>
     ),
     tags: ['Markdown', '实时预览', '所见即所得'],
-    proof: '书写与预览，始终同步',
   },
   {
     label: 'PERSONALIZE',
@@ -43,7 +42,6 @@ const scenes = [
       </>
     ),
     tags: ['浅深主题', '自定义背景', '灵活布局'],
-    proof: '你的节奏，你的工作区',
   },
   {
     label: 'ORGANIZE',
@@ -62,7 +60,6 @@ const scenes = [
       </>
     ),
     tags: ['文档树', '知识树', '快速查找'],
-    proof: '让知识有序生长',
   },
 ];
 const stages = {
@@ -75,7 +72,6 @@ const stages = {
   complete: '安装完成',
   error: '安装未完成',
 };
-const phaseOrder = ['preparing', 'copying', 'registering', 'complete'];
 
 function FeatureCard({ slide }) {
   if (slide === 1)
@@ -195,6 +191,8 @@ export default function Installer() {
   const native = isTauri();
   const [slide, setSlide] = useState(0);
   const [directory, setDirectory] = useState('');
+  // 被更新器拉起来时（命令行带 /UPDATE）走更新流程：目录由注册表决定，用户不能改。
+  const [update, setUpdate] = useState(false);
   const [status, setStatus] = useState({ stage: 'ready', percent: 0 });
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
@@ -207,8 +205,11 @@ export default function Installer() {
       setDirectory('C:\\Users\\you\\AppData\\Local\\MokiDown');
       return;
     }
-    invoke('default_install_directory')
-      .then(setDirectory)
+    invoke('startup_info')
+      .then((info) => {
+        setDirectory(info.directory);
+        setUpdate(Boolean(info.update));
+      })
       .catch((e) => setError(String(e)));
     let disposed = false,
       unlisten;
@@ -283,12 +284,34 @@ export default function Installer() {
   }
   async function launch() {
     try {
-      await invoke('launch_application');
+      // 更新流程装完直接把应用拉起来，并告诉它「刚更新过」——主程序据此跳过
+      // 原生启动动画，改播工作区入场动画。
+      await invoke('launch_application', { afterUpdate: update });
       await getCurrentWindow().close();
     } catch (e) {
       setError(String(e));
     }
   }
+  /*
+   * 更新流程全自动：不设按钮，进入即开始安装，装完自动拉起应用并关掉本窗口。
+   * 首次安装只保留开始按钮；首次安装和更新完成后都自动进入软件。
+   */
+  const autoStartedRef = useRef(false);
+  useEffect(() => {
+    if (!update || !native || autoStartedRef.current) return;
+    if (!directory || busy || done || error) return;
+    autoStartedRef.current = true;
+    void install();
+    // install/launch 是每次渲染重建的普通函数，这里只以状态为触发条件
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [update, native, directory, busy, done, error]);
+  useEffect(() => {
+    if (!native || !done || error) return undefined;
+    // 稍留一拍让完成态画出来，再交棒给应用
+    const timer = setTimeout(() => { void launch(); }, 900);
+    return () => clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [native, done, error]);
   function close() {
     if (busy) {
       setConfirmClose(true);
@@ -297,13 +320,6 @@ export default function Installer() {
     if (native) void getCurrentWindow().close();
     else setShowNotes(true);
   }
-  const currentPhase = done
-    ? 3
-    : status.stage === 'registering' || status.stage === 'shortcuts'
-      ? 2
-      : status.stage === 'copying'
-        ? 1
-        : 0;
   return (
     <main className={`installer ${busy ? 'is-installing' : ''} ${done ? 'is-done' : ''}`}>
       <div className="titlebar" data-tauri-drag-region>
@@ -351,7 +367,6 @@ export default function Installer() {
           <div className="card-motion">
             <FeatureCard slide={slide} />
           </div>
-          <div className="proof">{scenes[slide].proof}</div>
           <div
             className={`mascot mascot--${slide}`}
             role="img"
@@ -384,10 +399,14 @@ export default function Installer() {
           <span className="status-dot" />
           <strong>
             {done
-              ? '欢迎来到你的新工作区'
+              ? update
+                ? '更新完成，欢迎回来'
+                : '欢迎来到你的新工作区'
               : busy
                 ? stages[status.stage]
-                : '为下一个灵感，留一个位置。'}
+                : update
+                  ? '准备更新 MokiDown'
+                  : '为下一个灵感，留一个位置。'}
           </strong>
           <span className="percentage">
             {busy || done ? `${Math.round(status.percent)}%` : 'READY WHEN YOU ARE'}
@@ -406,28 +425,25 @@ export default function Installer() {
             {status.percent > 0 && <i className="progress-tip" />}
           </div>
         </div>
-        {busy || done ? (
-          <div className="phase-row">
-            {phaseOrder.map((phase, index) => (
-              <span key={phase} className={index <= currentPhase ? 'reached' : ''}>
-                <i>{index < currentPhase || done ? '✓' : index + 1}</i>
-                {['准备', '安装', '配置', '完成'][index]}
-              </span>
-            ))}
-          </div>
-        ) : (
+        {/* 路径行只在还没开始安装时出现。安装中/完成后的进度由上面的状态行与进度条
+            表达，不再额外摆一条「准备/安装/配置/完成」——完成页上它是纯噪音。 */}
+        {!busy && !done && (
           <div className="path-row">
             <span className="folder-icon">▱</span>
-            <label htmlFor="install-path">安装位置</label>
+            <label htmlFor="install-path">{update ? '更新位置' : '安装位置'}</label>
             <input
               id="install-path"
               value={directory}
+              readOnly={update}
               onChange={(event) => setDirectory(event.target.value)}
               spellCheck={false}
             />
-            <button className="text-button" onClick={chooseDirectory}>
-              更改
-            </button>
+            {/* 更新时目录来自注册表里上次的安装位置，不让改——改了会装出第二份 */}
+            {update ? null : (
+              <button className="text-button" onClick={chooseDirectory}>
+                更改
+              </button>
+            )}
           </div>
         )}
         {error && (
@@ -438,29 +454,23 @@ export default function Installer() {
         <div className="actions">
           <p>
             {done
-              ? '写下第一行，让想法慢慢生长。'
+              ? update
+                ? '更新完成，正在启动 MokiDown…'
+                : '安装完成，正在启动 MokiDown…'
               : busy
-                ? '正在准备你的写作空间，请保持窗口开启。'
-                : '仅为当前用户安装 · 文档始终属于你'}
+                ? update
+                  ? '正在更新，请保持窗口开启。'
+                  : '正在准备你的写作空间，请保持窗口开启。'
+                : update
+                  ? '将保留你的设置、文档与快捷方式'
+                  : '仅为当前用户安装 · 文档始终属于你'}
           </p>
-          {done ? (
-            <button className="primary" onClick={() => (native ? launch() : setShowNotes(true))}>
-              开始使用 <span>↗</span>
-            </button>
-          ) : (
+          {error ? <button className="primary" onClick={install}>重试安装</button> : !update && !done && (
             <button className="primary" disabled={busy || !directory} onClick={install}>
-              {busy ? (
-                <>
-                  <i className="button-spinner" />
-                  正在安装
-                </>
-              ) : (
-                <>
-                  {error ? '重新安装' : '开始安装'} <span>→</span>
-                </>
-              )}
+              {busy ? <><i className="button-spinner" />正在安装</> : '开始安装'}
             </button>
           )}
+
         </div>
       </footer>
       {(confirmClose || showNotes) && (

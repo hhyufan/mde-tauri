@@ -1,0 +1,133 @@
+/**
+ * @file update-dialog.scss
+ * @description 应用内更新弹窗。原先它只是 antd 默认 Modal 加几个内联样式，
+ *              没有做过视觉；这里按应用的设计令牌重做，并统一各状态的呈现。
+ */
+
+.update-dialog {
+  color: var(--text);
+  font-size: 13px;
+
+  &__title {
+    display: inline-flex;
+    align-items: center;
+    gap: 9px;
+  }
+
+  // 标题左侧的小圆标，和分栏标题的视觉一致
+  &__mark {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 20px;
+    height: 20px;
+    border-radius: 7px;
+    background: var(--accent);
+    color: #fff;
+    font-size: 11px;
+    font-weight: 700;
+  }
+
+  // 版本号一行：旧 → 新
+  &__versions {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 14px;
+    font-variant-numeric: tabular-nums;
+
+    b {
+      font-size: 15px;
+      font-weight: 600;
+      color: var(--accent);
+    }
+
+    span {
+      color: var(--text-dim);
+    }
+
+    em {
+      font-style: normal;
+      color: var(--text-sec);
+    }
+  }
+
+  &__status {
+    margin: 0;
+    color: var(--text-sec);
+    line-height: 1.7;
+  }
+
+  // 发布说明：内容可能很长，限高并允许滚动
+  &__notes {
+    margin-top: 12px;
+    padding: 10px 12px;
+    max-height: 200px;
+    overflow: auto;
+    border: 1px solid var(--border-light);
+    border-radius: var(--radius-sm);
+    background: var(--surface);
+    color: var(--text-sec);
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+    font-size: 12px;
+    line-height: 1.65;
+  }
+
+  // 进度：自绘的细条，比 antd 默认更贴合这套界面
+  &__track {
+    margin-top: 14px;
+    height: 6px;
+    border-radius: 999px;
+    background: var(--border);
+    overflow: hidden;
+  }
+
+  &__fill {
+    height: 100%;
+    border-radius: inherit;
+    background: var(--accent);
+    transition: width 0.25s ease;
+
+    &.is-active {
+      background: linear-gradient(
+        90deg,
+        color-mix(in srgb, var(--accent) 70%, var(--surface)),
+        var(--accent),
+        color-mix(in srgb, var(--accent) 70%, var(--surface))
+      );
+      background-size: 200% 100%;
+      animation: update-dialog-sheen 1.4s linear infinite;
+    }
+  }
+
+  &__meta {
+    display: flex;
+    justify-content: space-between;
+    margin-top: 7px;
+    color: var(--text-dim);
+    font-size: 11px;
+    font-variant-numeric: tabular-nums;
+  }
+
+  // 未保存文档的提醒要紧挨着按钮，所以放在内容末尾并留出上间距
+  .ant-alert {
+    margin-top: 14px;
+  }
+}
+
+@keyframes update-dialog-sheen {
+  from {
+    background-position: 100% 0;
+  }
+  to {
+    background-position: -100% 0;
+  }
+}
+
+// 减弱动效偏好下不做流光
+@media (prefers-reduced-motion: reduce) {
+  .update-dialog__fill.is-active {
+    animation: none;
+  }
+}

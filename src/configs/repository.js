@@ -3,7 +3,9 @@
  *
  * 设置页「关于」与标签栏右上角的开源入口共用同一份，避免多处硬编码后失配。
  */
-export const REPO_URL = 'https://github.com/hhyufan/mde-tauri';
+export const REPO_URL = 'https://github.com/hhyufan/mokidown';
 
 /** 在线体验站点（无需下载即可试用）。 */
 export const SITE_URL = 'https://www.miaogu.xyz';
+
+export const INSTALLER_URL = `${REPO_URL}/releases/latest`;

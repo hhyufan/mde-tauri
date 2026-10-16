@@ -207,24 +207,6 @@ h1 em {
 .preview .rule.short {
   width: 62%;
 }
-.proof {
-  position: absolute;
-  left: 44px;
-  top: 245px;
-  padding: 10px 13px;
-  background: #fff;
-  border: 1px solid #e4e8f4;
-  border-radius: 8px;
-  font-size: 10px;
-  color: #6276bb;
-  box-shadow: 0 8px 25px #52648a10;
-  z-index: 2;
-}
-.proof:before {
-  content: '✓';
-  margin-right: 7px;
-  color: #6d9c8b;
-}
 .mascot {
   position: absolute;
   width: 170px;
@@ -547,17 +529,10 @@ body.render .language {
 .bottom button:active {
   transform: translateY(0);
 }
-.primary:hover {
-  background: #5973d0;
-}
 .stage {
   animation: stage-float 5s ease-in-out infinite;
 }
-.proof {
-  animation: proof-float 4s ease-in-out infinite;
-}
-.render .stage,
-.render .proof {
+.render .stage {
   animation: none !important;
 }
 @keyframes stage-float {
@@ -567,15 +542,6 @@ body.render .language {
   }
   50% {
     translate: 0 -4px;
-  }
-}
-@keyframes proof-float {
-  0%,
-  100% {
-    translate: 0 0;
-  }
-  50% {
-    translate: 0 5px;
   }
 }
 @keyframes flow-light {
@@ -702,8 +668,7 @@ body {
 .stage {
   top: 56px;
 }
-.stage,
-.proof {
+.stage {
   animation: none;
 }
 .card-motion {
@@ -712,11 +677,6 @@ body {
   animation:
     card-enter 0.75s cubic-bezier(0.16, 1, 0.3, 1) both,
     card-drift 5.5s 0.75s ease-in-out infinite;
-}
-.stage > .proof {
-  animation:
-    proof-enter 0.65s 0.18s cubic-bezier(0.16, 1, 0.3, 1) both,
-    proof-drift 4.6s 0.85s ease-in-out infinite;
 }
 .mascot {
   background-image: url('./assets/moki-feature-scenes.png');
@@ -888,6 +848,14 @@ body {
 .path-row input:focus {
   border-bottom-color: #cbd6f1;
 }
+/* 更新模式下目录来自注册表、不允许改：去掉那根"可编辑"的下划线，光标也别提示可输入 */
+.path-row input[readonly],
+.path-row input[readonly]:hover,
+.path-row input[readonly]:focus {
+  border-bottom-color: transparent;
+  color: #7d8ba3;
+  cursor: default;
+}
 .text-button {
   font-size: 10px;
   color: #758abf;
@@ -910,73 +878,53 @@ body {
   color: #a0aabd;
   line-height: 1.5;
 }
+/*
+ * 主行动按钮。
+ *
+ * 旧版是「渐变底 + 1px 边框 + 阴影」三层叠加，12px 字、悬停还整体上移 2px，
+ * 并挂了一个 17px 的装饰箭头。参照常见设计系统的主按钮规格（例如 Dell 设计系统
+ * 的 button-primary：实色底、白字、40px 高、0 24px 内边距、14px/500 字重，
+ * hover 只加深底色、不做位移、CTA 不带装饰图标）改成下面这样：
+ * 实色、字重 600、44px 高、去掉边框与图标，hover/active 只改底色深浅。
+ * 位移与渐变在安装完成页上会显得轻浮，也与"这是最后一步"的语气不符。
+ */
 .primary {
   margin-left: auto;
-  display: flex;
+  display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 16px;
-  min-width: 150px;
-  height: 39px;
-  padding: 0 20px;
-  border: 1px solid #657cce;
-  border-radius: 9px;
-  background: linear-gradient(135deg, #7b90df, #647acb);
+  min-width: 148px;
+  height: 44px;
+  padding: 0 28px;
+  border: 0;
+  border-radius: 11px;
+  background: #647acb;
   color: #fff;
-  font-size: 12px;
-  box-shadow: 0 4px 9px #6a80cb19;
+  font-family: inherit;
+  font-size: 14px;
+  font-weight: 600;
+  letter-spacing: 0.2px;
+  box-shadow: 0 1px 2px #1c2e5324;
   transition:
-    transform 0.18s,
-    box-shadow 0.18s,
-    filter 0.2s;
+    background 0.14s ease,
+    box-shadow 0.14s ease;
 }
 .primary:hover:not(:disabled) {
-  transform: translateY(-2px);
-  box-shadow: 0 7px 18px #617bc231;
-  filter: brightness(1.04);
+  background: #566cc0;
+  box-shadow: 0 2px 6px #1c2e5330;
 }
 .primary:active:not(:disabled) {
-  transform: translateY(0);
+  background: #4b5fb0;
+  box-shadow: 0 1px 2px #1c2e5324;
+}
+.primary:focus-visible {
+  outline: 2px solid #647acb;
+  outline-offset: 2px;
 }
 .primary:disabled {
+  background: #c3cbe0;
+  box-shadow: none;
   cursor: default;
-  opacity: 0.75;
-}
-.primary span {
-  font-size: 17px;
-  font-weight: 300;
-}
-.phase-row {
-  display: flex;
-  gap: 26px;
-  height: 27px;
-  align-items: center;
-  font-size: 9px;
-  color: #b0b8c7;
-}
-.phase-row > span {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  transition: color 0.3s;
-}
-.phase-row i {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 13px;
-  height: 13px;
-  border-radius: 50%;
-  background: #f0f2f8;
-  font-size: 8px;
-  font-style: normal;
-}
-.phase-row .reached {
-  color: #8298c6;
-}
-.phase-row .reached i {
-  background: #eaf0fc;
-  color: #7b94ce;
 }
 .preview-badge {
   position: absolute;
@@ -1066,16 +1014,6 @@ body {
     translate: 0 0;
   }
 }
-@keyframes proof-enter {
-  from {
-    opacity: 0;
-    translate: 0 15px;
-  }
-  to {
-    opacity: 1;
-    translate: 0 0;
-  }
-}
 @keyframes mascot-enter {
   from {
     opacity: 0;
@@ -1093,15 +1031,6 @@ body {
   }
   50% {
     translate: 0 -4px;
-  }
-}
-@keyframes proof-drift {
-  0%,
-  100% {
-    translate: 0 0;
-  }
-  50% {
-    translate: 0 4px;
   }
 }
 @keyframes mascot-drift {

@@ -26,7 +26,7 @@ import {
   ThunderboltOutlined,
 } from '@ant-design/icons';
 import AppMark from '@components/ui/AppMark';
-import { REPO_URL } from '@/configs/repository';
+import { REPO_URL, INSTALLER_URL } from '@/configs/repository';
 import { open, save } from '@tauri-apps/plugin-dialog';
 import { readTextFile, writeTextFile } from '@tauri-apps/plugin-fs';
 import { getVersion } from '@tauri-apps/api/app';
@@ -545,7 +545,7 @@ function SettingsModal({ open: openProp, onClose }) {
                       </div>
                     </div>
                     <p className="settings-about__tagline">{t('settings.about.tagline')}</p>
-                    {canCheckUpdates() && <div><Button icon={<CloudDownloadOutlined />} loading={['checking', 'downloading', 'installing'].includes(updateStage)} onClick={() => useUpdateStore.getState().check()}>{t('sidebar.footer.checkUpdates')}</Button></div>}
+                    {canCheckUpdates() && <div><Button icon={<CloudDownloadOutlined />} loading={['checking', 'downloading', 'installing'].includes(updateStage)} onClick={() => useUpdateStore.getState().check()}>{t('sidebar.footer.checkUpdates')}</Button><Button type="link" onClick={() => openExternal(INSTALLER_URL)}>{t('settings.about.installer')}</Button></div>}
                     <dl className="settings-about__meta">
                       <dt>{t('settings.about.author')}</dt>
                       <dd>{t('settings.about.authorDesc')}</dd>

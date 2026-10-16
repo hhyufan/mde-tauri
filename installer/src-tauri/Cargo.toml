@@ -1,6 +1,6 @@
 [package]
 name = "mokidown-installer"
-version = "0.1.1"
+version = "0.1.3"
 edition = "2021"
 description = "React installer for MokiDown"
 
@@ -12,6 +12,10 @@ tauri = { version = "2.10", features = [] }
 tauri-plugin-dialog = "2"
 serde = { version = "1", features = ["derive"] }
 tempfile = "3"
+base64 = "0.22"
+
+[target.'cfg(windows)'.dependencies]
+winreg = "0.55"
 
 [profile.release]
 opt-level = "s"

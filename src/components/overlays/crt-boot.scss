@@ -1,0 +1,47 @@
+.workspace-entry {
+  position: fixed;
+  inset: 0;
+  z-index: 9000;
+  pointer-events: none;
+  overflow: hidden;
+  span {
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(
+      105deg,
+      transparent 35%,
+      color-mix(in srgb, var(--accent) 9%, transparent) 50%,
+      transparent 65%
+    );
+    transform: translateX(-100%);
+    animation: workspace-page-light 800ms cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  }
+}
+.workspace-arriving {
+  animation: workspace-page-arrive 650ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+@keyframes workspace-page-arrive {
+  from {
+    opacity: 0.3;
+    transform: translateY(8px) scale(0.994);
+    filter: blur(3px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+    filter: none;
+  }
+}
+@keyframes workspace-page-light {
+  to {
+    transform: translateX(100%);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .workspace-entry {
+    display: none;
+  }
+  .workspace-arriving {
+    animation: none;
+  }
+}

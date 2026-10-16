@@ -1,11 +1,21 @@
 use std::sync::Mutex;
 use std::time::{Duration, Instant};
-use tauri::{AppHandle, Manager};
+use tauri::{AppHandle, Emitter, Manager};
 
 use crate::startup_gate::StartupGate;
 
 #[derive(Default)]
 pub struct StartupState(Mutex<StartupGate>);
+
+/// 更新器装完后拉起应用时带的参数。React 安装器用这个值告诉主程序
+/// 「这次是被更新拉起来的」。
+pub const AFTER_UPDATE_FLAG: &str = "--moki-after-update";
+
+/// 本次启动是不是「刚更新完」。是的话不播原生启动动画（用户刚在安装器里
+/// 看过一遍流程，再放一遍开屏是重复的），改由主窗口播工作区入场动画。
+pub fn is_after_update_launch() -> bool {
+    std::env::args().any(|arg| arg == AFTER_UPDATE_FLAG)
+}
 
 pub fn is_starting(app: &AppHandle) -> bool {
     app.try_state::<StartupState>()
@@ -28,6 +38,9 @@ fn hand_over(app: &AppHandle) -> Result<(), String> {
         }
     }
     main.set_focus().map_err(|error| error.to_string())?;
+    if is_after_update_launch() {
+        let _ = main.emit("moki:workspace-enter", ());
+    }
     app.state::<StartupState>().0.lock().unwrap().finished = true;
     Ok(())
 }
@@ -78,6 +91,10 @@ pub fn splash_ready(
 ) -> Result<(), String> {
     if window.label() != "splash" {
         return Err("Only the splash window can announce its first frame".into());
+    }
+    if is_after_update_launch() {
+        let _ = window.close();
+        return Ok(());
     }
     #[cfg(not(target_os = "android"))]
     {
@@ -134,4 +151,10 @@ pub fn main_window_ready(
     #[cfg(target_os = "android")]
     let _ = (app, dark);
     Ok(())
+}
+
+/// 告诉前端本次是不是「刚更新完」，由前端决定要不要播工作区入场动画。
+#[tauri::command]
+pub fn startup_after_update() -> bool {
+    is_after_update_launch()
 }

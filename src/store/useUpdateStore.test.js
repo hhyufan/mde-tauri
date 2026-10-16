@@ -55,7 +55,7 @@ it('keeps startup failure quiet and permits a later manual retry', async () => {
   expect(store.getState()).toMatchObject({ stage: 'available', open: true });
 });
 
-it('installs only on consent, ignores double clicks and waits for explicit restart', async () => {
+it('installs only on consent, ignores double clicks and hands off automatically', async () => {
   let finish;
   api.installUpdate.mockImplementation((_resource, progress) => {
     progress('downloading', { downloaded: 50, total: 100 });
@@ -76,9 +76,7 @@ it('installs only on consent, ignores double clicks and waits for explicit resta
   expect(api.installUpdate).toHaveBeenCalledTimes(1);
   finish();
   await installing;
-  expect(store.getState().stage).toBe('installed');
-  expect(api.relaunchApp).not.toHaveBeenCalled();
-  await store.getState().restart();
+  expect(store.getState().stage).toBe('restarting');
   expect(api.relaunchApp).toHaveBeenCalledTimes(1);
 });
 

@@ -23,12 +23,20 @@ npm run installer:bundle      # build application, silent payload and standalone
 `npm run tauri:build:nsis` builds the app plus React installer without MSI.
 The result is `src-tauri/target/release/bundle/react/MokiDown_<version>_x64-setup.exe`.
 The payload is embedded into one executable; no adjacent files are needed.
-`node scripts/build-react-installer.mjs --reuse-app` repackages an already-built app.
+Every package rebuilds the application so its version and updater settings match
+the installer. Reusing an older application binary is intentionally rejected.
 
-App updates continue to use Tauri-signed NSIS artifacts. The React bootstrapper
-is for interactive installation; it is not an updater payload. Local builds can
-omit updater keys; builds with `TAURI_SIGNING_PRIVATE_KEY` produce updater
-artifacts. The standalone EXE needs Windows code signing in the release pipeline.
+GitHub Release publishes one branded EXE, its updater signature and latest.json.
+First installation and application updates download the exact same file. When
+started by the updater (/UPDATE), the installer starts automatically, preserves
+the original directory, launches the app and closes without action buttons.
+First installation asks only for the location and initial consent, then also
+launches the app automatically. No separate manual update package is published.
+
+Release signing order is: finish the EXE, apply Authenticode when configured,
+then sign those exact bytes with the Tauri updater key. The update manifest
+points directly to that versioned GitHub asset. Local builds do not publish
+unsigned update manifests.
 
 ## Installation behavior
 
@@ -37,16 +45,19 @@ Rust extracts the payload into an isolated temporary directory, launches it with
 by `src-tauri/windows/progress.nsh`. Progress represents installation **phases**,
 not a download rate or a byte counter. React interpolates only the visual width.
 Success requires the child process to succeed and the installed executable to
-exist in the requested directory. Only then can the user launch the application.
+exist in the requested directory. The app then opens automatically.
 Closing the installer is blocked while installation runs.
 
 React-driven installs refuse to force-kill a running editor. Updater behavior
 without the React progress argument remains unchanged. Backend failures stay in
 the React UI and allow retry. Rust validates paths; no shell executes path text.
-The custom UI requires WebView2, as other Tauri apps do. The standard NSIS package
-remains available for machines without the runtime.
+The custom UI requires WebView2, as other Tauri apps do. The NSIS payload remains an internal build artifact.
 
 The payload template is based on tauri-bundler **2.10.1** (MIT / Apache-2.0).
 Keep its upgrade, WebView2, association and uninstall logic in sync when upgrading
 the CLI. Customizations only add phase reporting and the running-editor guard
 for React-driven installs.
+
+After updating, --moki-after-update bypasses the old splash. Native handover
+triggers the page reveal only after the editor window is shown. Reduced-motion
+preferences disable decorative motion.

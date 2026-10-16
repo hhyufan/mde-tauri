@@ -562,17 +562,19 @@
   "moki.iconDesc": "When on, the M mark at the top-left is replaced by Moki's emblem.",
   "update.title": "MokiDown updates",
   "update.later": "Later",
-  "update.install": "Download and install",
+  "update.install": "Update now",
   "update.restart": "Restart now",
   "update.retry": "Check again",
   "update.idle": "",
   "update.checking": "Checking for updates…",
   "update.available": "Version {{version}} is available",
-  "update.consent": "Download and install this version? Installation may close the app. Save your documents first.",
+  "update.consent": "Download, install and return to your workspace automatically. Save your documents first.",
   "update.downloading": "Downloading update…",
   "update.installing": "Installing update. Please wait…",
   "update.installed": "Update installed. Restart when you are ready to finish updating.",
   "update.up-to-date": "You are up to date.",
   "update.error": "The update could not be completed. Please try again.",
-  "update.saveFirst": "Close this dialog and save all documents before installing or restarting."
+  "update.saveFirst": "Close this dialog and save all documents before installing or restarting.",
+  "update.restarting": "Opening the installer. MokiDown will reopen automatically when finished.",
+  "settings.about.installer": "Download installer"
 }

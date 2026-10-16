@@ -445,6 +445,17 @@ export async function getAppDocumentsDir() {
 }
 
 /**
+ * 本次启动是不是刚更新完（由 React 安装器带 --moki-after-update 拉起）。
+ *
+ * 原生侧会据此跳过启动动画，前端据此播电视开机效果。
+ *
+ * @returns {Promise<boolean>} 是则返回 true
+ */
+export async function startupAfterUpdate() {
+  return invoke('startup_after_update');
+}
+
+/**
  * 获取应用启动时携带的命令行参数。
  *
  * @returns {Promise<unknown>} 命令行参数列表

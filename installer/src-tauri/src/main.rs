@@ -7,13 +7,72 @@ const PAYLOAD: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/payload.exe"));
 struct InstallState { running: Arc<AtomicBool>, installed: Arc<Mutex<Option<PathBuf>>> }
 #[derive(Clone, serde::Serialize)]
 struct Progress { stage: String, percent: u8 }
+/// 启动时的上下文：是不是被更新器拉起来的，以及该装到哪个目录。
+#[derive(Clone, serde::Serialize)]
+struct StartupInfo { update: bool, directory: String }
 
 fn emit(app: &tauri::AppHandle, stage: &str, percent: u8) {
     let _ = app.emit("install-progress", Progress { stage: stage.into(), percent });
 }
-#[tauri::command]
-fn default_install_directory() -> Result<String, String> {
-    std::env::var_os("LOCALAPPDATA").map(|base|PathBuf::from(base).join("mokidown").to_string_lossy().into_owned()).ok_or_else(||"无法读取当前用户的安装目录".into())
+fn default_directory() -> Option<PathBuf> {
+    std::env::var_os("LOCALAPPDATA").map(|base| PathBuf::from(base).join("mokidown"))
+}
+/**
+ * 是不是被更新器拉起来的。
+ *
+ * tauri-plugin-updater 在 Windows 上会把 NSIS 那套参数传给它启动的程序，
+ * 其中就包含 /UPDATE（见插件 updater.rs 的 WindowsUpdaterType::Nsis 分支）。
+ * 我们要把 /UPDATE 继续转发给内嵌的 NSIS，否则 NSIS 会走「先卸载再装」那条路，
+ * 而 /UPDATE 的语义是原地升级：不卸载、保留快捷方式、保留开机启动项与安装位置。
+ */
+fn is_update_launch() -> bool {
+    std::env::args().any(|arg| arg.eq_ignore_ascii_case("/UPDATE"))
+}
+/**
+ * 读注册表里上次的安装位置。
+ *
+ * Tauri 的 NSIS 模板把安装目录写在 ${MANUPRODUCTKEY}（即 Software\MokiDown\mokidown）
+ * 的默认值上，模板里的 RestorePreviousInstallLocation 也是读它。更新时用户装过哪个
+ * 目录就以哪个为准，不能让用户重选——重选会装出第二份。
+ *
+ * 使用原生注册表接口保留中文和空格，不解析命令行工具的本地编码输出。
+ */
+/// 读取某个注册表分支下默认值里的安装路径；读不到返回 None。
+#[cfg(windows)]
+fn read_reg_default(hive: &str) -> Option<String> {
+    use winreg::{RegKey, enums::{HKEY_CURRENT_USER,HKEY_LOCAL_MACHINE}};
+    let registry=RegKey::predef(if hive=="HKCU" {HKEY_CURRENT_USER} else {HKEY_LOCAL_MACHINE});
+    if let Ok(key)=registry.open_subkey("Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\mokidown") {
+        if let Ok(value)=key.get_value::<String,_>("InstallLocation") {
+            let path=value.trim().trim_matches('"');
+            if !path.is_empty() { return Some(path.to_owned()); }
+        }
+    }
+    for key in ["Software\\hhyufan\\mokidown","Software\\MokiDown\\mokidown"] {
+        if let Ok(key)=registry.open_subkey(key) {
+            if let Ok(value)=key.get_value::<String,_>("") {
+                if !value.is_empty() { return Some(value); }
+            }
+        }
+    }
+    None
+}
+#[cfg(not(windows))]
+fn read_reg_default(_hive: &str) -> Option<String> { None }
+/// 依次找 HKCU、HKLM：Tauri 的 NSIS 默认按当前用户安装，所以 HKCU 先。
+fn previous_install_directory() -> Option<PathBuf> {
+    ["HKCU", "HKLM"].iter().find_map(|hive| read_reg_default(hive)).map(PathBuf::from)
+}
+// The running app passes its own location; base64 keeps Unicode and spaces intact
+// through ShellExecute/NSIS command-line quoting. Older clients use the registry.
+fn updater_directory() -> Option<PathBuf> {
+    use base64::Engine;
+    std::env::args().find_map(|argument| {
+        let encoded = argument.strip_prefix("/MOKI_DIRECTORY=")?;
+        let bytes = base64::engine::general_purpose::URL_SAFE_NO_PAD.decode(encoded).ok()?;
+        let directory = String::from_utf8(bytes).ok()?;
+        validate_directory(&directory).ok()
+    }).or_else(previous_install_directory)
 }
 fn validate_directory(value: &str) -> Result<PathBuf,String> {
     let path = PathBuf::from(value);
@@ -38,8 +97,18 @@ fn read_progress(app: &tauri::AppHandle, file: &std::path::Path, previous: &mut 
     }
 }
 #[tauri::command]
+fn startup_info() -> Result<StartupInfo,String> {
+    let update = is_update_launch();
+    // 更新时必须沿用上次装的位置；读不到才退回默认目录。
+    let directory = if update { updater_directory().or_else(default_directory) } else { previous_install_directory().or_else(default_directory) };
+    directory
+        .map(|path|StartupInfo{update,directory:path.to_string_lossy().into_owned()})
+        .ok_or_else(||"无法读取当前用户的安装目录".into())
+}
+#[tauri::command]
 async fn install_application(app: tauri::AppHandle, state: tauri::State<'_,InstallState>, directory:String) -> Result<(),String> {
     let folder=validate_directory(&directory)?;
+    let update=is_update_launch();
     if state.running.swap(true,Ordering::SeqCst) { return Err("安装正在进行".into()); }
     let state=state.inner().clone();
     let running=state.running.clone();
@@ -52,6 +121,8 @@ async fn install_application(app: tauri::AppHandle, state: tauri::State<'_,Insta
         std::fs::write(&setup,PAYLOAD).map_err(|e|e.to_string())?;
         let mut command=Command::new(&setup);
         command.arg("/S").arg(format!("/MOKI_PROGRESS={}",progress.display()));
+        // 转发 /UPDATE：让 NSIS 走原地升级，不卸载、保留快捷方式与安装位置。
+        if update { command.arg("/UPDATE"); }
         #[cfg(windows)] {
             use std::os::windows::process::CommandExt;
             // NSIS requires /D to be last and unquoted. No shell is involved.
@@ -78,15 +149,20 @@ async fn install_application(app: tauri::AppHandle, state: tauri::State<'_,Insta
     result
 }
 #[tauri::command]
-fn launch_application(state:tauri::State<'_,InstallState>)->Result<(),String> {
+fn launch_application(state:tauri::State<'_,InstallState>, after_update:Option<bool>)->Result<(),String> {
     let app=state.installed.lock().map_err(|e|e.to_string())?.clone().ok_or("请先完成安装")?;
-    Command::new(app).spawn().map_err(|e|e.to_string())?;Ok(())
+    let mut command=Command::new(app);
+    // 更新流程拉起应用时带上这个标志。主程序据此跳过原生启动动画，
+    // 改在主窗口里播一段工作区入场动画（用户刚看过安装流程，再放一遍开屏是重复的）。
+    // 常量与 src-tauri/src/startup.rs 的 AFTER_UPDATE_FLAG 必须一致。
+    if after_update.unwrap_or(false) { command.arg("--moki-after-update"); }
+    command.spawn().map_err(|e|e.to_string())?;Ok(())
 }
 fn main() {
     tauri::Builder::default()
         .manage(InstallState::default())
         .plugin(tauri_plugin_dialog::init())
-        .invoke_handler(tauri::generate_handler![default_install_directory,install_application,launch_application])
+        .invoke_handler(tauri::generate_handler![startup_info,install_application,launch_application])
         .on_window_event(|window,event| {
             if let tauri::WindowEvent::CloseRequested{api,..}=event {
                 if window.state::<InstallState>().running.load(Ordering::SeqCst) { api.prevent_close(); }

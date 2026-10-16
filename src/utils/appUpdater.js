@@ -2,7 +2,7 @@
  * @file 应用更新：读更新源、校验签名、下载安装、重启。
  *
  * 更新源是 tauri.conf.json 里 plugins.updater.endpoints 指向的 latest.json，
- * 由发布流程（.github/workflows/release.yml）随安装包一起同步到对象存储。
+ * 由发布流程随自定义安装包一起发布到 GitHub Release。
  *
  * 只在 Tauri 桌面壳里可用；浏览器跑 dev server 时这些 API 不存在，
  * 所以调用方要先用 canCheckUpdates() 判断。

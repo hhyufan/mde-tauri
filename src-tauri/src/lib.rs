@@ -1738,7 +1738,19 @@ pub fn run() {
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_store::Builder::default().build())
         .plugin(tauri_plugin_process::init())
-        .plugin(tauri_plugin_updater::Builder::new().build());
+        .plugin({
+            let mut updater = tauri_plugin_updater::Builder::new();
+            #[cfg(windows)]
+            if let Ok(executable) = std::env::current_exe() {
+                if let Some(directory) = executable.parent() {
+                    use base64::Engine;
+                    let encoded = base64::engine::general_purpose::URL_SAFE_NO_PAD
+                        .encode(directory.to_string_lossy().as_bytes());
+                    updater = updater.installer_arg(format!("/MOKI_DIRECTORY={encoded}"));
+                }
+            }
+            updater.build()
+        });
 
     // 启动期初始化：Windows 下补回关闭阴影后失去的窗口圆角，
     // 并确保 DWM 不绘制强调色边框。
@@ -1752,6 +1764,16 @@ pub fn run() {
         }
         // Both windows start hidden; the decoded splash and mounted App announce
         // readiness independently. Never open devtools here and steal focus.
+        //
+        // 刚更新完的那次启动不播原生启动动画：用户刚在 React 安装器里看过一遍
+        // 完整流程，再放一遍开屏是重复的。这里直接把 splash 窗口关掉，
+        // main_window_ready 会走 no_splash 分支立即完成交接；主窗口随后由前端
+        // 播一段电视开机效果（见 CrtBoot）。
+        if startup::is_after_update_launch() {
+            if let Some(splash) = app.get_webview_window("splash") {
+                let _ = splash.close();
+            }
+        }
         startup::install_watchdog(app.handle());
         let _ = &main_window;
         Ok(())
@@ -1809,6 +1831,7 @@ pub fn run() {
             show_main_window,
             startup::main_window_ready,
             startup::splash_ready,
+            startup::startup_after_update,
             hotkeys::check_hotkey_available,
             get_app_documents_dir,
             get_cli_args,

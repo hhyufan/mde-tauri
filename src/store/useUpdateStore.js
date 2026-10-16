@@ -3,7 +3,7 @@ import { canCheckUpdates, checkForUpdate, installUpdate, relaunchApp } from '@ut
 
 let startupChecked = false;
 let updateResource = null;
-const busy = (stage) => ['checking', 'downloading', 'installing'].includes(stage);
+const busy = (stage) => ['checking', 'downloading', 'installing', 'restarting'].includes(stage);
 const releaseResource = async () => {
   const resource = updateResource;
   updateResource = null;
@@ -26,10 +26,6 @@ const useUpdateStore = create((set, get) => ({
     }
     if (busy(get().stage)) {
       if (!startup) set({ open: true });
-      return;
-    }
-    if (get().stage === 'installed') {
-      set({ open: true });
       return;
     }
     set({
@@ -59,26 +55,19 @@ const useUpdateStore = create((set, get) => ({
   dismiss: () => {
     if (busy(get().stage)) return;
     set({ open: false });
-    if (get().stage !== 'installed') void releaseResource();
+    void releaseResource();
   },
   install: async () => {
     if (get().stage !== 'available' || !updateResource) return;
     set({ stage: 'downloading', error: '' });
     try {
       await installUpdate(updateResource, (stage, detail = {}) => set({ stage, ...detail }));
-      set({ stage: 'installed' });
+      set({ stage: 'restarting' });
       await releaseResource();
+      await relaunchApp();
     } catch (error) {
       set({ stage: 'error', error: String(error?.message || error) });
       await releaseResource();
-    }
-  },
-  restart: async () => {
-    if (get().stage !== 'installed') return;
-    try {
-      await relaunchApp();
-    } catch (error) {
-      set({ error: String(error?.message || error) });
     }
   },
 }));

@@ -21,7 +21,7 @@
     "preview": "vite preview",
     "preview:editor:production": "node scripts/preview-production-editor.mjs",
     "generate:showcase-data": "node scripts/generate-showcase-data.mjs",
-    "test:build-tools": "node --test scripts/windows-msvc.test.mjs scripts/startup-splash.test.mjs",
+    "test:build-tools": "node --test scripts/windows-msvc.test.mjs scripts/startup-splash.test.mjs scripts/create-update-manifest.test.mjs",
     "tauri": "node scripts/tauri.mjs",
     "tauri:dev": "node scripts/tauri.mjs dev",
     "tauri:build": "node scripts/build-react-installer.mjs --with-msi",

@@ -46,6 +46,7 @@ import { HOTKEY_COMMAND_EVENT } from '@utils/hotkeyCommands';
 import { isCapturingShortcut } from '@/configs/hotkeys';
 import ExternalFileConflictNotice from '@components/overlays/ExternalFileConflictNotice';
 import UpdateDialog from '@components/overlays/UpdateDialog';
+import CrtBoot from '@components/overlays/CrtBoot';
 import NotificationContainer from '@components/notification/NotificationContainer';
 import useSyncStore from '@store/useSyncStore';
 import { GUEST_USER_SCOPE, isOwnedByUser } from '@store/userScope';
@@ -140,6 +141,17 @@ function App() {
   const [isDragOver, setIsDragOver] = useState(false);
   const [dragTarget, setDragTarget] = useState(null);
   const [dragOverlayRect, setDragOverlayRect] = useState(null);
+  // Native handover emits only after the real editor window is shown.
+  const [crtBoot, setCrtBoot] = useState(false);
+  const finishWorkspaceEntry = useCallback(() => setCrtBoot(false), []);
+  useEffect(() => {
+    if (!window.__TAURI_INTERNALS__) return undefined;
+    let disposed = false;
+    const subscription = listen('moki:workspace-enter', () => {
+      if (!disposed) setCrtBoot(true);
+    });
+    return () => { disposed = true; subscription.then((unlisten) => unlisten()).catch(() => {}); };
+  }, []);
   const lastDragPositionRef = useRef(null);
   const lastDropAtRef = useRef(0);
   const allowWindowCloseRef = useRef(false);
@@ -929,6 +941,8 @@ function App() {
       </Suspense>
       <NotificationContainer />
       <UpdateDialog />
+      {/* 更新后的入场动画盖在所有内容之上，播完自行卸载 */}
+      {crtBoot && <CrtBoot onDone={finishWorkspaceEntry} />}
     </>
   );
 }
