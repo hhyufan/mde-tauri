@@ -1,5 +1,6 @@
 import { useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
+import { Tooltip } from 'antd';
 import {
   FileAddOutlined,
   FolderOpenOutlined,
@@ -68,16 +69,16 @@ export default function WelcomeScreen() {
           <h2>{t('moki.recent')}</h2>
           {recent.length ? (
             recent.map((file) => (
-              <button
-                key={file.path}
-                type="button"
-                title={file.path}
-                onClick={() => openFileFromPath(file.path, file.name)}
-              >
-                <FileTextOutlined />
-                <span>{file.name}</span>
-                <ArrowRightOutlined />
-              </button>
+              <Tooltip key={file.path} title={file.path} placement="top" mouseEnterDelay={0.3}>
+                <button
+                  type="button"
+                  onClick={() => openFileFromPath(file.path, file.name)}
+                >
+                  <FileTextOutlined />
+                  <span>{file.name}</span>
+                  <ArrowRightOutlined />
+                </button>
+              </Tooltip>
             ))
           ) : (
             <p>{t('moki.noRecent')}</p>

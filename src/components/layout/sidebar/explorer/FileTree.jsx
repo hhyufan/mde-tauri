@@ -637,14 +637,15 @@ function FileTree() {
                   autoFocus
                 />
               ) : (
-                <span
-                  className="file-tree__item-name"
-                  // 双击名字进入重命名，与资源管理器一致；不用额外按钮占位。
-                  onDoubleClick={(e) => { startRenaming(file, e); }}
-                  title={file.name}
-                >
-                  {file.name}
-                </span>
+                <Tooltip title={file.name} placement="right" mouseEnterDelay={0.5}>
+                  <span
+                    className="file-tree__item-name"
+                    // 双击名字进入重命名，与资源管理器一致；不用额外按钮占位。
+                    onDoubleClick={(e) => { startRenaming(file, e); }}
+                  >
+                    {file.name}
+                  </span>
+                </Tooltip>
               )}
               {fileSyncState && (
                 <Tooltip

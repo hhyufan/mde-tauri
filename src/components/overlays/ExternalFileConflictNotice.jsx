@@ -1,5 +1,6 @@
 import * as React from 'react';
 import { lazy, Suspense, useState } from 'react';
+import { Tooltip } from 'antd';
 
 const ExternalFileConflictModal = lazy(() => import('./ExternalFileConflictModal'));
 
@@ -8,10 +9,12 @@ export default function ExternalFileConflictNotice({ conflict, onKeep, onUseDisk
   return (
     <React.Fragment>
       <div className="external-file-notice" role="status">
-        <span title={conflict.path}>
-          {conflict.kind === 'removed' ? '文件已被删除或移动' : '文件在外部发生变化，自动保存已暂停'}
-          {' · '}{conflict.path.split(/[\\/]/).pop()}
-        </span>
+        <Tooltip title={conflict.path} placement="top" mouseEnterDelay={0.3}>
+          <span>
+            {conflict.kind === 'removed' ? '文件已被删除或移动' : '文件在外部发生变化，自动保存已暂停'}
+            {' · '}{conflict.path.split(/[\\/]/).pop()}
+          </span>
+        </Tooltip>
         <button type="button" onClick={() => setReviewOpen(true)}>查看并处理</button>
       </div>
       {reviewOpen && (

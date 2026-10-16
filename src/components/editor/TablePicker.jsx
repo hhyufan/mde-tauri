@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Button, InputNumber } from 'antd';
+import { Button, InputNumber, Tooltip } from 'antd';
 import { MAX_TABLE_ROWS, MAX_TABLE_COLUMNS, tableDimensions } from './tableDimensions';
 import './table-picker.scss';
 
@@ -48,16 +48,20 @@ export default function TablePicker({ onInsert, onClose, initialRows = 3, initia
       })}
     </div>
     <form onSubmit={(event) => { event.preventDefault(); insert(clamp(rows, MAX_TABLE_ROWS), clamp(columns, MAX_TABLE_COLUMNS)); }}>
-      <label data-table-axis="rows" title={t('table.wheelHint')}>{t('table.rows')}
-        <InputNumber size="small" aria-label={t('table.rows')} min={1} max={MAX_TABLE_ROWS} value={rows}
-          changeOnWheel={false}
-          onChange={(value) => setRows(clamp(value, MAX_TABLE_ROWS))} />
-      </label>
-      <label data-table-axis="columns" title={t('table.wheelHint')}>{t('table.columns')}
-        <InputNumber size="small" aria-label={t('table.columns')} min={1} max={MAX_TABLE_COLUMNS} value={columns}
-          changeOnWheel={false}
-          onChange={(value) => setColumns(clamp(value, MAX_TABLE_COLUMNS))} />
-      </label>
+      <Tooltip title={t('table.wheelHint')} placement="top" mouseEnterDelay={0.3}>
+        <label data-table-axis="rows">{t('table.rows')}
+          <InputNumber size="small" aria-label={t('table.rows')} min={1} max={MAX_TABLE_ROWS} value={rows}
+            changeOnWheel={false}
+            onChange={(value) => setRows(clamp(value, MAX_TABLE_ROWS))} />
+        </label>
+      </Tooltip>
+      <Tooltip title={t('table.wheelHint')} placement="top" mouseEnterDelay={0.3}>
+        <label data-table-axis="columns">{t('table.columns')}
+          <InputNumber size="small" aria-label={t('table.columns')} min={1} max={MAX_TABLE_COLUMNS} value={columns}
+            changeOnWheel={false}
+            onChange={(value) => setColumns(clamp(value, MAX_TABLE_COLUMNS))} />
+        </label>
+      </Tooltip>
       <Button type="primary" size="small" htmlType="submit">{t(resize ? 'table.resize' : 'table.insert')}</Button>
     </form>
     <p>{t('table.wheelHint')}</p>

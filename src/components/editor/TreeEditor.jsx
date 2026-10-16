@@ -187,15 +187,18 @@ export default function TreeEditor({ className = '', onAutoSave, onSourceChange 
               }}
             />
           ) : (
-            <button type="button" className="moki-tree__title" onClick={(event) => { event.stopPropagation(); startEdit(node); }}
-              title={t('tree.editHint')}>
-              <InlineTitle title={node.title || t('tree.newNode')} />
-            </button>
+            <Tooltip title={t('tree.editHint')} placement="top" mouseEnterDelay={0.3}>
+              <button type="button" className="moki-tree__title" onClick={(event) => { event.stopPropagation(); startEdit(node); }}>
+                <InlineTitle title={node.title || t('tree.newNode')} />
+              </button>
+            </Tooltip>
           )}
           {node.jumpLanguage && editing !== node.key && (
-            <span className="moki-tree__reference" title={node.originalText}>
-              {node.jumpLanguage}<span>{node.jumpIndex}</span>
-            </span>
+            <Tooltip title={node.originalText} placement="top" mouseEnterDelay={0.3}>
+              <span className="moki-tree__reference">
+                {node.jumpLanguage}<span>{node.jumpIndex}</span>
+              </span>
+            </Tooltip>
           )}
           {editing !== node.key && (
             <span className="moki-tree__actions" onClick={(event) => event.stopPropagation()}>

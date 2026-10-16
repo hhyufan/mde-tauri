@@ -228,23 +228,24 @@ function FloatingToolbar({ onInsert }) {
         className={cn('ft', position && 'ft--custom-position', visible && 'ft--show')}
         style={position ? { left: `${position.x}px`, top: `${position.y}px` } : undefined}
       >
-        <div
-          className="ft__grip"
-          onPointerDown={handleGripPointerDown}
-          onPointerMove={handleGripPointerMove}
-          onPointerUp={handleGripPointerUp}
-          onPointerCancel={handleGripPointerUp}
-          title={t('toolbar.drag', '拖动工具栏')}
-        >
-          <svg viewBox="0 0 16 24" width="10" height="16">
-            <circle cx="5" cy="6" r="1.5" fill="currentColor" />
-            <circle cx="11" cy="6" r="1.5" fill="currentColor" />
-            <circle cx="5" cy="12" r="1.5" fill="currentColor" />
-            <circle cx="11" cy="12" r="1.5" fill="currentColor" />
-            <circle cx="5" cy="18" r="1.5" fill="currentColor" />
-            <circle cx="11" cy="18" r="1.5" fill="currentColor" />
-          </svg>
-        </div>
+        <Tooltip title={t('toolbar.drag', '拖动工具栏')} placement="top" mouseEnterDelay={0.3}>
+          <div
+            className="ft__grip"
+            onPointerDown={handleGripPointerDown}
+            onPointerMove={handleGripPointerMove}
+            onPointerUp={handleGripPointerUp}
+            onPointerCancel={handleGripPointerUp}
+          >
+            <svg viewBox="0 0 16 24" width="10" height="16">
+              <circle cx="5" cy="6" r="1.5" fill="currentColor" />
+              <circle cx="11" cy="6" r="1.5" fill="currentColor" />
+              <circle cx="5" cy="12" r="1.5" fill="currentColor" />
+              <circle cx="11" cy="12" r="1.5" fill="currentColor" />
+              <circle cx="5" cy="18" r="1.5" fill="currentColor" />
+              <circle cx="11" cy="18" r="1.5" fill="currentColor" />
+            </svg>
+          </div>
+        </Tooltip>
         <span className="ft__sep" />
 
         <FtBtn title={t('toolbar.bold')} className="ft__btn" onClick={() => wrap('bold', '**')}><b>B</b></FtBtn>

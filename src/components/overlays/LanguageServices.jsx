@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Button, Input, Modal, Select, Switch } from 'antd';
+import { Button, Input, Modal, Select, Switch, Tooltip } from 'antd';
 import { AppstoreOutlined, ArrowLeftOutlined, CheckOutlined, CloudDownloadOutlined, PlusOutlined, ReloadOutlined,
   SearchOutlined, StopOutlined, DeleteOutlined, GlobalOutlined, LinkOutlined } from '@ant-design/icons';
 import { useTranslation } from 'react-i18next';
@@ -147,13 +147,17 @@ export default function LanguageServices() {
       <div className="language-services__search">
         <Input prefix={<SearchOutlined />} allowClear placeholder={t('languageServices.search')} value={query}
           onChange={(event) => setQuery(event.target.value)} aria-label={t('languageServices.search')} />
-        <Button icon={<PlusOutlined />} aria-label={t('languageServices.add')} title={t('languageServices.add')}
-          onClick={() => { setError(''); setAdding(true); }} disabled={!desktop} />
-        <Button icon={<ReloadOutlined />} aria-label={t('languageServices.refresh')} title={t('languageServices.refresh')}
-          loading={state.loading} disabled={!desktop} onClick={() => act(async () => {
-            for (const url of state.sources) await state.addCatalog(url);
-            await state.refresh();
-          })} />
+        <Tooltip title={t('languageServices.add')} placement="top" mouseEnterDelay={0.3}>
+          <Button icon={<PlusOutlined />} aria-label={t('languageServices.add')}
+            onClick={() => { setError(''); setAdding(true); }} disabled={!desktop} />
+        </Tooltip>
+        <Tooltip title={t('languageServices.refresh')} placement="top" mouseEnterDelay={0.3}>
+          <Button icon={<ReloadOutlined />} aria-label={t('languageServices.refresh')}
+            loading={state.loading} disabled={!desktop} onClick={() => act(async () => {
+              for (const url of state.sources) await state.addCatalog(url);
+              await state.refresh();
+            })} />
+        </Tooltip>
       </div>
       <div className="language-services__tabs" role="tablist">
         {['marketplace', 'installed'].map((key) => <button key={key} type="button" role="tab" aria-selected={filter === key}

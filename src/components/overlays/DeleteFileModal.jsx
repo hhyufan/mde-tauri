@@ -1,4 +1,4 @@
-import { Button, Modal } from 'antd';
+import { Button, Modal, Tooltip } from 'antd';
 import { useTranslation } from 'react-i18next';
 import FileTypeIcon from '@components/ui/FileTypeIcon';
 import './delete-file-modal.scss';
@@ -25,7 +25,9 @@ export default function DeleteFileModal({ file, loading = false, onConfirm, onCa
     {file && <div className="delete-file-modal">
       <div className="delete-file-modal__file">
         <FileTypeIcon fileName={file.name} isFolder={file.is_dir} />
-        <span title={file.path}>{file.name}</span>
+        <Tooltip title={file.path} placement="top" mouseEnterDelay={0.3}>
+          <span>{file.name}</span>
+        </Tooltip>
       </div>
       <p>{t('sidebar.explorer.deleteFileConfirm', { name: file.name })}</p>
     </div>}
