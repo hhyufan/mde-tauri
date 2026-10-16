@@ -61,3 +61,28 @@ for React-driven installs.
 After updating, --moki-after-update bypasses the old splash. Native handover
 triggers the page reveal only after the editor window is shown. Reduced-motion
 preferences disable decorative motion.
+
+## Carousel components
+
+The carousel renders local React compositions from FeatureScenes.jsx: a source/
+Markdown preview pair, a real Milkdown auto-typing demonstration, a local Markdown
+language-service demonstration, light/dark preview cards, and file-list/knowledge-tree
+panels. The Markdown styles, file-row styles, file icons and tree parser come
+from the application. It does not load workspace screenshots or initialize the
+editor's native services. Existing Moki artwork stays separate, with two new
+matching WYSIWYG and language-assistant poses in moki-editor-scenes.png.
+
+The auto-typing scene uses Milkdown commonmark input rules to turn typed markers
+into headings, emphasis and quotes. It mounts only while selected and releases
+the editor and timers on exit. Reduced-motion mode shows the completed document.
+The language scene is a local completion/diagnostics illustration, without
+starting a server or installing a language plugin in the installer.
+
+Navigation uses only small dots with an expanding active indicator and a crossfade.
+Manual navigation resets the automatic slide timer.
+Reference: [Page Controls](https://scaledesignsystem.com/components/page-controls/).
+
+In-app updater progress uses TaskList, following the 320px task panel in
+UI/md-editor.html. The status bar uses that reference's spinning segmented icon
+and Downloading/Installing status, and reopens the task list when clicked.
+Hiding the panel keeps the transfer alive; failures reopen it for retry.

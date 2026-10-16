@@ -1,0 +1,398 @@
+/* Use the same fonts, component rules and sizing as the application.
+   Scale each local composition as a unit rather than restyling its contents. */
+@font-face {
+  font-family: 'Poppins';
+  src: url('../../src/assets/font/Poppins-Regular.woff2') format('woff2');
+  font-weight: 400;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'Poppins';
+  src: url('../../src/assets/font/Poppins-SemiBold.woff2') format('woff2');
+  font-weight: 600;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'Source-HanSan';
+  src: url('../../src/assets/font/SourceHanSansSC-Regular.woff2') format('woff2');
+  font-display: swap;
+}
+@font-face {
+  font-family: 'JetBrains Mono';
+  src: url('../../src/assets/font/JetBrainsMono-VariableFont_wght.woff2') format('woff2');
+  font-display: swap;
+}
+.feature-scene {
+  --surface: #fff;
+  --sidebar: #fafafa;
+  --border: #e5e5e7;
+  --border-light: #efefef;
+  --text: #2c2c2e;
+  --text-sec: #6d6d6f;
+  --text-dim: #c4c4c6;
+  --accent: #4091ff;
+  --accent-bg: rgba(64, 145, 255, 0.08);
+  --accent-light: #e8f0ff;
+  --hover: #f0f0f2;
+  --active: #e8e8ea;
+  --warning: #ff9500;
+  --radius-sm: 6px;
+  --font-app: 'Poppins', 'Source-HanSan', system-ui, sans-serif;
+  --font-editor: 'JetBrains Mono', 'Source-HanSan', monospace;
+  position: relative;
+  width: 746px;
+  height: 408px;
+  transform: scale(0.75);
+  transform-origin: top left;
+  color: var(--text);
+  font: 14px var(--font-app);
+}
+.feature-scene [data-theme='dark'] {
+  --surface: #1e1e1e;
+  --sidebar: #191919;
+  --border: #3a3a3c;
+  --border-light: #303032;
+  --text: #e5e5e7;
+  --text-sec: #aaaab0;
+  --text-dim: #636366;
+  --accent: #5a9fff;
+  --accent-bg: rgba(90, 159, 255, 0.08);
+  --accent-light: #263650;
+  --hover: #2c2c2e;
+}
+.scene-surface,
+.scene-theme-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow:
+    0 14px 36px #314c7617,
+    0 2px 4px #314c7608;
+}
+.scene-tabbar {
+  padding: 0 10px;
+}
+.scene-layout-icon {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 36px;
+  color: var(--text-sec);
+}
+.scene-layout-icon svg {
+  width: 16px;
+  height: 16px;
+}
+.scene-editor-card {
+  width: 730px;
+  position: absolute;
+  top: 10px;
+  left: 0;
+  transform: rotate(-1.5deg);
+}
+.scene-editor-split {
+  display: flex;
+  height: 312px;
+}
+.scene-code {
+  width: 50%;
+  flex-shrink: 0;
+  padding: 24px 0;
+  border-right: 1px solid var(--border);
+  font: 14px/1.72 var(--font-editor);
+}
+.scene-code > div {
+  display: flex;
+  white-space: pre;
+}
+.scene-line-number {
+  color: #9d9d9f;
+  width: 42px;
+  flex-shrink: 0;
+  text-align: right;
+  padding-right: 16px;
+  user-select: none;
+}
+.scene-token-heading {
+  color: #e45649;
+}
+.scene-token-quote {
+  color: #a0a1a7;
+}
+.feature-scene .scene-markdown {
+  padding: 24px 28px;
+  font-size: 14px;
+  overflow: hidden;
+}
+.feature-scene .scene-markdown > :first-child {
+  margin-top: 0;
+}
+.scene-editor-footer,
+.scene-theme-footer {
+  display: flex;
+  justify-content: space-between;
+  padding: 7px 14px;
+  color: var(--text-sec);
+  background: var(--sidebar);
+  border-top: 1px solid var(--border);
+  font-size: 11px;
+}
+.scene-themes {
+  display: flex;
+  align-items: flex-start;
+}
+.scene-theme-card {
+  width: 392px;
+  transform: rotate(-3deg);
+  position: absolute;
+  top: 4px;
+  left: 0;
+}
+.scene-theme-card--dark {
+  top: 48px;
+  left: 308px;
+  transform: rotate(3deg);
+  box-shadow: 0 18px 34px #1c2e532b;
+}
+.feature-scene .scene-markdown--compact {
+  height: 292px;
+}
+.scene-files-card {
+  position: absolute;
+  top: 14px;
+  left: 0;
+  width: 254px;
+  height: 370px;
+  transform: rotate(-2deg);
+}
+.scene-files {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  background: var(--sidebar);
+}
+.scene-files .sidebar__tab {
+  gap: 5px;
+  padding: 0 4px;
+}
+.scene-folder {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 16px;
+  color: var(--text-sec);
+  font-size: 12px;
+}
+.scene-history {
+  margin-top: auto;
+  padding: 12px 16px;
+  border-top: 1px solid var(--border);
+  color: var(--text-sec);
+  font-size: 12px;
+  font-weight: 600;
+}
+.scene-history span {
+  float: right;
+  padding: 0 6px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  font-weight: 400;
+}
+.scene-tree-card {
+  position: absolute;
+  left: 236px;
+  top: 26px;
+  width: 484px;
+  transform: rotate(1deg);
+}
+.scene-tree-card .moki-tree__canvas {
+  padding: 12px 16px 14px;
+}
+.scene-tree-card .moki-tree__tools .ant-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+}
+.scene-tree-card .moki-tree__tools .moki-tree__add {
+  background: var(--accent-bg);
+}
+.scene-tree-card .moki-tree__count {
+  font-size: 11px;
+}
+.scene-demo-body {
+  height: 312px;
+  overflow: hidden;
+}
+.scene-writing-demo {
+  height: 100%;
+  overflow: hidden;
+  font-size: 15px;
+  line-height: 1.6;
+  padding: 20px 34px;
+}
+.scene-writing-demo .milkdown,
+.scene-writing-demo .milkdown-editor {
+  min-height: 0;
+  padding-bottom: 0;
+  caret-color: transparent;
+}
+.scene-writing-demo .milkdown-editor > :first-child {
+  margin-top: 0;
+}
+.scene-writing-demo .milkdown-editor h1 {
+  margin: 0 0 14px;
+}
+.scene-writing-demo .milkdown-editor h2 {
+  margin: 14px 0 8px;
+}
+.scene-writing-demo .milkdown-editor p {
+  margin: 8px 0;
+}
+.scene-writing-demo .milkdown-editor blockquote {
+  margin: 12px 0 0;
+  padding: 8px 14px;
+}
+.scene-demo-caret {
+  display: inline-block;
+  width: 1.5px;
+  height: 1em;
+  margin-left: 1px;
+  vertical-align: -0.12em;
+  background: var(--accent);
+  animation: scene-caret 1s steps(1) infinite;
+  pointer-events: none;
+}
+.scene-demo-loading {
+  height: 100%;
+  background: var(--surface);
+}
+.scene-language-demo {
+  position: relative;
+  min-height: 342px;
+  background: #fafafa;
+  font:
+    14px 'JetBrains Mono',
+    monospace;
+  color: #383a42;
+}
+.scene-language-source {
+  padding-top: 28px;
+}
+.scene-language-source > div {
+  display: flex;
+  align-items: center;
+  min-height: 28px;
+  white-space: pre;
+}
+.scene-language-source .scene-line-number {
+  width: 48px;
+}
+.scene-link-text {
+  color: #4078f2;
+}
+.scene-link-path {
+  color: #50a14f;
+}
+.scene-link-diagnostic {
+  text-decoration: underline wavy #e45649;
+  text-underline-offset: 4px;
+}
+.scene-typing-caret {
+  display: inline-block;
+  width: 1px;
+  height: 17px;
+  background: #526fff;
+  vertical-align: -3px;
+  animation: scene-caret 1s steps(1) infinite;
+}
+.scene-completions {
+  position: absolute;
+  top: 120px;
+  left: 235px;
+  width: 310px;
+  background: #fff;
+  border: 1px solid #c8c8c8;
+  border-radius: 3px;
+  box-shadow: 0 3px 8px #0002;
+  overflow: hidden;
+  opacity: 1;
+  transition: opacity 0.2s;
+  font-size: 13px;
+}
+.scene-completions.is-waiting {
+  opacity: 0;
+}
+.scene-completion-row {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  height: 29px;
+  padding: 0 9px;
+}
+.scene-completion-row.is-selected {
+  background: #dceafe;
+}
+.scene-completion-row .anticon {
+  color: #519aba;
+}
+.scene-completion-row b {
+  font-weight: 600;
+  color: #0066bf;
+}
+.scene-completion-row small {
+  margin-left: auto;
+  color: #8b8b8b;
+  font: 11px var(--font-app);
+}
+.scene-completion-detail {
+  display: flex;
+  justify-content: space-between;
+  padding: 8px 10px;
+  border-top: 1px solid #efefef;
+  font: 11px var(--font-app);
+  color: #707070;
+}
+.scene-completion-detail span {
+  color: #9a9a9a;
+}
+.scene-language-message {
+  position: absolute;
+  bottom: 57px;
+  left: 48px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font: 12px var(--font-app);
+  color: #8793a4;
+}
+.scene-language-message.is-resolved {
+  color: #4b9b7c;
+}
+.scene-diagnostic-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #e9a663;
+}
+.scene-language-demo > .scene-editor-footer {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  width: 100%;
+}
+@keyframes scene-caret {
+  50% {
+    opacity: 0;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .scene-demo-caret,
+  .scene-typing-caret {
+    animation: none;
+  }
+}

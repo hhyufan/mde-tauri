@@ -3,7 +3,8 @@ import { invoke, isTauri } from '@tauri-apps/api/core';
 import { listen } from '@tauri-apps/api/event';
 import { getCurrentWindow } from '@tauri-apps/api/window';
 import { open } from '@tauri-apps/plugin-dialog';
-import appIcon from '../../src-tauri/icons/32x32.png';
+import wordmark from '../../src/assets/mokidown-wordmark.webp';
+import FeatureScenes from './FeatureScenes';
 import './installer.css';
 
 const scenes = [
@@ -23,7 +24,40 @@ const scenes = [
         从第一行文字，到完整的创作。
       </>
     ),
-    tags: ['Markdown', '实时预览', '所见即所得'],
+  },
+  {
+    label: 'WYSIWYG',
+    title: (
+      <>
+        写下这一刻，
+        <br />
+        <em>即刻成为好文章。</em>
+      </>
+    ),
+    description: (
+      <>
+        输入 Markdown，文字自然成形。
+        <br />
+        标题、强调与引用，就在笔下呈现。
+      </>
+    ),
+  },
+  {
+    label: 'LANGUAGE',
+    title: (
+      <>
+        写作的细节，
+        <br />
+        <em>也有贴心的帮手。</em>
+      </>
+    ),
+    description: (
+      <>
+        Markdown 语言服务，辅助链接补全与检查。
+        <br />
+        让文档之间的连接，更顺畅。
+      </>
+    ),
   },
   {
     label: 'PERSONALIZE',
@@ -41,7 +75,6 @@ const scenes = [
         让写作空间成为你喜欢的模样。
       </>
     ),
-    tags: ['浅深主题', '自定义背景', '灵活布局'],
   },
   {
     label: 'ORGANIZE',
@@ -59,7 +92,6 @@ const scenes = [
         让每个想法，都有迹可循。
       </>
     ),
-    tags: ['文档树', '知识树', '快速查找'],
   },
 ];
 const stages = {
@@ -72,120 +104,6 @@ const stages = {
   complete: '安装完成',
   error: '安装未完成',
 };
-
-function FeatureCard({ slide }) {
-  if (slide === 1)
-    return (
-      <div className="theme-pair">
-        <div className="theme-card window">
-          <div className="theme-head">☀ &nbsp; LIGHT MODE</div>
-          <div className="swatches">
-            <i />
-            <i />
-            <i />
-          </div>
-          <h3>A fresh page.</h3>
-          <div className="theme-line" />
-          <div className="theme-line" />
-        </div>
-        <div className="theme-card dark window">
-          <div className="theme-head">☾ &nbsp; DARK MODE</div>
-          <div className="swatches">
-            <i />
-            <i />
-            <i />
-          </div>
-          <h3>Quietly inspired.</h3>
-          <div className="theme-line" />
-          <div className="theme-line" />
-        </div>
-      </div>
-    );
-  if (slide === 2)
-    return (
-      <div className="tree-card window">
-        <div className="bar">
-          <i />
-          <i />
-          <i />
-          <span>My knowledge space</span>⋯
-        </div>
-        <div className="tree-body">
-          <div className="files">
-            <b>MY WORKSPACE</b>
-            <br />⌄ &nbsp;▱ &nbsp; Projects
-            <br />
-            &nbsp;&nbsp;⌄ &nbsp;▱ &nbsp; Ideas
-            <div className="selected">&nbsp;&nbsp;&nbsp;▤ &nbsp; Getting started.md</div>
-            &nbsp;&nbsp;▤ &nbsp; Inspiration.md
-            <br />
-            &nbsp;&nbsp;› &nbsp;▱ &nbsp; Journal
-            <br />› &nbsp;▱ &nbsp; Reading notes
-          </div>
-          <div className="graph">
-            <svg viewBox="0 0 330 237">
-              <path
-                d="M155 57V82H75V111M155 82H235V111M75 131V152H135V173"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="1.3"
-              />
-            </svg>
-            <div className="node root">✧ &nbsp; My ideas</div>
-            <div className="node n1">▤ &nbsp; Writing</div>
-            <div className="node n2">▤ &nbsp; Reading</div>
-            <div className="node n3">▤ &nbsp; Inspiration</div>
-          </div>
-        </div>
-      </div>
-    );
-  return (
-    <div className="app window">
-      <div className="bar">
-        <i />
-        <i />
-        <i />
-        <span>my-first-idea.md</span>⋯
-      </div>
-      <div className="editor">
-        <div className="rail">
-          <b>▤</b>⌕<br />⌘<br />⚙
-        </div>
-        <div className="source">
-          {[
-            '# A little space for ideas',
-            '',
-            'Let your thoughts take shape.',
-            '',
-            '## Make something meaningful',
-            '',
-            '> One line at a time.',
-            '',
-            '- [x] Start with a small idea',
-          ].map((line, index) => (
-            <div key={index}>
-              <span className="line">{index + 1}</span>
-              <span className={line.startsWith('#') ? 'code-heading' : ''}>{line || ' '}</span>
-            </div>
-          ))}
-        </div>
-        <div className="preview">
-          <h2>
-            A little space
-            <br />
-            for ideas.
-          </h2>
-          <p>Let your thoughts take shape.</p>
-          <blockquote>One line at a time.</blockquote>
-          <div className="rule" />
-          <div className="rule short" />
-          <p>☑ Start with a small idea</p>
-          <span className="caret" />
-        </div>
-      </div>
-    </div>
-  );
-}
 
 export default function Installer() {
   const native = isTauri();
@@ -225,9 +143,12 @@ export default function Installer() {
     };
   }, [native]);
   useEffect(() => {
-    const timer = setInterval(() => setSlide((s) => (s + 1) % 3), 7200);
-    return () => clearInterval(timer);
-  }, []);
+    const timer = setTimeout(
+      () => setSlide((s) => (s + 1) % scenes.length),
+      slide === 1 ? 14000 : 7200,
+    );
+    return () => clearTimeout(timer);
+  }, [slide]);
   useEffect(() => {
     if (!demoRunning) return;
     const events = [
@@ -308,7 +229,9 @@ export default function Installer() {
   useEffect(() => {
     if (!native || !done || error) return undefined;
     // 稍留一拍让完成态画出来，再交棒给应用
-    const timer = setTimeout(() => { void launch(); }, 900);
+    const timer = setTimeout(() => {
+      void launch();
+    }, 900);
     return () => clearTimeout(timer);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [native, done, error]);
@@ -324,8 +247,8 @@ export default function Installer() {
     <main className={`installer ${busy ? 'is-installing' : ''} ${done ? 'is-done' : ''}`}>
       <div className="titlebar" data-tauri-drag-region>
         <div className="brand" data-tauri-drag-region>
-          <img src={appIcon} alt="" />
-          MokiDown<span>INSTALLER</span>
+          <img className="brand-wordmark" src={wordmark} alt="MokiDown" />
+          <span>INSTALLER</span>
         </div>
         <div className="window-actions">
           <button aria-label="最小化" onClick={() => native && getCurrentWindow().minimize()}>
@@ -357,22 +280,25 @@ export default function Installer() {
               ? '你的写作空间已经准备好了。让 Moki 陪你记录下一个想法。'
               : scenes[slide].description}
           </p>
-          <div className="tags">
-            {scenes[slide].tags.map((tag) => (
-              <span key={tag}>{tag}</span>
-            ))}
-          </div>
         </div>
-        <div key={`scene-${slide}`} className="stage">
-          <div className="card-motion">
-            <FeatureCard slide={slide} />
-          </div>
+        <div className="stage">
+          {scenes.map((scene, index) => (
+            <div
+              key={scene.label}
+              className={`card-motion${slide === index ? ' is-visible' : ''}`}
+              aria-hidden={slide !== index}
+            >
+              <FeatureScenes slide={index} active={slide === index} />
+            </div>
+          ))}
           <div
-            className={`mascot mascot--${slide}`}
+            className={`mascot mascot--${[0, 3, 4, 1, 2][slide]}`}
             role="img"
             aria-label={
               [
                 '浅色 Moki 书写，蓝白运动鞋',
+                '浅色 Moki 演示所见即所得，蓝白运动鞋',
+                '浅色 Moki 检查语言服务，蓝白运动鞋',
                 '深色 Moki 切换主题，深蓝运动鞋',
                 '浅色 Moki 整理文件，蓝白系带运动鞋',
               ][slide]
@@ -387,11 +313,11 @@ export default function Installer() {
               aria-pressed={slide === index}
               className={`dot ${slide === index ? 'active' : ''}`}
               onClick={() => setSlide(index)}
-            />
+            >
+              <i aria-hidden="true" />
+            </button>
           ))}
-          <span>0{slide + 1} — 03</span>
         </nav>
-        <div className="feature-label">A SPACE FOR YOUR IDEAS</div>
       </section>
       <footer className="install-panel">
         {native ? null : <div className="preview-badge">交互设计预览 · 不会安装文件</div>}
@@ -429,7 +355,16 @@ export default function Installer() {
             表达，不再额外摆一条「准备/安装/配置/完成」——完成页上它是纯噪音。 */}
         {!busy && !done && (
           <div className="path-row">
-            <span className="folder-icon">▱</span>
+            <svg
+              className="folder-icon"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="1.6"
+              aria-hidden="true"
+            >
+              <path d="M3 7a2 2 0 0 1 2-2h5l2 2h7a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
+            </svg>
             <label htmlFor="install-path">{update ? '更新位置' : '安装位置'}</label>
             <input
               id="install-path"
@@ -441,7 +376,18 @@ export default function Installer() {
             {/* 更新时目录来自注册表里上次的安装位置，不让改——改了会装出第二份 */}
             {update ? null : (
               <button className="text-button" onClick={chooseDirectory}>
-                更改
+                <span>更改</span>
+                <svg
+                  viewBox="0 0 20 20"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="1.7"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  aria-hidden="true"
+                >
+                  <path d="m7.5 5 5 5-5 5" />
+                </svg>
               </button>
             )}
           </div>
@@ -452,25 +398,40 @@ export default function Installer() {
           </p>
         )}
         <div className="actions">
-          <p>
-            {done
-              ? update
-                ? '更新完成，正在启动 MokiDown…'
-                : '安装完成，正在启动 MokiDown…'
-              : busy
+          {(done || busy || update) && (
+            <p>
+              {done
                 ? update
-                  ? '正在更新，请保持窗口开启。'
-                  : '正在准备你的写作空间，请保持窗口开启。'
-                : update
-                  ? '将保留你的设置、文档与快捷方式'
-                  : '仅为当前用户安装 · 文档始终属于你'}
-          </p>
-          {error ? <button className="primary" onClick={install}>重试安装</button> : !update && !done && (
-            <button className="primary" disabled={busy || !directory} onClick={install}>
-              {busy ? <><i className="button-spinner" />正在安装</> : '开始安装'}
-            </button>
+                  ? '更新完成，正在启动 MokiDown…'
+                  : '安装完成，正在启动 MokiDown…'
+                : busy
+                  ? update
+                    ? '正在更新，请保持窗口开启。'
+                    : '正在准备你的写作空间，请保持窗口开启。'
+                  : update
+                    ? '将保留你的设置、文档与快捷方式'
+                    : ''}
+            </p>
           )}
-
+          {error ? (
+            <button className="primary" onClick={install}>
+              重试安装
+            </button>
+          ) : (
+            !update &&
+            !done && (
+              <button className="primary" disabled={busy || !directory} onClick={install}>
+                {busy ? (
+                  <>
+                    <i className="button-spinner" />
+                    正在安装
+                  </>
+                ) : (
+                  '开始安装'
+                )}
+              </button>
+            )
+          )}
         </div>
       </footer>
       {(confirmClose || showNotes) && (
