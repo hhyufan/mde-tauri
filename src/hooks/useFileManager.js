@@ -450,7 +450,6 @@ export function useFileManager() {
     markTabSaved(path, tab.content);
     addRecentFile({ name, path, ext });
     if (!isAndroid) startFileWatching(path).catch(() => {});
-    notify('success', t('notification.fileSaved'), name);
 
     if (externalFileId) {
       await syncEngine.claimExternalDoc(externalFileId, path, tab.content, tab.encoding);
@@ -471,7 +470,7 @@ export function useFileManager() {
     if (currentDir && path.startsWith(currentDir.replace(/[\\/]+$/, ''))) {
       await loadDirectory(currentDir);
     }
-  }, [addRecentFile, isAndroid, loadDirectory, markTabSaved, notify, t, updateTabPath]);
+  }, [addRecentFile, isAndroid, loadDirectory, markTabSaved, updateTabPath]);
 
   /**
    * 将未命名标签真正持久化到磁盘或 SAF 文档树。
@@ -683,7 +682,6 @@ export function useFileManager() {
         }
         if (useFileStore.getState().currentDir === currentDir) await loadDirectory(currentDir);
         await openFileFromPath(childUri, trimmed);
-        notify('success', t('notification.fileCreated'), trimmed);
         return { ok: true, path: childUri };
       }
 
@@ -695,7 +693,6 @@ export function useFileManager() {
       await writeFileContent(targetPath, '');
       if (useFileStore.getState().currentDir === currentDir) await loadDirectory(currentDir);
       await openFileFromPath(targetPath, trimmed);
-      notify('success', t('notification.fileCreated'), trimmed);
       return { ok: true, path: targetPath };
     } catch (err) {
       notify('error', t('notification.error'), String(err));
@@ -803,7 +800,6 @@ export function useFileManager() {
     try {
       const result = await saveExistingFile(tab.path, tab.content, tab.encoding, tab.id);
       if (result.success) {
-        notify('success', t('notification.fileSaved'), tab.name);
         syncEngine.registerLocalDocument(tab.path, {
           name: tab.name,
           ext: tab.ext,
@@ -878,7 +874,6 @@ export function useFileManager() {
           updateTabPath(tab.id, path, name);
           markTabSaved(path, tab.content);
           addRecentFile({ name, path, ext });
-          notify('success', t('notification.fileSaved'), path);
           if (externalFileId) {
             await syncEngine.claimExternalDoc(externalFileId, path, tab.content, tab.encoding);
           } else {
@@ -1107,7 +1102,6 @@ export function useFileManager() {
       replaceBookmarkPath(sourcePath, targetPath);
 
       if (currentDir) await loadDirectory(currentDir);
-      notify('success', t('notification.renamed'), trimmed);
       return { ok: true, path: targetPath };
     } catch (error) {
       notify('error', t('notification.error'), String(error));
