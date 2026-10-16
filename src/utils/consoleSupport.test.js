@@ -25,12 +25,14 @@ describe('console availability', () => {
     expect(supportsConsoleForTab({ name: 'app.ts', ext: 'ts' })).toBe(true);
     expect(supportsConsoleForTab({ name: 'index.html', ext: 'html' })).toBe(true);
     expect(supportsConsoleForTab({ name: 'style.scss', ext: 'scss' })).toBe(true);
+    // Markdown 现在由内置的 Marksman 插件提供语言服务（链接补全、定义跳转、链接诊断），
+    // 所以它不再属于"没有任何支持"的文件，控制台要能打开来看诊断。
+    expect(supportsConsoleForTab({ name: 'README.md', ext: 'md' })).toBe(true);
   });
 
   it('is unavailable for plain files without LSP or runtime support', () => {
     resetLsp();
     expect(supportsConsoleForTab({ name: 'notes.txt', ext: 'txt' })).toBe(false);
-    expect(supportsConsoleForTab({ name: 'README.md', ext: 'md' })).toBe(false);
     expect(supportsConsoleForTab({ name: 'data.json', ext: 'json' })).toBe(false);
     expect(supportsConsoleForTab(null)).toBe(false);
   });
