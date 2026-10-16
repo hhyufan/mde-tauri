@@ -271,6 +271,15 @@
     border-inline-end: 1px solid var(--border) !important;
     background: transparent;
 
+    // antd 的条目标题外面还有一层 .ant-menu-title-content，它自带
+    // nowrap + 省略号。中文标签短，看不出问题；英文 "Language services"
+    // 会被截成 "Language servi…"。允许换行后任何语言都不再被截。
+    .ant-menu-title-content {
+      white-space: normal;
+      overflow: visible;
+      text-overflow: clip;
+    }
+
     .ant-menu-item {
       height: auto;
       line-height: 1.4;
