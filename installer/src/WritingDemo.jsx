@@ -7,7 +7,9 @@ import {
   editorViewOptionsCtx,
 } from '@milkdown/kit/core';
 import { commonmark } from '@milkdown/kit/preset/commonmark';
-import { splitBlock } from '@milkdown/kit/prose/commands';
+import { splitBlock, liftEmptyBlock } from '@milkdown/kit/prose/commands';
+import { splitListItem } from '@milkdown/kit/prose/schema-list';
+import { gfm } from '@milkdown/kit/preset/gfm';
 import { Plugin } from '@milkdown/kit/prose/state';
 import { Decoration, DecorationSet } from '@milkdown/kit/prose/view';
 import { $prose } from '@milkdown/kit/utils';
@@ -17,8 +19,10 @@ const sequence = [
   '## 捕捉今天的灵感',
   '让 **灵感** 自然流淌。',
   '> 好的想法，值得记录。',
+  '- [x] 记录今天的灵感',
+  '[ ] 写下新的故事',
 ];
-const completed = sequence.join('\n\n');
+const completed = sequence.slice(0, 5).join('\n\n') + '\n- ' + sequence[5];
 const demoCaret = $prose(
   () =>
     new Plugin({
@@ -42,9 +46,10 @@ const demoCaret = $prose(
 );
 
 // Run real Milkdown input rules, just as typed text triggers the app's editor.
-export default function WritingDemo() {
+export default function WritingDemo({ onComplete }) {
   const root = useRef(null);
   const [failed, setFailed] = useState(false);
+  const [finished, setFinished] = useState(false);
   useEffect(() => {
     let disposed = false;
     let created = false;
@@ -64,6 +69,7 @@ export default function WritingDemo() {
         }));
       })
       .use(commonmark)
+      .use(gfm)
       .use(demoCaret);
     editor
       .create()
@@ -73,18 +79,30 @@ export default function WritingDemo() {
           void editor.destroy();
           return;
         }
-        if (reduced) return;
+        if (reduced) {
+          setFinished(true);
+          onComplete?.();
+          return;
+        }
         const view = editor.ctx.get(editorViewCtx);
         const steps = sequence.flatMap((line, index) => [
-          ...(index ? ['ENTER'] : []),
+          ...(index ? [index === 4 ? 'EXIT_QUOTE' : index === 5 ? 'NEXT_TASK' : 'ENTER'] : []),
           ...line,
-          'WAIT',
+          ...(index < sequence.length - 1 ? ['WAIT'] : []),
         ]);
         let index = 0;
         const type = () => {
           if (disposed || index >= steps.length) return;
           const step = steps[index++];
           if (step === 'ENTER') splitBlock(view.state, view.dispatch);
+          else if (step === 'EXIT_QUOTE') {
+            splitBlock(view.state, view.dispatch);
+            liftEmptyBlock(view.state, view.dispatch);
+          } else if (step === 'NEXT_TASK')
+            splitListItem(view.state.schema.nodes.list_item, { checked: null })(
+              view.state,
+              view.dispatch,
+            );
           else if (step !== 'WAIT') {
             const { from, to } = view.state.selection;
             const handled = view.someProp('handleTextInput', (handler) =>
@@ -92,21 +110,27 @@ export default function WritingDemo() {
             );
             if (!handled) view.dispatch(view.state.tr.insertText(step, from, to));
           }
-          timer = setTimeout(type, step === 'WAIT' ? 600 : 80);
+          if (index === steps.length) {
+            setFinished(true);
+            onComplete?.();
+          } else timer = setTimeout(type, step === 'WAIT' ? 600 : 80);
         };
         timer = setTimeout(type, 400);
       })
       .catch(() => {
-        if (!disposed) setFailed(true);
+        if (!disposed) {
+          setFailed(true);
+          onComplete?.();
+        }
       });
     return () => {
       disposed = true;
       clearTimeout(timer);
       if (created) void editor.destroy();
     };
-  }, []);
+  }, [onComplete]);
   return (
-    <div className="md-preview md-preview--milkdown scene-writing-demo">
+    <div className="md-preview md-preview--milkdown scene-writing-demo" data-complete={finished}>
       <div ref={root} />
       {failed && <p>写下新的想法，让灵感自然流淌。</p>}
     </div>

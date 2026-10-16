@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { invoke, isTauri } from '@tauri-apps/api/core';
 import { listen } from '@tauri-apps/api/event';
 import { getCurrentWindow } from '@tauri-apps/api/window';
@@ -8,23 +8,6 @@ import FeatureScenes from './FeatureScenes';
 import './installer.css';
 
 const scenes = [
-  {
-    label: 'WRITE',
-    title: (
-      <>
-        落笔即所见，
-        <br />
-        <em>专注每个想法。</em>
-      </>
-    ),
-    description: (
-      <>
-        Markdown 源码与实时预览并肩呈现。
-        <br />
-        从第一行文字，到完整的创作。
-      </>
-    ),
-  },
   {
     label: 'WYSIWYG',
     title: (
@@ -39,6 +22,23 @@ const scenes = [
         输入 Markdown，文字自然成形。
         <br />
         标题、强调与引用，就在笔下呈现。
+      </>
+    ),
+  },
+  {
+    label: 'WRITE',
+    title: (
+      <>
+        落笔即所见，
+        <br />
+        <em>专注每个想法。</em>
+      </>
+    ),
+    description: (
+      <>
+        Markdown 源码与实时预览并肩呈现。
+        <br />
+        从第一行文字，到完整的创作。
       </>
     ),
   },
@@ -108,6 +108,15 @@ const stages = {
 export default function Installer() {
   const native = isTauri();
   const [slide, setSlide] = useState(0);
+  const nextSlideTimer = useRef(null);
+  const handleSceneComplete = useCallback((finishedSlide) => {
+    // Static accessibility demos stay under manual navigation.
+    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+    clearTimeout(nextSlideTimer.current);
+    nextSlideTimer.current = setTimeout(() => {
+      setSlide((current) => (current === finishedSlide ? (current + 1) % scenes.length : current));
+    }, 1000);
+  }, []);
   const [directory, setDirectory] = useState('');
   // 被更新器拉起来时（命令行带 /UPDATE）走更新流程：目录由注册表决定，用户不能改。
   const [update, setUpdate] = useState(false);
@@ -143,11 +152,7 @@ export default function Installer() {
     };
   }, [native]);
   useEffect(() => {
-    const timer = setTimeout(
-      () => setSlide((s) => (s + 1) % scenes.length),
-      slide === 1 ? 14000 : 7200,
-    );
-    return () => clearTimeout(timer);
+    return () => clearTimeout(nextSlideTimer.current);
   }, [slide]);
   useEffect(() => {
     if (!demoRunning) return;
@@ -260,27 +265,31 @@ export default function Installer() {
         </div>
       </div>
       <section className="feature" aria-label="MokiDown 功能介绍">
-        <div key={`copy-${slide}`} className="copy">
-          <div className="eyebrow">
-            0{slide + 1} / {scenes[slide].label}
+        {scenes.map((scene, index) => (
+          <div
+            key={scene.label}
+            className={`copy${slide === index ? ' is-visible' : ''}`}
+            aria-hidden={slide !== index}
+          >
+            <div className="eyebrow">
+              0{index + 1} / {scene.label}
+            </div>
+            <h1>
+              {done ? (
+                <>
+                  一切已就绪，
+                  <br />
+                  <em>开始新的创作。</em>
+                </>
+              ) : (
+                scene.title
+              )}
+            </h1>
+            <p className="description">
+              {done ? '你的写作空间已经准备好了。让 Moki 陪你记录下一个想法。' : scene.description}
+            </p>
           </div>
-          <h1>
-            {done ? (
-              <>
-                一切已就绪，
-                <br />
-                <em>开始新的创作。</em>
-              </>
-            ) : (
-              scenes[slide].title
-            )}
-          </h1>
-          <p className="description">
-            {done
-              ? '你的写作空间已经准备好了。让 Moki 陪你记录下一个想法。'
-              : scenes[slide].description}
-          </p>
-        </div>
+        ))}
         <div className="stage">
           {scenes.map((scene, index) => (
             <div
@@ -288,22 +297,30 @@ export default function Installer() {
               className={`card-motion${slide === index ? ' is-visible' : ''}`}
               aria-hidden={slide !== index}
             >
-              <FeatureScenes slide={index} active={slide === index} />
+              <FeatureScenes
+                slide={index}
+                active={slide === index}
+                onComplete={handleSceneComplete}
+              />
             </div>
           ))}
-          <div
-            className={`mascot mascot--${[0, 3, 4, 1, 2][slide]}`}
-            role="img"
-            aria-label={
-              [
-                '浅色 Moki 书写，蓝白运动鞋',
-                '浅色 Moki 演示所见即所得，蓝白运动鞋',
-                '浅色 Moki 检查语言服务，蓝白运动鞋',
-                '深色 Moki 切换主题，深蓝运动鞋',
-                '浅色 Moki 整理文件，蓝白系带运动鞋',
-              ][slide]
-            }
-          />
+          {scenes.map((scene, index) => (
+            <div
+              key={`mascot-${scene.label}`}
+              className={`mascot mascot--${[3, 0, 4, 1, 2][index]}${slide === index ? ' is-visible' : ''}`}
+              aria-hidden={slide !== index}
+              role="img"
+              aria-label={
+                [
+                  '浅色 Moki 演示所见即所得，蓝白运动鞋',
+                  '浅色 Moki 书写，蓝白运动鞋',
+                  '浅色 Moki 检查语言服务，蓝白运动鞋',
+                  '深色 Moki 切换主题，深蓝运动鞋',
+                  '浅色 Moki 整理文件，蓝白系带运动鞋',
+                ][index]
+              }
+            />
+          ))}
         </div>
         <nav className="dots" aria-label="切换功能介绍">
           {scenes.map((scene, index) => (

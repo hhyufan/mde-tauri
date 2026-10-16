@@ -1,8 +1,11 @@
-import { lazy, Suspense } from 'react';
+import { lazy, Suspense, useCallback, useEffect, useRef, useState } from 'react';
 import ReactMarkdown from 'react-markdown';
 import LanguageDemo from './LanguageDemo';
+import SplitDemo from './SplitDemo';
+import ThemeDemo from './ThemeDemo';
+import TreeDemo from './TreeDemo';
 import remarkGfm from 'remark-gfm';
-import { Tree, ConfigProvider } from 'antd';
+import { Tree, ConfigProvider, Input } from 'antd';
 import {
   FolderOpenOutlined,
   FileTextOutlined,
@@ -15,7 +18,7 @@ import {
   OneToOneOutlined,
 } from '@ant-design/icons';
 import FileIcon from '../../src/components/ui/FileTypeIcon';
-import { parseTreeText } from '../../src/utils/mgtree';
+import { flattenTree } from '../../src/utils/mgtree';
 import '../../src/components/editor/markdown-preview.scss';
 import '../../src/components/layout/sidebar/explorer/file-tree.scss';
 import '../../src/components/layout/tab-bar/tabbar.scss';
@@ -27,10 +30,6 @@ const WritingDemo = lazy(() => import('./WritingDemo'));
 
 const markdown =
   '# 写下新的想法\n\n从一行文字，开始新的创作。\n\n> 好的想法，值得被认真记录。\n\n- [x] 记录今天的灵感\n- [ ] 写下新的故事';
-const lines = markdown.split('\n');
-const tree = parseTreeText(
-  '我的知识空间\n  写作与灵感\n    每日随笔\n    创作清单\n  阅读与积累\n    阅读笔记\n    收藏的句子',
-);
 
 function DocumentPreview({ compact = false }) {
   return (
@@ -101,13 +100,22 @@ function FileList() {
         </div>
       ))}
       <div className="scene-history">
-        › &nbsp; 本地历史 <span>0</span>
+        <svg
+          viewBox="0 0 16 16"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="1.5"
+          aria-hidden="true"
+        >
+          <path d="m6 3 5 5-5 5" />
+        </svg>
+        本地历史 <span className="scene-history-count">0</span>
       </div>
     </div>
   );
 }
 
-function TreePreview() {
+function TreePreview({ nodes, editing }) {
   const toNode = (node, index, siblings) => ({
     key: node.key,
     className: index === siblings.length - 1 ? 'moki-tree__last' : '',
@@ -118,7 +126,24 @@ function TreePreview() {
         ) : (
           <FileTextOutlined className="moki-tree__icon" />
         )}
-        <span className="moki-tree__title">{node.title}</span>
+        {editing?.key === node.key ? (
+          <span
+            className="scene-tree-input-wrap"
+            style={{ '--scene-input-length': editing.value.length }}
+          >
+            <Input
+              className="moki-tree__input"
+              size="small"
+              value={editing.value}
+              readOnly
+              tabIndex={-1}
+              aria-label="新节点名称"
+            />
+            <span className="scene-typing-caret" aria-hidden="true" />
+          </span>
+        ) : (
+          <span className="moki-tree__title">{node.title}</span>
+        )}
       </div>
     ),
     children: node.children.map(toNode),
@@ -154,13 +179,16 @@ function TreePreview() {
             <span className="moki-tree__zoom">100%</span>
           </div>
           <span className="moki-tree__count">
-            <ApartmentOutlined />7 个节点
+            <ApartmentOutlined />
+            {flattenTree(nodes).length} 个节点
           </span>
         </div>
         <div className="moki-tree__canvas">
           <Tree
-            treeData={tree.map(toNode)}
-            defaultExpandAll
+            treeData={nodes.map(toNode)}
+            expandedKeys={flattenTree(nodes).map((node) => node.key)}
+            selectedKeys={editing ? [editing.key] : []}
+            motion={null}
             showLine={{ showLeafIcon: false }}
             blockNode
             selectable={false}
@@ -179,16 +207,31 @@ function TreePreview() {
   );
 }
 
-export default function FeatureScenes({ slide, active }) {
-  if (slide === 1)
+export default function FeatureScenes({ slide, active, onComplete }) {
+  const [retained, setRetained] = useState(active);
+  const activeRef = useRef(active);
+  activeRef.current = active;
+  const present = active || retained;
+  useEffect(() => {
+    if (active) {
+      setRetained(true);
+      return undefined;
+    }
+    const timer = setTimeout(() => setRetained(false), 480);
+    return () => clearTimeout(timer);
+  }, [active]);
+  const complete = useCallback(() => {
+    if (activeRef.current) onComplete?.(slide);
+  }, [slide, onComplete]);
+  if (slide === 0)
     return (
       <div className="feature-scene scene-wysiwyg" aria-label="所见即所得组件展示">
         <div className="scene-surface scene-editor-card">
           <PanelHeader name="灵感随笔.md" />
           <div className="scene-demo-body">
-            {active && (
+            {present && (
               <Suspense fallback={<div className="scene-demo-loading" />}>
-                <WritingDemo />
+                <WritingDemo onComplete={complete} />
               </Suspense>
             )}
           </div>
@@ -204,29 +247,19 @@ export default function FeatureScenes({ slide, active }) {
       <div className="feature-scene scene-language" aria-label="Markdown 语言服务组件展示">
         <div className="scene-surface scene-editor-card">
           <PanelHeader name="阅读清单.md" />
-          {active && <LanguageDemo />}
+          {present && <LanguageDemo onComplete={complete} />}
         </div>
       </div>
     );
   if (slide === 3)
     return (
       <div className="feature-scene scene-themes" aria-label="浅深主题组件展示">
-        <div className="scene-theme-card">
-          <PanelHeader name="开始创作.md" />
-          <DocumentPreview compact />
-          <div className="scene-theme-footer">
-            <span>浅色主题</span>
-            <span>UTF-8 · LF</span>
-          </div>
-        </div>
-        <div className="scene-theme-card scene-theme-card--dark" data-theme="dark">
-          <PanelHeader name="开始创作.md" />
-          <DocumentPreview compact />
-          <div className="scene-theme-footer">
-            <span>深色主题</span>
-            <span>UTF-8 · LF</span>
-          </div>
-        </div>
+        {present && (
+          <ThemeDemo onComplete={complete}>
+            <PanelHeader name="开始创作.md" />
+            <DocumentPreview compact />
+          </ThemeDemo>
+        )}
       </div>
     );
   if (slide === 4)
@@ -237,7 +270,11 @@ export default function FeatureScenes({ slide, active }) {
         </div>
         <div className="scene-surface scene-tree-card">
           <PanelHeader name="我的知识树.mgtree" extension="mgtree" />
-          <TreePreview />
+          {present && (
+            <TreeDemo onComplete={complete}>
+              {(nodes, editing) => <TreePreview nodes={nodes} editing={editing} />}
+            </TreeDemo>
+          )}
         </div>
       </div>
     );
@@ -245,27 +282,7 @@ export default function FeatureScenes({ slide, active }) {
     <div className="feature-scene scene-write" aria-label="源码与 Markdown 预览组件展示">
       <div className="scene-surface scene-editor-card">
         <PanelHeader name="开始创作.md" />
-        <div className="scene-editor-split">
-          <div className="scene-code" aria-label="Markdown 源码">
-            {lines.map((line, i) => (
-              <div key={i}>
-                <span className="scene-line-number">{i + 1}</span>
-                <span
-                  className={
-                    line.startsWith('#')
-                      ? 'scene-token-heading'
-                      : line.startsWith('>')
-                        ? 'scene-token-quote'
-                        : ''
-                  }
-                >
-                  {line || ' '}
-                </span>
-              </div>
-            ))}
-          </div>
-          <DocumentPreview />
-        </div>
+        {present && <SplitDemo onComplete={complete} />}
         <div className="scene-editor-footer">
           <span>Markdown</span>
           <span>UTF-8 &nbsp; · &nbsp; LF</span>

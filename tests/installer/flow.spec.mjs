@@ -20,7 +20,7 @@ test('feature navigation, preview installation and duplicate-click protection', 
   await expect(page.getByRole('heading', { name: /让零散灵感/ })).toBeVisible();
   await expect(page.getByLabel('文件列表与知识树组件展示')).toBeVisible();
   await expect(page.locator('.stage img')).toHaveCount(0);
-  await expect(page.getByText('阅读与积累', { exact: true })).toBeVisible();
+  await expect(page.getByText('阅读与积累', { exact: true })).toBeVisible({ timeout: 10000 });
   await expect(page.locator('.scene-tree-card .ant-tree')).toBeVisible();
   await expect(page.getByRole('img', { name: '浅色 Moki 整理文件，蓝白系带运动鞋' })).toBeVisible();
   await page.getByRole('button', { name: '开始安装', exact: false }).click();

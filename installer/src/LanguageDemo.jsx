@@ -1,19 +1,25 @@
 import { useEffect, useState } from 'react';
 import { FileTextOutlined, CheckCircleOutlined } from '@ant-design/icons';
+import useDemoComplete from './useDemoComplete';
 
 // A local language-service demonstration; no server or document access in setup.
-export default function LanguageDemo() {
+export default function LanguageDemo({ onComplete }) {
   const [step, setStep] = useState(0);
   useEffect(() => {
     if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
-      setStep(1);
+      setStep(2);
       return;
     }
     const timers = [setTimeout(() => setStep(1), 1400), setTimeout(() => setStep(2), 4300)];
     return () => timers.forEach(clearTimeout);
   }, []);
+  useDemoComplete(step === 2, onComplete);
   return (
-    <div className="scene-language-demo" aria-label="Markdown 链接补全与诊断演示">
+    <div
+      className="scene-language-demo"
+      data-complete={step === 2}
+      aria-label="Markdown 链接补全与诊断演示"
+    >
       <div className="scene-language-source">
         <div>
           <span className="scene-line-number">1</span>

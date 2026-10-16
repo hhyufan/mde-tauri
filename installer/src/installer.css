@@ -108,7 +108,16 @@ button:focus-visible {
   top: 57px;
   left: 36px;
   width: 276px;
-  animation: copy-enter 0.5s ease both;
+  opacity: 0;
+  visibility: hidden;
+  transition:
+    opacity 450ms ease-in-out,
+    visibility 0s linear 450ms;
+}
+.copy.is-visible {
+  opacity: 1;
+  visibility: visible;
+  transition-delay: 0s;
 }
 .eyebrow {
   display: flex;
@@ -154,17 +163,15 @@ h1 em {
   inset: 0;
   opacity: 0;
   visibility: hidden;
-  transform: translateY(5px);
   transition:
-    opacity 0.48s ease,
-    transform 0.48s ease,
-    visibility 0.48s;
+    opacity 450ms ease-in-out,
+    visibility 0s linear 450ms;
   pointer-events: none;
 }
 .card-motion.is-visible {
   opacity: 1;
   visibility: visible;
-  transform: translateY(0);
+  transition-delay: 0s;
 }
 .mascot {
   position: absolute;
@@ -175,8 +182,17 @@ h1 em {
   z-index: 3;
   background: url('./assets/moki-feature-scenes.png') 0 0 / 300% 100%;
   filter: drop-shadow(0 5px 5px #6075a00c);
-  animation: mascot-enter 0.6s 0.15s ease both;
+  opacity: 0;
+  visibility: hidden;
+  transition:
+    opacity 450ms ease-in-out,
+    visibility 0s linear 450ms;
   pointer-events: none;
+}
+.mascot.is-visible {
+  opacity: 1;
+  visibility: visible;
+  transition-delay: 0s;
 }
 .mascot--1 {
   background-position: 50% 0;
