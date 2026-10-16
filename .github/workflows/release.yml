@@ -133,7 +133,31 @@ jobs:
             gh release create $tag --repo $env:GITHUB_REPOSITORY --target $env:GITHUB_SHA --title "MokiDown $tag" --generate-notes --draft
             if ($LASTEXITCODE -ne 0) { throw 'Could not create release.' }
           }
-          gh release upload $tag $setup $signature $manifest --repo $env:GITHUB_REPOSITORY --clobber
+          # 重跑发布时同名资产已存在，必须先删掉再传。
+          #
+          # 这里不能图省事用 `gh release upload --clobber`：它是「先 DELETE 再 POST」，
+          # 两个请求之间不等 GitHub 端把删除反映出来，紧接着的同名上传就会撞
+          # `422 ReleaseAsset.name already exists`，把整次发布打断。
+          # 所以逐个资产显式删除，再轮询确认它真的从资产列表里消失，然后才上传。
+          $assets = @(gh release view $tag --repo $env:GITHUB_REPOSITORY --json assets --jq '.assets[].name')
+          foreach ($file in @($setup, $signature, $manifest)) {
+            $name = Split-Path -LiteralPath $file -Leaf
+            # 用 -ccontains：PowerShell 的 -contains 不区分大小写，而资产名里
+            # MokiDown_（React 安装器）与 mokidown_（旧 NSIS 包）只差大小写，
+            # 用错会误判成另一个文件已存在。
+            if ($assets -ccontains $name) {
+              gh release delete-asset $tag $name --repo $env:GITHUB_REPOSITORY --yes
+              if ($LASTEXITCODE -ne 0) { throw "Could not delete existing asset: $name" }
+              $removed = $false
+              for ($attempt = 0; $attempt -lt 20 -and -not $removed; $attempt++) {
+                Start-Sleep -Milliseconds 500
+                $current = @(gh release view $tag --repo $env:GITHUB_REPOSITORY --json assets --jq '.assets[].name')
+                $removed = -not ($current -ccontains $name)
+              }
+              if (-not $removed) { throw "Asset $name still listed after deletion." }
+            }
+          }
+          gh release upload $tag $setup $signature $manifest --repo $env:GITHUB_REPOSITORY
           if ($LASTEXITCODE -ne 0) { throw 'Could not upload installer and manifest.' }
           gh release edit $tag --repo $env:GITHUB_REPOSITORY --draft=false --latest
           if ($LASTEXITCODE -ne 0) { throw 'Could not publish release.' }
