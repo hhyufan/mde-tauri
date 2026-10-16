@@ -11,6 +11,16 @@ beforeEach(() => {
   useLspStore.setState({ enabled: true, installed: [], catalog: [], sources: [], preferred: {}, operations: {}, statuses: {}, revision: 0 });
   invoke.mockReset();
 });
+it('offers Marksman and installs its Markdown aliases through the existing plugin flow', async () => {
+  const markdown = LANGUAGE_PLUGIN_CATALOG.find((plugin) => plugin.id === 'mde.marksman');
+  expect(markdown.args).toEqual(['server']);
+  expect(markdown.install.assets['x86_64-pc-windows-msvc']).toBe('marksman.exe');
+  invoke.mockResolvedValueOnce({ manifest: markdown, enabled: true, installedVersion: markdown.version });
+  await useLspStore.getState().install(markdown);
+  expect(selectLanguagePlugin(useLspStore.getState(), 'markdown')?.manifest.id).toBe(markdown.id);
+  expect(getFileLanguage('reading.mdown')).toBe('markdown');
+});
+
 it('only connects installed, enabled plugins and resolves explicit provider preferences', () => {
   expect(selectLanguagePlugin(useLspStore.getState(), 'rust')).toBeNull();
   const first = { manifest, enabled: false };

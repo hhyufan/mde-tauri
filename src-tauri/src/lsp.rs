@@ -97,6 +97,7 @@ fn workspace(file: &Path, language: &str) -> (PathBuf, bool) {
     let markers: &[&str] = match language {
         "rust" => &["Cargo.toml", "rust-project.json"],
         "python" => &["pyproject.toml", "pyrightconfig.json", "setup.py"],
+        "markdown" => &[".marksman.toml"],
         "java" => &[
             "pom.xml",
             "settings.gradle",
@@ -133,6 +134,7 @@ fn workspace(file: &Path, language: &str) -> (PathBuf, bool) {
                 })
             });
         if dotnet
+            || (language == "markdown" && directory.join(".git").exists())
             || markers
                 .iter()
                 .any(|marker| directory.join(marker).is_file())
@@ -712,6 +714,26 @@ mod tests {
             (directory.path().to_path_buf(), false)
         );
         assert!(file_uri(&file).unwrap().starts_with("file:///"));
+    }
+    #[test]
+    fn markdown_workspace_uses_marksman_config_or_git_root() {
+        let directory = tempfile::tempdir().unwrap();
+        fs::create_dir_all(directory.path().join("notes/sub")).unwrap();
+        let file = directory.path().join("notes/sub/readme.md");
+        assert_eq!(
+            workspace(&file, "markdown"),
+            (file.parent().unwrap().to_path_buf(), true)
+        );
+        fs::write(directory.path().join(".git"), "gitdir: /worktrees/example").unwrap();
+        assert_eq!(
+            workspace(&file, "markdown"),
+            (directory.path().to_path_buf(), false)
+        );
+        fs::write(directory.path().join("notes/.marksman.toml"), "").unwrap();
+        assert_eq!(
+            workspace(&file, "markdown"),
+            (directory.path().join("notes"), false)
+        );
     }
     #[test]
     fn kotlin_classpath_contains_matching_stdlib_and_quotes_paths() {

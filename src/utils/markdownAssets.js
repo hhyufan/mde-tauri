@@ -138,7 +138,8 @@ export function resolveMarkdownLinkPath(href, documentPath) {
 
   const [pathWithQuery = '', hash = ''] = normalizedHref.split('#', 2);
   const [pathPart = ''] = pathWithQuery.split('?', 1);
-  const decodedPath = decodeURI(pathPart);
+  let decodedPath;
+  try { decodedPath = decodeURIComponent(pathPart); } catch { decodedPath = pathPart; }
   if (!decodedPath) {
     return { path: '', internal: false, hash };
   }

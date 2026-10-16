@@ -64,6 +64,8 @@ pub struct InstallRecipe {
     #[serde(default)]
     pub asset: String,
     #[serde(default)]
+    pub assets: HashMap<String, String>,
+    #[serde(default)]
     pub format: String,
     #[serde(default)]
     pub url: String,
@@ -180,9 +182,12 @@ pub fn validate(manifest: &PluginManifest) -> Result<(), String> {
         "github" => {
             if recipe.repository.split('/').count() != 2
                 || recipe.repository.split('/').any(|part| !valid_id(part))
-                || recipe.asset.contains('/')
-                || recipe.asset.contains('\\')
-                || recipe.asset.is_empty()
+                || (recipe.asset.is_empty() && recipe.assets.is_empty())
+                || recipe.assets.len() > 16
+                || std::iter::once(&recipe.asset)
+                    .filter(|name| !name.is_empty())
+                    .chain(recipe.assets.values())
+                    .any(|name| !relative(name) || name.contains('/'))
             {
                 return Err("Invalid GitHub release recipe".into());
             }
@@ -526,6 +531,31 @@ fn run_installer(
     }
     Ok(())
 }
+fn release_asset<'a>(recipe: &'a InstallRecipe, target: &str) -> Result<&'a str, String> {
+    if recipe.assets.is_empty() {
+        return Ok(&recipe.asset);
+    }
+    recipe
+        .assets
+        .get(target)
+        .map(String::as_str)
+        .ok_or_else(|| format!("No language-server release for {target}"))
+}
+
+fn install_binary(archive: &Path, directory: &Path, executable: &str) -> Result<(), String> {
+    if !relative(executable) {
+        return Err("Invalid executable path".into());
+    }
+    let mut binary = directory.join(executable);
+    if cfg!(windows) && binary.extension().is_none() {
+        binary.set_extension("exe");
+    }
+    fs::create_dir_all(binary.parent().ok_or("Invalid executable path")?)
+        .map_err(|error| error.to_string())?;
+    fs::copy(archive, binary).map_err(|error| error.to_string())?;
+    Ok(())
+}
+
 fn native_target() -> Result<String, String> {
     let architecture = match std::env::consts::ARCH {
         "x86_64" => "x86_64",
@@ -617,9 +647,9 @@ fn install_payload(
                 } else {
                     recipe.format.as_str()
                 };
-                let asset_name = recipe
-                    .asset
-                    .replace("{target}", &native_target()?)
+                let target = native_target()?;
+                let asset_name = release_asset(recipe, &target)?
+                    .replace("{target}", &target)
                     .replace("{archive}", format);
                 // Public release downloads have no unauthenticated API-rate-limit dependency.
                 let release_path = if manifest.version == "latest" {
@@ -677,7 +707,12 @@ fn install_payload(
                 }
             }
             progress(app, &manifest.id, "extracting", None, "");
-            unpack(&archive, &format, directory, cancel)?;
+            if format == "binary" {
+                cancelled(cancel)?;
+                install_binary(&archive, directory, &recipe.executable)?;
+            } else {
+                unpack(&archive, &format, directory, cancel)?;
+            }
             fs::remove_file(&archive).map_err(|error| error.to_string())?;
             if recipe.kind == "jdtls" {
                 let (java, _) = crate::script_runner::find_runtime("java", None)?;
@@ -958,6 +993,39 @@ pub async fn uninstall_language_plugin(app: AppHandle, id: String) -> Result<(),
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn marksman_platform_assets_and_binary_installation() {
+        let catalog: Vec<PluginManifest> =
+            serde_json::from_str(include_str!("../../src/configs/language-plugins.json")).unwrap();
+        let mut plugin = catalog
+            .into_iter()
+            .find(|item| item.id == "mde.marksman")
+            .unwrap();
+        validate(&plugin).unwrap();
+        assert_eq!(
+            release_asset(&plugin.install, "x86_64-pc-windows-msvc").unwrap(),
+            "marksman.exe"
+        );
+        assert_eq!(
+            release_asset(&plugin.install, "aarch64-unknown-linux-gnu").unwrap(),
+            "marksman-linux-arm64"
+        );
+        assert!(release_asset(&plugin.install, "unsupported").is_err());
+        plugin
+            .install
+            .assets
+            .insert("x86_64-pc-windows-msvc".into(), "../escape.exe".into());
+        assert!(validate(&plugin).is_err());
+        let temporary = tempfile::tempdir().unwrap();
+        let source = temporary.path().join(".download");
+        fs::write(&source, b"server binary").unwrap();
+        install_binary(&source, temporary.path(), "bin/marksman").unwrap();
+        assert_eq!(
+            fs::read(locate(temporary.path(), "bin/marksman").unwrap()).unwrap(),
+            b"server binary"
+        );
+        assert!(install_binary(&source, temporary.path(), "../escape").is_err());
+    }
     #[test]
     #[cfg(windows)]
     fn external_program_paths_have_no_verbatim_prefix() {

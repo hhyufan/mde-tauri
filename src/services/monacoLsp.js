@@ -1,7 +1,9 @@
 import { LspConnection } from './lspConnection';
 import useLspStore, { selectLanguagePlugin } from '@store/useLspStore';
-import useProblemsStore, { problemDocumentKey } from '@store/useProblemsStore';
+import useProblemsStore, { problemDocumentKey, problemPathKey } from '@store/useProblemsStore';
 import { disableBundledLanguageServices } from './monacoLanguageServices';
+import { invoke } from '@tauri-apps/api/core';
+import { markdownLinkContext, normalizeMarkdownPathItems, markdownDirectoryItems, markdownDocumentLinks } from './markdownLspPaths';
 
 export const toPosition = ({ lineNumber, column }) => ({ line: lineNumber - 1, character: column - 1 });
 export const toRange = (range) => ({
@@ -40,6 +42,7 @@ export function completionItem(monaco, model, position, item, defaults = {}) {
     commitCharacters: item.commitCharacters ?? defaults.commitCharacters,
     additionalTextEdits: item.additionalTextEdits?.map((edit) => ({ range: toRange(edit.range), text: edit.newText })),
     preselect: item.preselect,
+    command: item.mokiCommand,
   };
 }
 
@@ -77,7 +80,8 @@ export function attachMonacoLsp(monaco, model, tab) {
         if (capability) capabilities[capability] = registration.registerOptions || true;
       }
     }
-    if (method === 'textDocument/publishDiagnostics' && params?.uri === document?.uri && document) {
+    if (method === 'textDocument/publishDiagnostics' && document
+      && problemPathKey(params?.uri) === problemPathKey(document.uri)) {
       if (params.version != null && params.version !== version) return;
       const metadata = { uri: model.uri.toString(), filePath: tab.path || '', tabId: tab.id, modelUri: model.uri.toString(),
         fileName: tab.name,
@@ -226,11 +230,25 @@ export function attachMonacoLsp(monaco, model, tab) {
     try { return await callback(...args); } catch (_) { return fallback; }
   };
   providers.push(monaco.languages.registerCompletionItemProvider(language, {
-    triggerCharacters: ['.', ':', '<', '"', "'", '/', '@'],
+    triggerCharacters: ['.', ':', '<', '"', "'", '/', '@', ...(language === 'markdown' ? ['[', '(', '#'] : [])],
     provideCompletionItems: guard({ suggestions: [] }, async (model, position, _context, token) => {
+      const currentVersion = version;
+      const pathContext = key === 'mde.marksman' ? markdownLinkContext(model, position) : null;
       const result = await request('completionProvider', 'textDocument/completion', position, { context: { triggerKind: 1 } }, token);
-      return { suggestions: (Array.isArray(result) ? result : result?.items || []).map((item) => completionItem(monaco, model, position, item, result?.itemDefaults)),
+      const local = document && pathContext ? await markdownDirectoryItems(pathContext, document,
+        (dirPath) => invoke('get_directory_contents', { dirPath })) : [];
+      if (disposed || currentVersion !== version || token?.isCancellationRequested) return { suggestions: [] };
+      const items = Array.isArray(result) ? result : result?.items || [];
+      const normalized = document && pathContext ? normalizeMarkdownPathItems(items, document, pathContext) : items;
+      const unique = new Map([...local, ...normalized].map((item) => [item.textEdit?.newText ?? item.label, item]));
+      return { suggestions: [...unique.values()].map((item) => completionItem(monaco, model, position, item, result?.itemDefaults)),
         incomplete: Boolean(result?.isIncomplete) };
+    }),
+  }));
+  if (key === 'mde.marksman' && monaco.languages.registerLinkProvider) providers.push(monaco.languages.registerLinkProvider(language, {
+    provideLinks: guard({ links: [] }, async (model) => {
+      await ready;
+      return { links: disposed ? [] : markdownDocumentLinks(model.getValue(), document.uri) };
     }),
   }));
   providers.push(monaco.languages.registerHoverProvider(language, {

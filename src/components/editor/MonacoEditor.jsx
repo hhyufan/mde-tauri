@@ -233,6 +233,16 @@ const MonacoEditorComponent = forwardRef(function MonacoEditorComponent({ classN
     setEditorInstance(editor);
     const linkOpener = monaco.editor.registerLinkOpener({
       async open(resource) {
+        if (resource.scheme === 'file') {
+          if (resource.path.endsWith('/')) return false;
+          try {
+            const result = await readFileContent(resource.fsPath);
+            if (!result.success) return false;
+            useEditorStore.getState().openFile({ path: resource.fsPath,
+              name: resource.path.split('/').pop(), content: result.content, encoding: result.encoding });
+            return true;
+          } catch (_) { return false; }
+        }
         const url = externalLink(resource.toString());
         if (!url) return false;
         try { await openExternal(url); } catch (error) { console.error('Unable to open link:', error); }

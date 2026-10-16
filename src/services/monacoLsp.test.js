@@ -36,7 +36,7 @@ beforeEach(() => {
   monaco = { editor: { setModelMarkers: vi.fn() }, MarkerSeverity: { Error: 8, Warning: 4, Info: 2, Hint: 1 },
     languages: { CompletionItemKind: { Text: 0, Function: 1 }, CompletionItemInsertTextRule: { InsertAsSnippet: 4 } },
     Uri: { parse: (value) => value } };
-  for (const kind of ['CompletionItem', 'Hover', 'Definition', 'Reference', 'DocumentFormattingEdit', 'SignatureHelp']) {
+  for (const kind of ['CompletionItem', 'Hover', 'Definition', 'Reference', 'DocumentFormattingEdit', 'SignatureHelp', 'Link']) {
     monaco.languages[`register${kind}Provider`] = vi.fn((_language, provider) => {
       providers[kind] = provider;
       const disposable = { dispose: vi.fn() }; providerDisposables.push(disposable); return disposable;
@@ -57,6 +57,46 @@ async function open() {
   await vi.waitFor(() => expect(useLspStore.getState().statuses['mde.pyright']?.status).toBe('ready'));
   return mock.connections.at(-1);
 }
+it('binds Markdown link completions and publishes missing-reference diagnostics to Problems', async () => {
+  model.getLanguageId = () => 'markdown';
+  mock.document = { uri: 'file:///C:/notes/readme.md', rootUri: 'file:///C:/notes' };
+  model.getValue = () => '# Notes\n\n[[missing]]';
+  useLspStore.setState({ installed: [{ enabled: true, manifest: { id: 'mde.marksman', languages: ['markdown'], args: ['server'] } }] });
+  binding = attachMonacoLsp(monaco, model, { id: 'readme', name: 'readme.md', path: '/notes/readme.md' });
+  const connection = mock.connections[0];
+  await vi.waitFor(() => expect(useLspStore.getState().statuses['mde.marksman']?.status).toBe('ready'));
+  expect(providers.CompletionItem.triggerCharacters).toEqual(expect.arrayContaining(['[', '(', '#', '/']));
+  const range = { start: { line: 2, character: 0 }, end: { line: 2, character: 11 } };
+  connection.onNotification('textDocument/publishDiagnostics', { uri: 'file:///c%3A/notes/readme.md', version: 1,
+    diagnostics: [{ message: 'Missing document', severity: 2, source: 'marksman', range }] });
+  expect(monaco.editor.setModelMarkers).toHaveBeenLastCalledWith(model, 'lsp', [expect.objectContaining({ message: 'Missing document', severity: 4, startLineNumber: 3 })]);
+  expect(collectProblems(useProblemsStore.getState())).toHaveLength(1);
+  useLspStore.getState().setEnabled(false);
+  expect(connection.closed).toBe(true);
+  expect(collectProblems(useProblemsStore.getState())).toHaveLength(0);
+});
+
+it('completes the current directory and makes the accepted Markdown link clickable', async () => {
+  model.getLanguageId = () => 'markdown';
+  model.getValue = () => '[Read](./)';
+  mock.document = { uri: 'file:///C:/notes/sub/main.md', rootUri: 'file:///C:/notes' };
+  useLspStore.setState({ installed: [{ enabled: true, manifest: { id: 'mde.marksman', languages: ['markdown'] } }] });
+  binding = attachMonacoLsp(monaco, model, { id: 'main', name: 'main.md', path: 'C:/notes/sub/main.md' });
+  await vi.waitFor(() => expect(useLspStore.getState().statuses['mde.marksman']?.status).toBe('ready'));
+  mock.connections[0].request.mockResolvedValueOnce({ items: [
+    { label: 'sub/notes.md', textEdit: { range: { start: { line: 0, character: 7 }, end: { line: 0, character: 9 } }, newText: '/sub/notes.md' } },
+    { label: 'parent.md', textEdit: { newText: '/parent.md' } },
+  ] });
+  invoke.mockResolvedValueOnce([{ name: 'notes.md', is_dir: false }, { name: 'child', is_dir: true }]);
+  const result = await providers.CompletionItem.provideCompletionItems(model, { lineNumber: 1, column: 10 }, {}, {});
+  expect(invoke).toHaveBeenCalledWith('get_directory_contents', { dirPath: 'C:/notes/sub/' });
+  expect(result.suggestions.map((item) => item.insertText)).toContain('./notes.md');
+  expect(result.suggestions.map((item) => item.insertText)).not.toContain('../parent.md');
+  expect(result.suggestions.find((item) => item.insertText === './child/').command.id).toBe('editor.action.triggerSuggest');
+  model.getValue = () => '[Read](./notes.md)';
+  expect(await providers.Link.provideLinks(model)).toMatchObject({ links: [{ url: 'file:///C:/notes/sub/notes.md' }] });
+});
+
 it('converts UTF-16 ranges and LSP completion snippets and import edits', () => {
   expect(toPosition({ lineNumber: 2, column: 5 })).toEqual({ line: 1, character: 4 });
   const range = { start: { line: 0, character: 1 }, end: { line: 0, character: 3 } };

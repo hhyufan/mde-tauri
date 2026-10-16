@@ -56,5 +56,45 @@
     "languages": ["rust"], "extensions": { "rs": "rust" }, "icon": "Rs", "color": "#bd7b5b",
     "homepage": "https://github.com/rust-lang/rust-analyzer", "requirements": "Rust toolchain; rust-src for standard-library navigation", "requirementsZh": "需要 Rust 工具链；标准库导航需 rust-src", "args": [],
     "install": { "kind": "github", "repository": "rust-lang/rust-analyzer", "asset": "rust-analyzer-{target}.{archive}", "format": "native", "executable": "rust-analyzer" }
+  },
+  {
+    "id": "mde.marksman",
+    "name": "Markdown · Marksman",
+    "publisher": "Marksman",
+    "version": "2026-02-08",
+    "description": "Markdown link and heading completion, definition navigation, references and diagnostics.",
+    "descriptionZh": "提供 Markdown 链接与标题补全、定义跳转、引用查找和链接诊断。",
+    "languages": [
+      "markdown"
+    ],
+    "extensions": {
+      "md": "markdown",
+      "markdown": "markdown",
+      "mdown": "markdown",
+      "mdwn": "markdown",
+      "mkd": "markdown",
+      "mkdn": "markdown"
+    },
+    "icon": "Markdown",
+    "color": "#519aba",
+    "homepage": "https://github.com/artempyanykh/marksman",
+    "requirements": "Self-contained desktop binary; no runtime required",
+    "requirementsZh": "独立桌面程序，无需额外运行环境",
+    "args": [
+      "server"
+    ],
+    "install": {
+      "kind": "github",
+      "repository": "artempyanykh/marksman",
+      "assets": {
+        "x86_64-pc-windows-msvc": "marksman.exe",
+        "x86_64-unknown-linux-gnu": "marksman-linux-x64",
+        "aarch64-unknown-linux-gnu": "marksman-linux-arm64",
+        "x86_64-apple-darwin": "marksman-macos",
+        "aarch64-apple-darwin": "marksman-macos"
+      },
+      "format": "binary",
+      "executable": "marksman"
+    }
   }
 ]
