@@ -151,28 +151,44 @@ jobs:
           # `422 ReleaseAsset.name already exists`，把整次发布打断。
           # 所以逐个资产显式删除，再轮询确认它真的从资产列表里消失，然后才上传。
           $assets = @(gh release view $tag --repo $env:GITHUB_REPOSITORY --json assets --jq '.assets[].name')
+
+          function Get-ReleaseAssets {
+            return @(gh release view $tag --repo $env:GITHUB_REPOSITORY --json assets --jq '.assets[].name')
+          }
+
           foreach ($file in @($setup, $signature, $manifest)) {
             # 不要写 Split-Path -LiteralPath $file -Leaf：-LiteralPath 只属于 ParentSet，
             # 不含 -Leaf，运行时会报 "Parameter set cannot be resolved"（踩过一次，
             # 而且这是参数绑定错误、语法解析查不出来）。.NET 取文件名精确且不解释通配符。
             $name = [System.IO.Path]::GetFileName($file)
-            # 用 -ccontains：PowerShell 的 -contains 不区分大小写，而资产名里
-            # MokiDown_（React 安装器）与 mokidown_（旧 NSIS 包）只差大小写，
-            # 用错会误判成另一个文件已存在。
-            if ($assets -ccontains $name) {
-              gh release delete-asset $tag $name --repo $env:GITHUB_REPOSITORY --yes
-              if ($LASTEXITCODE -ne 0) { throw "Could not delete existing asset: $name" }
+            # 冲突判定必须不区分大小写：GitHub 对 release 资产名的唯一性判定本身就
+            # 不区分大小写。列表里存在小写的 mokidown_0.1.3_x64-setup.exe 时，上传
+            # 大写的 MokiDown_0.1.3_x64-setup.exe 会直接
+            # `422 ReleaseAsset.name already exists`（已用全大写探针实测确认）。
+            # 所以这里要按列表里的「原名」把小写那份删掉，而不是跳过上传。
+            $lower = $name.ToLowerInvariant()
+            foreach ($existing in @($assets | Where-Object { $_.ToLowerInvariant() -eq $lower })) {
+              Write-Output "命名冲突（大小写不同也算同名），先删除已有资产：$existing"
+              gh release delete-asset $tag $existing --repo $env:GITHUB_REPOSITORY --yes
+              if ($LASTEXITCODE -ne 0) { throw "Could not delete existing asset: $existing" }
               $removed = $false
               for ($attempt = 0; $attempt -lt 20 -and -not $removed; $attempt++) {
                 Start-Sleep -Milliseconds 500
-                $current = @(gh release view $tag --repo $env:GITHUB_REPOSITORY --json assets --jq '.assets[].name')
-                $removed = -not ($current -ccontains $name)
+                $removed = -not ((Get-ReleaseAssets) -contains $existing)
               }
-              if (-not $removed) { throw "Asset $name still listed after deletion." }
+              if (-not $removed) { throw "Asset $existing still listed after deletion." }
             }
           }
           gh release upload $tag $setup $signature $manifest --repo $env:GITHUB_REPOSITORY
           if ($LASTEXITCODE -ne 0) { throw 'Could not upload installer and manifest.' }
+          # 终态校验：这一步曾经「绿着但包没上去」（被不区分大小写的重复检查静默跳过），
+          # 所以上传完必须确认三个资产真的都在列表里。
+          $uploaded = Get-ReleaseAssets
+          foreach ($file in @($setup, $signature, $manifest)) {
+            $name = [System.IO.Path]::GetFileName($file)
+            if (-not ($uploaded -ccontains $name)) { throw "上传后资产不在列表中：$name" }
+          }
+          Write-Output "已上传并确认：$(($uploaded | Where-Object { $_ -like 'MokiDown_*' -or $_ -eq 'latest.json' }) -join ', ')"
           gh release edit $tag --repo $env:GITHUB_REPOSITORY --draft=false --latest
           if ($LASTEXITCODE -ne 0) { throw 'Could not publish release.' }
 
