@@ -47,6 +47,10 @@ import { history } from '@milkdown/kit/plugin/history';
 import { clipboard } from '@milkdown/kit/plugin/clipboard';
 import { listener, listenerCtx } from '@milkdown/kit/plugin/listener';
 import { codeBlockComponent, codeBlockConfig } from '@milkdown/kit/component/code-block';
+// 链接与图片的就地编辑：链接用工具条（选中即改文字与地址），图片用行内组件
+// （无 src 时给出可输入的占位）。两处都用 kit 转发的组件，与 code-block 同一套。
+import { linkTooltipPlugin, linkTooltipConfig, toggleLinkCommand } from '@milkdown/kit/component/link-tooltip';
+import { imageInlineComponent, inlineImageConfig } from '@milkdown/kit/component/image-inline';
 import { $ctx, $inputRule, $nodeSchema, $prose, $remark, getMarkdown, insert, replaceRange } from '@milkdown/kit/utils';
 import { toggleMark } from '@milkdown/kit/prose/commands';
 import { InputRule } from '@milkdown/kit/prose/inputrules';
@@ -118,7 +122,7 @@ import { useDocumentScrollState } from '@hooks/useDocumentScrollState';
 import { getDocumentViewState, registerDocumentViewState, requestDocumentViewStateSave } from '@utils/documentViewState';
 import { setBuffer, registerEditorBufferFlusher } from '@utils/editorBuffer';
 import { isImeComposing } from '@utils/keyboard';
-import { hydrateMarkdownImages, parseMarkdownLineHint, resolveMarkdownLinkPath } from '@utils/markdownAssets';
+import { hydrateMarkdownImages, loadMarkdownImageSrc, parseMarkdownLineHint, resolveMarkdownLinkPath } from '@utils/markdownAssets';
 import { observeMarkdownEnhancements } from '@utils/observeMarkdownEnhancements';
 import i18n from '@/i18n';
 import MermaidRenderer from './MermaidRenderer';
@@ -1459,6 +1463,30 @@ function MilkdownInner({
           previewLabel: 'Preview',
           previewLoading: 'Rendering...',
         });
+        // 链接：选中即可在工具条里改文字与目标地址，空链接也能直接补上。
+        ctx.set(linkTooltipConfig.key, {
+          ...ctx.get(linkTooltipConfig.key),
+          editButton: i18n.t('editor.linkEdit'),
+          confirmButton: i18n.t('editor.linkConfirm'),
+          removeButton: i18n.t('editor.linkRemove'),
+          inputPlaceholder: i18n.t('editor.linkPlaceholder'),
+          onCopyLink: (link) => {
+            void navigator.clipboard?.writeText(link).catch(() => {});
+            useToastStore.getState().toast(i18n.t('preview.copiedToClipboard'));
+          },
+        });
+        // 图片：保留 commonmark 的行内图片 schema（.md 原文形态不变），
+        // 空 src 时由组件给出可输入的占位，因此"插进去的空图片"也能改。
+        //
+        // uploadButton 必须显式给 undefined：给了文案它就会渲染一个浏览器原生的
+        // <input type="file">，而本应用的图片是工作区内的相对路径，不走上传。
+        ctx.set(inlineImageConfig.key, {
+          ...ctx.get(inlineImageConfig.key),
+          uploadButton: undefined,
+          confirmButton: i18n.t('editor.imageConfirm'),
+          uploadPlaceholderText: i18n.t('editor.imagePlaceholder'),
+          proxyDomURL: (url) => (url ? loadMarkdownImageSrc(url, documentPath) : Promise.resolve('')),
+        });
         ctx.update(editorViewOptionsCtx, (prev) => ({
           ...prev,
           editable: () => !readOnly,
@@ -1488,6 +1516,8 @@ function MilkdownInner({
       .use(mathPlugins)
       .use(history)
       .use(codeBlockComponent)
+      .use(linkTooltipPlugin)
+      .use(imageInlineComponent)
       .use(listener);
 
     if (!readOnly) editor.use(milkdownMarkdownPaste).use(clipboard).use(milkdownEditingFlow).use(milkdownGapCursor);
@@ -1568,18 +1598,26 @@ function MilkdownInner({
           case 'link':
             {
               const { from, to, empty } = view.state.selection;
+              // 选中文字就直接套上链接；没选中就先落一段占位文字再套，
+              // 让工具条立刻以编辑态出现等着填地址——不再插入字面文本 [link](url)。
               if (empty) {
-                insert('[link](url)', true)(ctx);
-              } else {
-                const selected = getMarkdown({ from, to })(ctx) || 'link';
-                replaceRange(`[${selected}](url)`, { from, to })(ctx);
+                const text = i18n.t('editor.linkPlaceholder');
+                view.dispatch(view.state.tr.insertText(text, from, to));
+                view.dispatch(view.state.tr.setSelection(
+                  TextSelection.create(view.state.doc, from, from + text.length),
+                ));
               }
+              run(toggleLinkCommand);
               handled = true;
               view.focus();
             }
             break;
           case 'image':
-            run(insertImageCommand, { src: 'url', alt: 'alt', title: '' });
+            // 插一张空图片（src 为空）：行内图片组件的占位本身就是地址输入口，
+            // 这样插进去的图能当场改，而不是用 src="url" 造一张坏图。
+            run(insertImageCommand, { src: '', alt: '', title: '' });
+            handled = true;
+            view.focus();
             break;
           case 'taskList':
             {
