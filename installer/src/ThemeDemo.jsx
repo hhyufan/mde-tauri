@@ -24,9 +24,12 @@ export default function ThemeDemo({ children, onComplete }) {
   const [finished, setFinished] = useState(reduced);
   useEffect(() => {
     if (reduced) return undefined;
+    // 涟漪本身只有 300ms（见 feature-scenes.css），此前两跳之间隔了 3.8s，
+    // 体感是"动画太长"。这里把每一跳前的停留压到 1s：
+    // 1.0s 起跳深色（+300ms 结束）→ 再停 1s → 2.6s 起跳回浅色。
     const timers = [
-      setTimeout(() => setReveal('dark'), 1300),
-      setTimeout(() => setReveal('light'), 5100),
+      setTimeout(() => setReveal('dark'), 1000),
+      setTimeout(() => setReveal('light'), 2600),
     ];
     return () => timers.forEach(clearTimeout);
   }, [reduced]);
@@ -44,10 +47,15 @@ export default function ThemeDemo({ children, onComplete }) {
           key={reveal}
           className="scene-theme-ripple"
           aria-hidden="true"
-          onAnimationEnd={() => {
+          onAnimationEnd={(event) => {
+            // 只认覆盖层自己的动画：animationend 会从子元素冒泡上来，
+            // 提前收掉覆盖层就会露出还没换底色的那一帧（白闪）。
+            if (event.target !== event.currentTarget) return;
+            // 先把底色切过去——此刻覆盖层还在，这一帧看不见；
+            // 下一帧再撤覆盖层，避免"覆盖层已移除、底色尚未换"的一帧。
             setDark(reveal === 'dark');
-            setReveal(null);
             if (reveal === 'light') setFinished(true);
+            requestAnimationFrame(() => setReveal(null));
           }}
         >
           <ThemeFrame dark={reveal === 'dark'}>{children}</ThemeFrame>

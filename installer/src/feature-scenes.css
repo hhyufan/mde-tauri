@@ -216,6 +216,14 @@
   pointer-events: none;
   animation: scene-theme-reveal 300ms ease-out both;
 }
+/* 主题切换由上面这层 300ms 的涟漪完成。若场景内的元素自己还带 background/color
+   过渡（例如 installer.css 里那条 0.15s 的 background），覆盖层撤掉之后它们会
+   再演一遍浅→深，看起来就是"已经切成深色了，又白闪一下"。这里统一禁掉：这一
+   场景的过渡由涟漪负责，元素自身不需要再过渡一遍。 */
+.scene-theme-demo,
+.scene-theme-demo * {
+  transition: none !important;
+}
 @keyframes scene-theme-reveal {
   from {
     clip-path: circle(0 at 28px calc(100% - 18px));
