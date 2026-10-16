@@ -48,7 +48,18 @@
 // 背景（玻璃）模式：面板与其内部控件改用玻璃底色，避免出现实色方块。
 // 浮层变量 --moki-glass-popup 定义在 body 级，这里同时覆盖面板内的 antd 控件。
 .app--background {
+  // 标题栏里那个搜索框本体：基础样式给的是实色 var(--surface)，而它的输入框
+  // 自己写的是 transparent —— 容器不透明，输入框透明也看不出透来。
+  // 这里按控件那一档给玻璃面（与工具栏按钮、范围选择器同一档）。
+  .titlebar__search.search-dropdown { background: transparent; }
   .search-dropdown__panel { @include background-popup.image-surface; }
+  // 范围选择器的弹层：antd 把它挂到 body 上，只有自己的类名能命中它。
+  // 它归浮层那一档（重绘壁纸，与面包屑下拉同一套），设置里的下拉不在此列、保持不透明。
+  .search-dropdown__scope-menu { @include background-popup.image-surface; }
+  // 上一条依赖弹层类名，而类名要靠 antd 的 prop —— 版本不同会静默失效。
+  // 这条不依赖类名：搜索框这个 Select 用 getPopupContainer 把弹层留在了自己的子树里，
+  // 于是普通后代选择器就能命中，等于给上一条兜底。
+  .titlebar__search .ant-select-dropdown { @include background-popup.image-surface; }
   .search-dropdown__clear:hover,
   .search-dropdown__toolbar button:hover { background: var(--moki-glass-hover); }
   .search-dropdown__toolbar button[aria-pressed='true'],
@@ -59,7 +70,19 @@
   .search-dropdown__error { background: color-mix(in srgb, var(--error) 14%, transparent); }
   .search-dropdown__footer { border-top-color: transparent; }
   // 范围选择器本体（弹层在 body 级由 background-surfaces 统一适配）。
-  .search-dropdown__scope .ant-select-selector { background: var(--moki-glass-surface); }
+  // 触发器（显示"整个工作区"的那个框）**不透明**：透的是它下面的列表弹层。
+  // 原先这条给的是 --moki-glass-surface（约 63% 透明），于是框和列表一样透，
+  // 在壁纸上就成了一片、看不出边界。
+  // antd v5 的样式是运行时注入到 head 的，选择器形如
+  // `.ant-select-outlined:not(.ant-select-customize-input) .ant-select-selector`，
+  // 权重高于这里两条类名，所以普通写法会被压住（改了半天没效果就是这个原因）。
+  // 这两处要的就是"直接透明"，用 !important 明确压过组件库。
+  .search-dropdown__scope .ant-select-selector,
+  .search-dropdown__scope.ant-select .ant-select-selector {
+    background: transparent !important;
+    box-shadow: none !important;
+    border-color: var(--border-light) !important;
+  }
 }
 @media (max-width: 768px) {
   .search-dropdown__panel { position: fixed; top: calc(58px + env(safe-area-inset-top)); left: 8px; right: 8px; width: auto; min-width: 0; }

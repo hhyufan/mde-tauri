@@ -143,7 +143,7 @@ export default function FileNameField({
           variant="borderless"
           size="small"
           value={extension}
-          options={FILE_EXTENSIONS.map((ext) => ({ value: ext }))}
+          options={FILE_EXTENSIONS.map((extension) => ({ value: extension, label: <span>{extension}</span> }))}
           onChange={(value) => onExtensionChange(value ?? '')}
           onDropdownVisibleChange={(open) => { dropdownOpenRef.current = open; }}
           onBlur={() => { dropdownOpenRef.current = false; }}

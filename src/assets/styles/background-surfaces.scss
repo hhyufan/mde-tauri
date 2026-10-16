@@ -225,6 +225,9 @@ body.moki-has-background {
   //
   // 这里**不含** .ant-select-dropdown：设置里的下拉框要求不透背景，而应用里的
   // antd 下拉基本都出自设置（其余下拉各有自己的类名），所以让它不参与这套。
+  // antd 的 Select 弹层（改名后缀、搜索范围、设置等）与面包屑下拉同一套：
+  // 它 portal 到 body，所以必须写在 body 级这一份清单里，挂在 .app 上的那份对它无效。
+  .ant-select-dropdown,
   .footer__dropdown,
   .sort-dropdown,
   .ft,

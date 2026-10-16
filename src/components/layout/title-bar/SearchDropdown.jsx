@@ -110,6 +110,8 @@ export default function SearchDropdown({ open, onOpen, onClose }) {
         </div>
         <Select
           className="search-dropdown__scope"
+            popupClassName="search-dropdown__scope-menu"
+            getPopupContainer={(node) => node.parentElement ?? document.body}
           size="small"
           aria-label={t('search.scope')}
           value={search.effectiveScope}
@@ -118,9 +120,9 @@ export default function SearchDropdown({ open, onOpen, onClose }) {
           // 与面包屑、历史折叠按钮共用同款箭头（默认朝右，样式里旋转 90° 朝下）。
           suffixIcon={<ChevronIcon className="search-dropdown__scope-arrow" />}
           options={[
-            { value: 'project', label: t('search.project'), disabled: !search.projectRoot },
-            { value: 'folder', label: t('search.folder'), disabled: !search.currentDir },
-            { value: 'open', label: t('search.openFiles') },
+            { value: 'project', label: <span>{t('search.project')}</span>, disabled: !search.projectRoot },
+            { value: 'folder', label: <span>{t('search.folder')}</span>, disabled: !search.currentDir },
+            { value: 'open', label: <span>{t('search.openFiles')}</span> },
           ]}
         />
         <Tooltip title={t('search.caseSensitive')}><button type="button" aria-label={t('search.caseSensitive')} aria-pressed={caseSensitive}
