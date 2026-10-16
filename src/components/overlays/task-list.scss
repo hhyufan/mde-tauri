@@ -52,20 +52,17 @@
     max-height: min(360px, 60vh);
     overflow-y: auto;
   }
-  // 每条任务用一条分割线分开；关闭按钮贴着分割线的右上角，
-  // 像关标签页一样一条一条关掉，比在下面放一整行"取消"省空间。
+  // 每条任务用一条分割线分开；关闭按钮在标题行里，所以这里不需要定位上下文。
   .task-item {
-    position: relative;
     padding: 8px 0 12px;
     border-bottom: 1px solid var(--border-light);
     &:last-child {
       border-bottom: 0;
     }
   }
+  // 关闭按钮放在标题行末尾（服务名/百分比之后），背景透明即可：
+  // 它不再压在分割线上，也就不需要为它准备一块底色。
   .task-close {
-    position: absolute;
-    right: 0;
-    bottom: 2px;
     width: 18px;
     height: 18px;
     padding: 0;
@@ -92,6 +89,13 @@
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+  }
+  // 下载量与百分比同一行：数字在左，百分比贴右。
+  .task-meta-row {
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+    margin-top: 7px;
   }
   .ti-pct {
     // 项目里没有 --font-mono，写它会静默回退到浏览器默认等宽字体，
@@ -121,8 +125,20 @@
     font-size: 12px;
     color: var(--text-sec);
   }
-  .task-meta {
+  // 下载量与百分比同一行，左右两端对齐：左侧撑满把百分比推到行尾，
+  // 与上面标题行的关闭按钮同一竖直位置。
+  .task-meta-row {
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
     margin-top: 7px;
+  }
+  .task-meta {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
     font: 11px var(--font-editor);
     color: var(--text-dim);
   }

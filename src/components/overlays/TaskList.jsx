@@ -49,17 +49,27 @@ export default function TaskList() {
         </button>
       </div>
       <div className="task-list">
-        {tasks.map((task) => (
-          <div className="task-item" key={`${task.kind}-${task.id}`}>
-            <div className="ti-row">
-              <span className="ti-name">
-                {task.name}
-                {task.kind === 'update' && task.version ? ` · v${task.version}` : ''}
-              </span>
-              {task.showBar && task.percent !== undefined && (
-                <span className="ti-pct">{task.percent}%</span>
-              )}
-            </div>
+        {tasks.map((task) => {
+          // 数字进度那一行的左侧内容：下载量优先，其次是版本对比。
+          const metaLeft = task.meta || (task.kind === 'update' ? versionRow : '');
+          return (
+            <div className="task-item" key={`${task.kind}-${task.id}`}>
+              <div className="ti-row">
+                <span className="ti-name">
+                  {task.name}
+                  {task.kind === 'update' && task.version ? ` · v${task.version}` : ''}
+                </span>
+                {task.close && (
+                  <button
+                    type="button"
+                    className="task-close"
+                    aria-label={`${t('tasks.closeTask')}：${task.name}`}
+                    onClick={() => closeTask(task)}
+                  >
+                    &times;
+                  </button>
+                )}
+              </div>
             <p className="task-status" role="status">
               {task.status}
             </p>
@@ -75,8 +85,13 @@ export default function TaskList() {
                 <div className="fill" style={{ width: `${task.percent ?? 35}%` }} />
               </div>
             )}
-            {task.meta && <div className="task-meta">{task.meta}</div>}
-            {task.kind === 'update' && versionRow && <div className="task-meta">{versionRow}</div>}
+            {(metaLeft || task.percent !== undefined) && (
+              // 百分比与下载量同一行：数字在左，百分比贴右。
+              <div className="task-meta-row">
+                <span className="task-meta">{metaLeft}</span>
+                {task.percent !== undefined && <span className="ti-pct">{task.percent}%</span>}
+              </div>
+            )}
 
             {task.kind === 'update' && update.stage === 'available' && (
               <>
@@ -118,19 +133,9 @@ export default function TaskList() {
                 </button>
               </div>
             )}
-
-            {task.close && (
-              <button
-                type="button"
-                className="task-close"
-                aria-label={`${t('tasks.closeTask')}：${task.name}`}
-                onClick={() => closeTask(task)}
-              >
-                &times;
-              </button>
-            )}
           </div>
-        ))}
+          );
+        })}
       </div>
     </section>
   );
