@@ -25,6 +25,10 @@ export default [
       'miaogu-notepad/**',
       'releases/**',
       '.dbg/**',
+      // 本地探测脚本与跑 smoke 用的二进制（marksman.exe）都放在这里，
+      // 属于开发期临时产物；git 已经忽略它，eslint 的忽略列表也要跟上，
+      // 否则 `eslint .` 会把临时脚本算进项目并报出一堆 no-undef。
+      '.cache/**',
       '.codex-mde-server-editor/**',
     ],
   },
