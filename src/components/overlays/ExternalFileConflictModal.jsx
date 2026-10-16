@@ -56,7 +56,7 @@ function ExternalFileConflictModal({ conflict, onKeep, onUseDisk, onSaveAs, onCl
       <Alert
         type="warning"
         showIcon
-        message={conflict.kind === 'removed' ? '原文件已被删除或移动' : '磁盘内容与本地编辑内容冲突'}
+        message={conflict.kind === 'removed' ? i18n.t('sync.conflict.removedMessage') : i18n.t('sync.conflict.changedMessage')}
         description={i18n.t('sync.conflict.changedHint')}
       />
       <Paragraph ellipsis={{ rows: 2 }} style={{ marginTop: 16 }}>
@@ -68,8 +68,8 @@ function ExternalFileConflictModal({ conflict, onKeep, onUseDisk, onSaveAs, onCl
             original={localContent}
             modified={conflict.diskContent}
             fileName={conflict.path}
-            localLabel="本地编辑内容"
-            remoteLabel="磁盘内容"
+            localLabel={i18n.t('sync.conflict.local')}
+            remoteLabel={i18n.t('sync.conflict.remote')}
             theme={theme}
             fontSize={fontSize}
             fontFamily={fontFamily}

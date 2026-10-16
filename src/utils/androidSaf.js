@@ -12,6 +12,8 @@
  * `isAndroidSafAvailable()` 或更上层封装统一判断，而不是自行分支运行时环境。
  */
 
+import i18n from '@/i18n';
+
 const SAF_SCHEME = 'content://';
 
 // 按 callbackId 暂存尚未完成的选择器 Promise。
@@ -334,7 +336,7 @@ export async function readFileText(uri) {
   const data = parseJson(b.readFile(uri));
   if (!data || data.ok === false) {
     throwIfError(data);
-    throw new Error('Failed to read SAF file');
+    throw new Error(i18n.t('error.safRead'));
   }
   const bytes = base64ToBytes(data.content_base64 || '');
   const decoder = new TextDecoder('utf-8');
@@ -364,7 +366,7 @@ export async function writeFileText(uri, content) {
   const data = parseJson(b.writeFile(uri, bytesToBase64(bytes)));
   if (!data || data.ok === false) {
     throwIfError(data);
-    throw new Error('Failed to write SAF file');
+    throw new Error(i18n.t('error.safWrite'));
   }
   return { size: data.size };
 }

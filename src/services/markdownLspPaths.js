@@ -1,4 +1,7 @@
 // Marksman uses workspace-rooted Markdown paths; the editor opens local files.
+
+import i18n from '@/i18n';
+// Marksman uses workspace-rooted Markdown paths; the editor opens local files.
 // Keep that translation here so completion and link navigation agree.
 const encodePath = (value) => value.split('/').map(encodeURIComponent).join('/');
 const decodePath = (value) => {
@@ -143,7 +146,7 @@ export async function markdownDirectoryItems(context, document, readDirectory) {
       sortText: `${folder ? '0' : '1'}${name}`,
       textEdit: { range: context.range, newText: path },
       ...(folder
-        ? { mokiCommand: { id: 'editor.action.triggerSuggest', title: '继续选择路径' } }
+        ? { mokiCommand: { id: 'editor.action.triggerSuggest', title: i18n.t('editor.continuePathSuggest') } }
         : {}),
     });
     return [

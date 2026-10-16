@@ -4,6 +4,7 @@
  * 本文件对上层暴露稳定的“按路径工作”接口，并在内部根据普通文件路径与
  * `content://` SAF URI 自动分流到 Rust 命令或 Android Bridge，屏蔽平台差异。
  */
+import i18n from '@/i18n';
 import { invoke } from '@tauri-apps/api/core';
 import { listen } from '@tauri-apps/api/event';
 import { getCurrentWindow } from '@tauri-apps/api/window';
@@ -119,7 +120,7 @@ export async function readFileContent(path) {
     } catch (e) {
       return {
         success: false,
-        message: `Failed to read file: ${e?.message || e}`,
+        message: i18n.t('error.readFailed', { detail: e?.message || e }),
       };
     }
   }
@@ -167,7 +168,7 @@ async function writeEncodedFile(filePath, content, encoding) {
     } catch (e) {
       return {
         success: false,
-        message: `Failed to save file: ${e?.message || e}`,
+        message: i18n.t('error.saveFailed', { detail: e?.message || e }),
       };
     }
   }

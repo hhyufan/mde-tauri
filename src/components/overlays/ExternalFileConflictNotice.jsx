@@ -12,7 +12,7 @@ export default function ExternalFileConflictNotice({ conflict, onKeep, onUseDisk
       <div className="external-file-notice" role="status">
         <Tooltip title={conflict.path} placement="top" mouseEnterDelay={0.3}>
           <span>
-            {conflict.kind === 'removed' ? '文件已被删除或移动' : '文件在外部发生变化，自动保存已暂停'}
+            {conflict.kind === 'removed' ? i18n.t('sync.conflict.noticeRemoved') : i18n.t('sync.conflict.noticeChanged')}
             {' · '}{conflict.path.split(/[\\/]/).pop()}
           </span>
         </Tooltip>

@@ -252,7 +252,7 @@ function FloatingToolbar({ onInsert }) {
         className={cn('ft', position && 'ft--custom-position', visible && 'ft--show')}
         style={position ? { left: `${position.x}px`, top: `${position.y}px` } : undefined}
       >
-        <Tooltip title={t('toolbar.drag', '拖动工具栏')} placement="top" mouseEnterDelay={0.3}>
+        <Tooltip title={t('toolbar.drag')} placement="top" mouseEnterDelay={0.3}>
           <div
             className="ft__grip"
             onPointerDown={handleGripPointerDown}

@@ -36,7 +36,7 @@ function RecoveryModal({ open, drafts, onRestore, onDiscard }) {
             disabled={selectedDrafts.length === 0}
             onClick={() => onRestore(selectedDrafts)}
           >
-            恢复所选 ({selectedDrafts.length})
+            {i18n.t('unsaved.restoreSelected', { count: selectedDrafts.length })}
           </Button>
         </Space>
       )}
@@ -57,10 +57,10 @@ function RecoveryModal({ open, drafts, onRestore, onDiscard }) {
               <Title level={5} style={{ display: 'inline', margin: 0 }}>{draft.name}</Title>
             </Checkbox>
             <Paragraph type="secondary" ellipsis={{ rows: 1 }} style={{ margin: '6px 0' }}>
-              {draft.path || '未命名文档'} · {draft.diskState === 'changed' ? '磁盘文件也已变化' : draft.diskState === 'missing' ? '原文件已不存在' : '磁盘文件未变化'}
+              {draft.path || i18n.t('unsaved.untitled')} · {draft.diskState === 'changed' ? i18n.t('unsaved.diskChanged') : draft.diskState === 'missing' ? i18n.t('unsaved.diskMissing') : i18n.t('unsaved.diskUnchanged')}
             </Paragraph>
             <Text code style={{ whiteSpace: 'pre-wrap' }}>
-              {(draft.content || '').slice(0, 320) || '（空白草稿）'}
+              {(draft.content || '').slice(0, 320) || i18n.t('unsaved.emptyDraft')}
             </Text>
           </div>
         ))}

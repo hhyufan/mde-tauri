@@ -825,11 +825,11 @@ function App() {
   ]);
 
   const dragOverlayTitle = dragTarget === 'explorer'
-    ? t('drag.explorerTitle', '移动到资源管理器')
-    : t('drag.editorTitle', '打开到新标签页');
+    ? t('drag.explorerTitle')
+    : t('drag.editorTitle');
   const dragOverlayHint = dragTarget === 'explorer'
-    ? t('drag.explorerHint', '松开后移动到当前资源管理器目录，并打开文件')
-    : t('drag.editorHint', '松开后只打开文件，不切换资源管理器目录');
+    ? t('drag.explorerHint')
+    : t('drag.editorHint');
 
   return (
     <>
