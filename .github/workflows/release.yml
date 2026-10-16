@@ -206,7 +206,7 @@ jobs:
 
       # tag 统一从 tauri.conf.json 版本推出，与 windows 任务保持一致；
       # 手动触发时 github.ref_name 是分支名，不能拿来当 tag。
-      - name: 解析版本与 tag
+      - name: Resolve version and tag
         id: meta
         run: |
           set -euo pipefail
@@ -215,7 +215,7 @@ jobs:
           echo "tag=v${VERSION}" >> "$GITHUB_OUTPUT"
           echo "版本 ${VERSION} → tag v${VERSION}"
 
-      - name: 取回已签名的安装器与签名
+      - name: Fetch the signed installer and its signature
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
@@ -228,7 +228,7 @@ jobs:
             --pattern "MokiDown_${{ steps.meta.outputs.version }}_x64-setup.exe.sig"
           ls -lh dist
 
-      - name: 生成指向 OSS 的 latest.json
+      - name: Write latest.json pointing at OSS
         env:
           BUCKET: ${{ vars.OSS_BUCKET }}
           REGION: ${{ vars.OSS_REGION }}
@@ -243,7 +243,7 @@ jobs:
             --out=dist/latest.json
           cat dist/latest.json
 
-      - name: 安装 ossutil
+      - name: Install ossutil
         run: |
           set -euo pipefail
           curl -sSL -o ossutil.zip \
@@ -253,7 +253,7 @@ jobs:
           chmod +x /usr/local/bin/ossutil64
           ossutil64 --version
 
-      - name: 上传到 OSS
+      - name: Upload to OSS
         env:
           OSS_ACCESS_KEY_ID: ${{ secrets.OSS_ACCESS_KEY_ID }}
           OSS_ACCESS_KEY_SECRET: ${{ secrets.OSS_ACCESS_KEY_SECRET }}
@@ -277,7 +277,7 @@ jobs:
           ossutil64 cp dist/latest.json "oss://${BUCKET}/updates/latest.json" \
             --meta "Cache-Control:no-cache" --force
 
-      - name: 验证可匿名下载
+      - name: Verify anonymous download
         env:
           BUCKET: ${{ vars.OSS_BUCKET }}
           REGION: ${{ vars.OSS_REGION }}
@@ -344,7 +344,7 @@ jobs:
       # 保留当前版本与 latest.json，其余 MokiDown_*_x64-setup.exe(.sig) 一并删除。
       # 放在最后一步是刻意的：万一前面的上传或校验失败，旧包还在，
       # 不至于让线上那份 latest.json 指向一个已经不存在的文件。
-      - name: 清理 OSS 上的旧安装包
+      - name: Prune old installers from OSS
         env:
           OSS_ACCESS_KEY_ID: ${{ secrets.OSS_ACCESS_KEY_ID }}
           OSS_ACCESS_KEY_SECRET: ${{ secrets.OSS_ACCESS_KEY_SECRET }}
