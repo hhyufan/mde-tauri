@@ -92,7 +92,6 @@ export default function WelcomeScreen() {
           <MokiSprite />
           <div className="moki-welcome__caption">
             <strong>Moki / 墨笺</strong>
-            <span>{t('moki.caption')}</span>
           </div>
         </div>
       )}
