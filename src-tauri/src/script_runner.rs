@@ -48,13 +48,12 @@ struct RunControl {
 static RUNS: Lazy<Mutex<HashMap<String, Arc<RunControl>>>> =
     Lazy::new(|| Mutex::new(HashMap::new()));
 
+/// 起脚本/编译器/语言服务用的命令。
+///
+/// 「不弹控制台黑框」这件事统一交给 [`crate::process::hidden`]，这里只再补一层
+/// 脚本运行特有的需求：Unix 下自成进程组，便于整棵进程树一起结束。
 pub(super) fn command(program: impl AsRef<std::ffi::OsStr>) -> Command {
-    let mut command = Command::new(program);
-    #[cfg(windows)]
-    {
-        use std::os::windows::process::CommandExt;
-        command.creation_flags(0x08000000); // CREATE_NO_WINDOW
-    }
+    let mut command = crate::process::hidden(program);
     #[cfg(unix)]
     {
         use std::os::unix::process::CommandExt;

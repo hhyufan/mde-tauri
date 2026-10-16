@@ -20,6 +20,7 @@ mod language_plugins;
 mod lsp;
 #[cfg(windows)]
 mod msvc;
+mod process;
 mod script_runner;
 mod search;
 mod startup;
@@ -1149,7 +1150,7 @@ fn move_path_to_recycle_bin(path: &str, is_dir: bool) -> Result<(), String> {
         )
     };
 
-    let output = Command::new("powershell")
+    let output = process::hidden("powershell")
         .args([
             "-NoProfile",
             "-NonInteractive",
