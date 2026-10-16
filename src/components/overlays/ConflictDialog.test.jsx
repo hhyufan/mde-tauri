@@ -1,3 +1,18 @@
+// 这几个弹窗用的是模块级 i18n（不接 useTranslation），测试环境默认走英文语言表，
+// 而本文件的断言写的是中文。按仓库既有做法（见 FileTree.delete / History 等）显式 mock。
+vi.mock('@/i18n', () => ({
+  default: {
+    t: (key) =>
+      ({
+        'sync.conflict.removedMessage': '原文件已被删除或移动',
+        'sync.conflict.changedMessage': '磁盘内容与本地编辑内容冲突',
+        'sync.conflict.local': '本地编辑内容',
+        'sync.conflict.remote': '磁盘内容',
+        'sync.conflict.noticeRemoved': '文件已被删除或移动',
+        'sync.conflict.noticeChanged': '文件在外部发生变化，自动保存已暂停',
+      })[key] ?? key,
+  },
+}));
 import * as React from 'react';
 import { afterEach, expect, it, vi } from 'vitest';
 import { act, cleanup, render } from '@testing-library/react';
