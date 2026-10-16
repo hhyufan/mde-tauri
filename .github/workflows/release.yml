@@ -161,3 +161,151 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw 'Could not upload installer and manifest.' }
           gh release edit $tag --repo $env:GITHUB_REPOSITORY --draft=false --latest
           if ($LASTEXITCODE -ne 0) { throw 'Could not publish release.' }
+
+  # 把同一个已签名安装器与更新清单镜像到 OSS。
+  #
+  # 客户端 endpoint 顺序是 [OSS 地域, OSS 加速, GitHub]：国内先走 OSS（快且稳），
+  # OSS 走不通会自动退到 GitHub，三个都不通才报错——这是 tauri-plugin-updater
+  # 的 endpoint 循环语义（成功即 break，只有全部失败才返回错误），所以
+  # “走不通不报错”不需要客户端改代码，只要把顺序排成这样。
+  sync-oss:
+    needs: windows
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # tag 统一从 tauri.conf.json 版本推出，与 windows 任务保持一致；
+      # 手动触发时 github.ref_name 是分支名，不能拿来当 tag。
+      - name: 解析版本与 tag
+        id: meta
+        run: |
+          set -euo pipefail
+          VERSION=$(node -p "require('./src-tauri/tauri.conf.json').version")
+          echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
+          echo "tag=v${VERSION}" >> "$GITHUB_OUTPUT"
+          echo "版本 ${VERSION} → tag v${VERSION}"
+
+      - name: 取回已签名的安装器与签名
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          mkdir -p dist
+          # 只取 React 安装器与它的 minisign 签名：它既是更新载荷，也是 Release
+          # 页面上供人手动安装的那一个，两边必须是同一份字节。
+          gh release download "${{ steps.meta.outputs.tag }}" -D dist --repo "${{ github.repository }}" \
+            --pattern "MokiDown_${{ steps.meta.outputs.version }}_x64-setup.exe" \
+            --pattern "MokiDown_${{ steps.meta.outputs.version }}_x64-setup.exe.sig"
+          ls -lh dist
+
+      - name: 生成指向 OSS 的 latest.json
+        env:
+          BUCKET: ${{ vars.OSS_BUCKET }}
+          REGION: ${{ vars.OSS_REGION }}
+        run: |
+          set -euo pipefail
+          VERSION="${{ steps.meta.outputs.version }}"
+          # 复用 create-update-manifest.mjs 里的 releaseManifest()（有单测覆盖），
+          # 只把下载基址换成 OSS，不再另写一份 jq 逻辑——两份实现迟早会漂移。
+          node scripts/create-update-manifest.mjs \
+            --oss-base="https://${BUCKET}.oss-${REGION}.aliyuncs.com/updates" \
+            --sig="dist/MokiDown_${VERSION}_x64-setup.exe.sig" \
+            --out=dist/latest.json
+          cat dist/latest.json
+
+      - name: 安装 ossutil
+        run: |
+          set -euo pipefail
+          curl -sSL -o ossutil.zip \
+            https://gosspublic.alicdn.com/ossutil/1.7.19/ossutil-v1.7.19-linux-amd64.zip
+          unzip -q ossutil.zip
+          find . -name 'ossutil64' -type f -exec mv {} /usr/local/bin/ossutil64 \;
+          chmod +x /usr/local/bin/ossutil64
+          ossutil64 --version
+
+      - name: 上传到 OSS
+        env:
+          OSS_ACCESS_KEY_ID: ${{ secrets.OSS_ACCESS_KEY_ID }}
+          OSS_ACCESS_KEY_SECRET: ${{ secrets.OSS_ACCESS_KEY_SECRET }}
+          BUCKET: ${{ vars.OSS_BUCKET }}
+          REGION: ${{ vars.OSS_REGION }}
+        run: |
+          set -euo pipefail
+          VERSION="${{ steps.meta.outputs.version }}"
+          ENDPOINT="oss-${REGION}.aliyuncs.com"
+          # ossutil 不读 OSS_ACCESS_KEY_ID / OSS_ACCESS_KEY_SECRET 这类环境变量，
+          # 只认命令行参数或配置文件；不显式给凭据会报
+          # "accessKeyID and ecsUrl are both empty"。这里先写一份临时配置，
+          # 后面每条命令就不必重复传 -i/-k（配置落在 runner 家目录，随环境销毁）。
+          ossutil64 config -e "$ENDPOINT" -i "$OSS_ACCESS_KEY_ID" -k "$OSS_ACCESS_KEY_SECRET" -L CH > /dev/null
+          PKG="MokiDown_${VERSION}_x64-setup.exe"
+          # 顺序很重要：先传更新包与签名，最后才传 latest.json。
+          # 反过来的话，客户端可能先读到新版本号，却还下载不到对应的包。
+          ossutil64 cp "dist/${PKG}" "oss://${BUCKET}/updates/${PKG}" --update --force
+          ossutil64 cp "dist/${PKG}.sig" "oss://${BUCKET}/updates/${PKG}.sig" --update --force
+          # latest.json 要禁缓存，否则客户端可能长时间看不到新版本。
+          ossutil64 cp dist/latest.json "oss://${BUCKET}/updates/latest.json" \
+            --meta "Cache-Control:no-cache" --force
+
+      - name: 验证可匿名下载
+        env:
+          BUCKET: ${{ vars.OSS_BUCKET }}
+          REGION: ${{ vars.OSS_REGION }}
+        run: |
+          set -euo pipefail
+          # 验证客户端真正会下载的那条路：地域域名。
+          HOST="${BUCKET}.oss-${REGION}.aliyuncs.com"
+          URL="https://${HOST}/updates/latest.json"
+          CODE=$(curl -s -o /dev/null -w '%{http_code}' "$URL")
+          echo "$URL -> $CODE"
+          # 403 基本就是 Bucket 读写权限没设成公共读。
+          [ "$CODE" = "200" ] || {
+            echo "::error::latest.json 无法匿名访问（$CODE），请确认 Bucket 读写权限为「公共读」";
+            exit 1;
+          }
+          BODY=$(curl -s "$URL")
+          PKG_URL=$(echo "$BODY" | jq -r '.platforms["windows-x86_64"].url')
+          # platform.url 是单值，客户端下载时没有多地址回退，所以这里必须是
+          # 一直可用的地域域名（加速域名时通时不通，只做第二候选）。
+          case "$PKG_URL" in
+            *"oss-${REGION}.aliyuncs.com"*) ;;
+            *) echo "::error::latest.json 的下载地址不是地域域名：$PKG_URL"; exit 1 ;;
+          esac
+          # 必须指向大写的 React 安装器。指错成小写 NSIS 包，更新会退回系统原生界面。
+          case "$PKG_URL" in
+            *"/MokiDown_"*"-setup.exe") ;;
+            *) echo "::error::latest.json 没有指向 React 安装器：$PKG_URL"; exit 1 ;;
+          esac
+          # 三个 platform 键都要在：老客户端会按自己的 bundle 类型取对应条目。
+          for key in windows-x86_64 windows-x86_64-nsis windows-x86_64-msi; do
+            echo "$BODY" | jq -e ".platforms[\"$key\"].url" > /dev/null \
+              || { echo "::error::latest.json 缺少 platform 键：$key"; exit 1; }
+          done
+          # 只取首字节，别在 CI 里真下 30 MB；范围请求返回 206，一并接受。
+          PKG_CODE=$(curl -s -o /dev/null -w '%{http_code}' -r 0-0 "$PKG_URL")
+          echo "$PKG_URL -> $PKG_CODE"
+          case "$PKG_CODE" in
+            200 | 206) ;;
+            *) echo "::error::安装包无法匿名下载（$PKG_CODE）：$PKG_URL"; exit 1 ;;
+          esac
+          # endpoint 顺序本身就是行为约定（OSS 优先、GitHub 兜底），这里静态断言，
+          # 免得以后有人调整配置把国内又推回 GitHub。
+          FIRST=$(node -p "require('./src-tauri/tauri.conf.json').plugins.updater.endpoints[0]")
+          LAST=$(node -p "const e=require('./src-tauri/tauri.conf.json').plugins.updater.endpoints; e[e.length-1]")
+          case "$FIRST" in
+            *aliyuncs.com*) ;;
+            *) echo "::error::第一个 endpoint 不是 OSS，国内会先走 GitHub：$FIRST"; exit 1 ;;
+          esac
+          case "$LAST" in
+            *github.com*) ;;
+            *) echo "::error::最后一个 endpoint 不是 GitHub，缺兜底：$LAST"; exit 1 ;;
+          esac
+          # 加速域名只作为 endpoints 的第二候选，时通时不通属于已知情况，
+          # 所以这里只提示、不判失败——免得它把整次发布拦下来。
+          ACCEL="https://${BUCKET}.oss-accelerate.aliyuncs.com/updates/latest.json"
+          ACCEL_CODE=$(curl -s -o /dev/null -w '%{http_code}' --max-time 15 "$ACCEL" || echo 000)
+          echo "加速域名（仅参考，不作判据）: $ACCEL -> $ACCEL_CODE"
+          if [ "$ACCEL_CODE" != "200" ]; then
+            echo "::warning title=加速域名不可达::${ACCEL} 返回 ${ACCEL_CODE}，客户端会继续退到下一候选。"
+          fi
+          echo "OSS 镜像完成：latest.json 与安装包均可匿名下载。"
