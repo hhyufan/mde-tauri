@@ -1,5 +1,16 @@
 name: Release Windows
 
+# 两种触发方式，各自的坑：
+#
+#   push tag 'v*' —— GitHub 用的是「被推送的那个 tag 指向的提交」里的这份工作流文件，
+#                    不是分支上最新的那份。所以 tag 打在旧提交上时，改 main 也不会让
+#                    这次发布用上新定义（现象就是"工作流未更新"）。
+#                    → 发版时把 tag 打在包含目标工作流的提交上。
+#   workflow_dispatch —— 手动触发时要选 main（或含目标工作流的 ref）。
+#                    默认分支之外的分支上跑，用的同样是那个 ref 自己的工作流。
+#
+# 另外注意 release.yml 只负责出包与发布；日常 CI 是 ci.yml（on: push / pull_request）。
+
 on:
   workflow_dispatch:
   push:
