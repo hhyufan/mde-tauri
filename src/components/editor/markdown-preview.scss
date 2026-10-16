@@ -1172,3 +1172,13 @@ html[data-theme='dark'] .md-preview {
   --md-table-head-bg: color-mix(in srgb, var(--md-tint) 34%, transparent);
   --md-table-head-fg: color-mix(in srgb, var(--md-tint) 35%, var(--text));
 }
+
+// Milkdown 的 tables.css 里写着 .ProseMirror .tableWrapper { overflow-x: auto; }，
+// 权重 (0,2,0) 高于上面的 .tableWrapper，且位于另一个 CSS chunk，所以此前只改应用侧
+// 规则没有生效：纵向仍被算成 auto，表格再矮也会长出纵向滚动条、滚轮还被它接管。
+// 这里以更高权重显式关掉纵向；横向保留，宽表格仍可横滚。
+.md-preview .ProseMirror .tableWrapper,
+.md-preview .ProseMirror .moki-table__scroll {
+  overflow-x: auto;
+  overflow-y: hidden;
+}
