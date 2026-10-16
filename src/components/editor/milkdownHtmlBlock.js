@@ -1,7 +1,6 @@
 import { $nodeSchema, $view } from '@milkdown/kit/utils';
 import { NodeSelection } from '@milkdown/kit/prose/state';
 import i18n from '@/i18n';
-import { withTooltip } from '@utils/imperativeTooltip';
 
 export function sanitizeMilkdownHtml(value) {
   const template = document.createElement('template');
@@ -32,13 +31,13 @@ export const htmlBlockView = $view(htmlBlockSchema.node, () => (initialNode, vie
   const preview = document.createElement('div'); preview.className = 'md-preview__html md-preview__html-block-preview';
   const button = document.createElement('button'); button.type = 'button'; button.className = 'md-preview__html-edit';
   button.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m16 3 5 5-13 13H3v-5Z"/><path d="m14 5 5 5"/></svg>';
-  button.setAttribute('aria-label', i18n.t('editor.editHtml')); const buttonHost = withTooltip(button, i18n.t('editor.editHtml')); button.hidden = !view.editable;
+  button.setAttribute('aria-label', i18n.t('editor.editHtml')); button.title = i18n.t('editor.editHtml'); button.hidden = !view.editable;
   const input = document.createElement('textarea'); input.className = 'md-preview__html-input'; input.setAttribute('aria-label', i18n.t('editor.htmlContent')); input.hidden = true;
   const panel = document.createElement('div'); panel.className = 'md-preview__html-panel'; panel.hidden = true;
   const toolbar = document.createElement('div'); toolbar.className = 'md-preview__html-toolbar';
   const label = document.createElement('span'); label.textContent = 'HTML';
   const done = document.createElement('button'); done.type = 'button'; done.className = 'md-preview__html-done'; done.textContent = i18n.t('editor.finishHtml');
-  toolbar.append(label, done); panel.append(toolbar, input); dom.append(preview, buttonHost, panel);
+  toolbar.append(label, done); panel.append(toolbar, input); dom.append(preview, button, panel);
   const render = () => {
     dom.dataset.value = node.attrs.value;
     preview.innerHTML = sanitizeMilkdownHtml(node.attrs.value);

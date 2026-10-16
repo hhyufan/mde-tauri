@@ -5,7 +5,6 @@ import { CellSelection, TableMap } from '@milkdown/kit/prose/tables';
 import i18n from '@/i18n';
 import { MAX_TABLE_ROWS, MAX_TABLE_COLUMNS, tableDimensions } from './tableDimensions';
 import { createElement } from 'react';
-import { withTooltip } from '@utils/imperativeTooltip';
 import { createRoot } from 'react-dom/client';
 import TablePicker from './TablePicker';
 
@@ -191,9 +190,9 @@ export const milkdownTableView = $view(tableSchema.node, () => (initialNode, vie
   const outside = (event) => { if (!controls.contains(event.target)) closePicker(); };
   const button = (label, className, action) => {
     const button = document.createElement('button'); button.type = 'button'; button.className = className;
-    button.setAttribute('aria-label', label);
+    button.title = label; button.setAttribute('aria-label', label);
     button.addEventListener('mousedown', (event) => event.preventDefault());
-    button.addEventListener('click', action); return withTooltip(button, label);
+    button.addEventListener('click', action); return button;
   };
   const edit = button(i18n.t('table.resize'), 'moki-table__edit', () => {
     if (pickerRoot) { closePicker(); return; }

@@ -3,9 +3,6 @@
  */
 .md-preview {
   flex: 1;
-  // 只写 overflow-y 会让横向的 visible 被算成 auto：预览容器自己就变成横向滚动容器，
-  // 连 1px 的取整误差都滚出滚动条。横向交给各块自己（表格包裹层、代码块），外层关掉。
-  overflow-x: hidden;
   overflow-y: auto;
   padding: 24px 32px;
   font-family: var(--font-app);
@@ -309,9 +306,6 @@
     margin: 1em 0;
     padding: 16px;
     overflow-x: auto;
-    // 只想横向滚（宽表格）：CSS 里一侧 auto、另一侧 visible 时，visible 会被算成 auto，
-    // 于是纵向也长出滚动条，表格再矮都出。这里显式关掉纵向。
-    overflow-y: hidden;
     font-family: var(--font-editor);
     font-size: 0.9em;
     line-height: 1.6;
@@ -846,9 +840,6 @@
     .preview-panel {
       padding: 16px;
       overflow-x: auto;
-      // 只想横向滚（宽表格）：CSS 里一侧 auto、另一侧 visible 时，visible 会被算成 auto，
-      // 于是纵向也长出滚动条，表格再矮都出。这里显式关掉纵向。
-      overflow-y: hidden;
     }
 
     .preview-divider,
@@ -877,9 +868,6 @@
 
   .tableWrapper {
     overflow-x: auto;
-    // 只想横向滚（宽表格）：CSS 里一侧 auto、另一侧 visible 时，visible 会被算成 auto，
-    // 于是纵向也长出滚动条，表格再矮都出。这里显式关掉纵向。
-    overflow-y: hidden;
     // 表格间距统一由 table 自身承担，相邻表格之间才有一致的上下留白。
     margin: 0;
   }
@@ -891,9 +879,6 @@
 
 .md-preview__table-wrap {
   overflow-x: auto;
-  // 只想横向滚（宽表格）：CSS 里一侧 auto、另一侧 visible 时，visible 会被算成 auto，
-  // 于是纵向也长出滚动条，表格再矮都出。这里显式关掉纵向。
-  overflow-y: hidden;
   // 同上：间距交给 table，避免包裹层与表格两道外边距叠加。
   margin: 0;
 }
@@ -914,8 +899,7 @@
     user-select: none;
     &[hidden] { display: none; }
   }
-  // 网格按钮已挪进表格左上角内侧，不再需要为它在上方预留空间——那是"一进一出挤动布局"的来源。
-  &.moki-table--tools-visible { padding-top: 0; }
+  &.moki-table--tools-visible { padding-top: 32px; }
   &.moki-table--tools-visible .moki-table__tools { opacity: 1; visibility: visible; }
   .moki-table__edit, .moki-table__insert {
     position: absolute;
@@ -932,8 +916,7 @@
     &:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
   }
   .moki-table__edit {
-    // 钉在表格左上角内侧：不再占用表格外的空间，也就不会挤动上方布局。
-    top: 6px; left: 6px; width: 26px; height: 26px;
+    top: 0; left: 0; width: 26px; height: 26px;
     display: grid; place-items: center;
     svg { width: 16px; height: 16px; }
   }
@@ -941,8 +924,7 @@
   .moki-table__insert[hidden] { display: none; }
   .moki-table__insert--row { right: -10px; }
   .moki-table__insert--column { top: -17px; }
-  // 面板从按钮正下方展开（按钮在 6px 处、26px 高）。
-  .moki-table__picker { position: absolute; top: 36px; left: 6px; pointer-events: auto; z-index: 20; }
+  .moki-table__picker { position: absolute; top: 32px; left: 0; pointer-events: auto; z-index: 20; }
   .moki-table__picker .ft__table-panel {
     position: relative; top: auto; right: auto; bottom: auto; left: auto; transform: none; z-index: 10;
     /*
@@ -1013,9 +995,6 @@
   border: 1px solid var(--border-light);
   border-radius: var(--radius-sm);
   overflow-x: auto;
-  // 只想横向滚（宽表格）：CSS 里一侧 auto、另一侧 visible 时，visible 会被算成 auto，
-  // 于是纵向也长出滚动条，表格再矮都出。这里显式关掉纵向。
-  overflow-y: hidden;
 
   svg {
     max-width: 100%;
@@ -1149,9 +1128,6 @@
 
 .katex-display {
   overflow-x: auto;
-  // 只想横向滚（宽表格）：CSS 里一侧 auto、另一侧 visible 时，visible 会被算成 auto，
-  // 于是纵向也长出滚动条，表格再矮都出。这里显式关掉纵向。
-  overflow-y: hidden;
   padding: 0.5em 0;
 }
 
@@ -1177,35 +1153,4 @@ html[data-theme='dark'] .md-preview {
   // 表头回到"淡蓝底 + 亮蓝字"：白字只配实心底，这里不用。
   --md-table-head-bg: color-mix(in srgb, var(--md-tint) 34%, transparent);
   --md-table-head-fg: color-mix(in srgb, var(--md-tint) 35%, var(--text));
-}
-
-// Milkdown 的 tables.css 里写着 .ProseMirror .tableWrapper { overflow-x: auto; }，
-// 权重 (0,2,0) 高于上面的 .tableWrapper，且位于另一个 CSS chunk，所以此前只改应用侧
-// 规则没有生效：纵向仍被算成 auto，表格再矮也会长出纵向滚动条、滚轮还被它接管。
-// 这里以更高权重显式关掉纵向；横向保留，宽表格仍可横滚。
-.md-preview .ProseMirror .tableWrapper,
-.md-preview .ProseMirror .moki-table__scroll {
-  overflow-x: auto;
-  overflow-y: hidden;
-}
-
-// Milkdown 还给没有显式宽度的单元格一个最小宽度
-// （.ProseMirror td:not([data-colwidth]) { min-width: var(--default-cell-min-width); }），
-// 列一多就顶破 width: 100%，于是"放得下"的表格也出现横向滚动。这里把它归零：
-// 列宽交给 table-layout 去分，只有真的放不下时才横滚。
-.md-preview .ProseMirror table {
-  --default-cell-min-width: 0;
-}
-
-// 表格编辑的实现里，外层 div 同时带着 moki-table 与 Milkdown 的 tableWrapper 两个类，
-// 于是它自己也成了横向滚动容器；而插入按钮故意探出 10px（right: -10px），
-// 这 10px 被算进可滚区域，导致表格明明放得下也会出现横向滚动条。
-// 横滚只交给内层 __scroll：外层用 clip（它不产生滚动容器），
-// 再留 14px 的溢出余量，让探出的按钮依旧可见、不被裁掉。
-.md-preview .ProseMirror .moki-table {
-  // 权重必须高于 Milkdown 的 .ProseMirror .tableWrapper（同为两个类，(0,3,0) > (0,2,0)），
-  // 否则它在另一个 CSS chunk 里排到后面就会把这条压掉。
-  overflow-x: clip;
-  overflow-y: visible;
-  overflow-clip-margin: 14px;
 }
