@@ -6,6 +6,7 @@ import { useTranslation } from 'react-i18next';
 import useLspStore, { availablePlugins, selectLanguagePlugin } from '@store/useLspStore';
 import { openExternal } from '@utils/tauriApi';
 import { getMaterialIcons, loadMaterialIcons } from '@utils/materialIcons';
+import TaskRing from '@components/ui/TaskRing';
 // JavaScript / TypeScript 使用网上获取的官方品牌图标（devicon，MIT License）：
 // https://github.com/devicons/devicon
 import javascriptLogo from '@/assets/devicon/javascript-original.svg';
@@ -93,7 +94,9 @@ export default function LanguageServices() {
     const installed = state.installed.find((entry) => entry.manifest.id === plugin.id);
     const operation = state.operations[plugin.id];
     if (BUSY.has(operation?.phase)) return <div className="language-services__actions">
-      <span className="language-services__working"><ReloadOutlined spin />{t(`languageServices.phase.${operation.phase}`)}
+      <span className="language-services__working">
+        <TaskRing progress={operation.percent ?? undefined} />
+        {t(`languageServices.phase.${operation.phase}`)}
         {operation.percent != null && ` ${operation.percent}%`}</span>
       {operation.phase !== 'uninstalling' && <Button size="small" type="text" onClick={() => act(() => state.cancelInstall(plugin.id))}>{t('languageServices.cancel')}</Button>}
     </div>;

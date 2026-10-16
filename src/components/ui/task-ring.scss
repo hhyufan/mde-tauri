@@ -1,0 +1,44 @@
+/**
+ * 圆环进度（TaskRing）。
+ *
+ * 轨道用 currentColor 加透明度：状态栏里按钮的 color 是 --accent，语言服务列表里
+ * 是自身文字色，两处都能自适应；明暗主题下也都看得见——早先写死 --border-light，
+ * 暗色主题下 rgb(44,44,46) 与背景几乎同色，看起来就像轨道"透明不显示"。
+ */
+.task-ring {
+  width: 12px;
+  height: 12px;
+  flex-shrink: 0;
+  &__track {
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 3;
+    opacity: 0.22;
+  }
+  &__value {
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 3;
+    stroke-linecap: round;
+    transition: stroke-dashoffset 0.3s ease;
+  }
+  &.is-indeterminate {
+    animation: task-ring-spin 1s linear infinite;
+    .task-ring__value {
+      transition: none;
+    }
+  }
+}
+@keyframes task-ring-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .task-ring {
+    animation: none;
+    .task-ring__value {
+      transition: none;
+    }
+  }
+}

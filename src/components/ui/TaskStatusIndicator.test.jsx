@@ -7,7 +7,7 @@ globalThis.React = React;
 vi.mock('react-i18next', () => ({ useTranslation: () => ({ t: (key) => key }) }));
 afterEach(cleanup);
 
-const ring = () => document.querySelector('.task-status-indicator__ring');
+const ring = () => document.querySelector('.task-ring');
 
 it('keeps the current task visible in the status bar and reopens its collapsed panel', () => {
   const onClick = vi.fn();
