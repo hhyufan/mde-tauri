@@ -232,6 +232,8 @@ body.moki-has-background {
   .ft__table-panel,
   .monaco-context-menu,
   .task-panel,
+  .notif,
+  .toast,
   .md-preview--milkdown .milkdown-media-tools,
   .milkdown-media-preview-editor,
   .ant-dropdown .ant-dropdown-menu,
@@ -239,12 +241,16 @@ body.moki-has-background {
     @include background-popup.image-surface;
   }
 
-  // 两套 toast（右上 .notif、居中 .toast）要的是"透背景但有一点白"，
-  // 与「运行」「查看并处理」这类按钮同一档浓度，所以走玻璃表面：
-  // image-surface 是整块重绘壁纸，太实；纯 transparent 又只剩底色、太白不够。
+  // 两套 toast 与面包屑下拉走同一套（重绘壁纸，因此看不到中间那些组件），
+  // 但提示还需要一点"纸面"感，于是在壁纸之上再叠一层淡白：
+  // 它是不透明的整块底色，不是靠半透明透出正文，所以观感与按钮那一档呼应，
+  // 又不会把编辑器内容透进来。
   .notif,
   .toast {
-    background: var(--moki-glass-surface);
+    background-image:
+      linear-gradient(var(--moki-glass-surface), var(--moki-glass-surface)),
+      linear-gradient(var(--moki-background-wash), var(--moki-background-wash)),
+      var(--moki-background-image, none);
   }
 
   // 轮廓沿用轻边框与阴影。

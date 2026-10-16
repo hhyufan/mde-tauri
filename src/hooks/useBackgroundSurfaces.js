@@ -4,10 +4,8 @@ import { useLayoutEffect } from 'react';
 // 否则铺出来的是一块与底图错位的实色小方块，看着像箭头压着树枝。
 // 任务列表面板同理：它与面包屑下拉保持一致。条目上的关闭按钮在标题行里、
 // 背景透明，不压线，所以不需要对位底图。
-//
-// 两套 toast 不在这里：它们走的是玻璃面（透背景但带一点白），不是按坐标重绘
-// 壁纸，所以不需要 --moki-popup-x/y。
-const POPUPS = '.footer__dropdown, .sort-dropdown, .search-dropdown__panel, .ant-dropdown-menu, .ant-picker-panel-container, .ft, .ft__heading-panel, .ft__table-panel, .monaco-context-menu, .moki-tree__chevron, .task-panel, .milkdown-media-tools, .milkdown-media-preview-editor';
+// 两套 toast 也走同一套重绘壁纸（叠加一层淡白），因此同样需要这里的坐标。
+const POPUPS = '.footer__dropdown, .sort-dropdown, .search-dropdown__panel, .ant-dropdown-menu, .ant-picker-panel-container, .ft, .ft__heading-panel, .ft__table-panel, .monaco-context-menu, .moki-tree__chevron, .task-panel, .milkdown-media-tools, .milkdown-media-preview-editor, .notif, .toast';
 const POSITIONERS = '.ant-dropdown, .ant-picker-dropdown';
 
 // Portal popups need the same image, cover dimensions and viewport coordinates
