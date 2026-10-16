@@ -22,6 +22,13 @@ jobs:
       - run: git diff --exit-code -- package.json package-lock.json src-tauri/Cargo.toml
       - run: npm run build
       - run: npm run check:bundle
+      # 安装器的宣传页直接渲染应用的真实组件（installer/src/FeatureScenes.jsx 引
+      # src/components/ui/FileTypeIcon、src/utils/mgtree 等），所以应用侧挪文件或改
+      # 导出名会把安装器构建弄坏。这里构建一次，让它在 CI 就红，而不是等发版那次
+      # Windows 构建跑到一半才炸。
+      - run: npm run installer:build
+      # 引真组件的代价是安装器包变大（主 chunk 172 kB → ~510 kB）。代价合理，但要有门看着。
+      - run: npm run check:installer-bundle
 
   rust:
     runs-on: windows-latest
