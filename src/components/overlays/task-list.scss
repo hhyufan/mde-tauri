@@ -70,7 +70,9 @@
     white-space: nowrap;
   }
   .ti-pct {
-    font-family: var(--font-mono, monospace);
+    // 项目里没有 --font-mono，写它会静默回退到浏览器默认等宽字体，
+    // 跟编辑器里的 JetBrains Mono 不是一个东西。用真实令牌。
+    font-family: var(--font-editor);
     font-size: 11px;
     color: var(--accent);
     font-weight: 500;
@@ -97,7 +99,7 @@
   }
   .task-meta {
     margin-top: 7px;
-    font: 11px var(--font-mono, monospace);
+    font: 11px var(--font-editor);
     color: var(--text-dim);
   }
   .task-hint,

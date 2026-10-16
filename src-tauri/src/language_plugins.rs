@@ -289,6 +289,24 @@ fn cancelled(cancel: &AtomicBool) -> Result<(), String> {
         Ok(())
     }
 }
+/// 下载进度里的体积文案。
+///
+/// 知道总大小时给出「已下载 / 总量」，否则只给已下载——早先无论是否知道总量都只印
+/// 已下载，界面上就只看到"1 MB"，看不出还要下多久。小于 1 MB 用 KB，避免小文件
+/// 被整数除法显示成 "0 MB"。
+fn size_text(received: u64, total: Option<u64>) -> String {
+    fn amount(bytes: u64) -> String {
+        if bytes < 1024 * 1024 {
+            format!("{:.0} KB", bytes as f64 / 1024.0)
+        } else {
+            format!("{:.1} MB", bytes as f64 / (1024.0 * 1024.0))
+        }
+    }
+    match total.filter(|size| *size > 0) {
+        Some(size) => format!("{} / {}", amount(received), amount(size)),
+        None => amount(received),
+    }
+}
 fn download(
     client: &reqwest::blocking::Client,
     url: &str,
@@ -338,7 +356,7 @@ fn download(
                 total
                     .filter(|size| *size > 0)
                     .map(|size| (received * 100 / size).min(100)),
-                &format!("{} MB", received / 1024 / 1024),
+                &size_text(received, total),
             );
             last = Instant::now();
         }
@@ -993,6 +1011,23 @@ pub async fn uninstall_language_plugin(app: AppHandle, id: String) -> Result<(),
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn download_size_text_shows_total_when_known() {
+        // 知道总量：给出"已下载 / 总量"，界面上才看得出还要下多久。
+        assert_eq!(
+            size_text(3 * 1024 * 1024, Some(30 * 1024 * 1024)),
+            "3.0 MB / 30.0 MB"
+        );
+        // 不知道总量（没有 content-length）：退回只报已下载。
+        assert_eq!(size_text(3 * 1024 * 1024, None), "3.0 MB");
+        // 总量为 0 视为未知，不能显示成 "3.0 MB / 0.0 MB"。
+        assert_eq!(size_text(3 * 1024 * 1024, Some(0)), "3.0 MB");
+        // 小文件用 KB，避免整数除法把 400 KB 显示成 0 MB。
+        assert_eq!(size_text(400 * 1024, Some(900 * 1024)), "400 KB / 900 KB");
+        assert_eq!(size_text(0, Some(900 * 1024)), "0 KB / 900 KB");
+    }
+
     #[test]
     fn marksman_platform_assets_and_binary_installation() {
         let catalog: Vec<PluginManifest> =
