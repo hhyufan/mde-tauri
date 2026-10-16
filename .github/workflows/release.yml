@@ -139,7 +139,18 @@ jobs:
         run: |
           $version = (Get-Content -LiteralPath src-tauri/tauri.conf.json -Raw | ConvertFrom-Json).version
           $installer = Get-ChildItem -LiteralPath 'src-tauri/target/release/bundle/react' -Filter '*.exe' -File
-          gh release upload "v$version" $installer.FullName --repo '${{ github.repository }}' --clobber
+          if (@($installer).Count -ne 1) { throw "Expected exactly one React installer, found $(@($installer).Count)." }
+          $name = $installer.Name
+          # tauri-action 会把整个 bundle/ 目录都收走，所以 bundle/react 下的安装器
+          # 往往已经被它传过了。这时再传同名资产会 422（ReleaseAsset.name already
+          # exists），而 --clobber 也救不了：它会先删掉旧资产、随后那一次重传仍然
+          # 撞名失败，结果是本来好好的资产被删掉。所以先查再传，已存在就跳过。
+          $existing = gh release view "v$version" --json assets --jq '.assets[].name' --repo '${{ github.repository }}'
+          if (@($existing) -contains $name) {
+            Write-Output "$name 已在 Release 上（tauri-action 已上传），跳过。"
+            exit 0
+          }
+          gh release upload "v$version" $installer.FullName --repo '${{ github.repository }}'
           if ($LASTEXITCODE -ne 0) { throw 'React installer upload failed.' }
 
   # 构建完成后，把更新包与 latest.json 同步到阿里云 OSS。
