@@ -152,7 +152,10 @@ jobs:
           # 所以逐个资产显式删除，再轮询确认它真的从资产列表里消失，然后才上传。
           $assets = @(gh release view $tag --repo $env:GITHUB_REPOSITORY --json assets --jq '.assets[].name')
           foreach ($file in @($setup, $signature, $manifest)) {
-            $name = Split-Path -LiteralPath $file -Leaf
+            # 不要写 Split-Path -LiteralPath $file -Leaf：-LiteralPath 只属于 ParentSet，
+            # 不含 -Leaf，运行时会报 "Parameter set cannot be resolved"（踩过一次，
+            # 而且这是参数绑定错误、语法解析查不出来）。.NET 取文件名精确且不解释通配符。
+            $name = [System.IO.Path]::GetFileName($file)
             # 用 -ccontains：PowerShell 的 -contains 不区分大小写，而资产名里
             # MokiDown_（React 安装器）与 mokidown_（旧 NSIS 包）只差大小写，
             # 用错会误判成另一个文件已存在。
