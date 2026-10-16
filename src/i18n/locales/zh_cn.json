@@ -545,6 +545,8 @@
   "moki.openFile": "打开文件",
   "moki.recent": "继续上次的思路",
   "moki.noRecent": "打开过的文档会显示在这里。",
+  "moki.nameLight": "Moki / 晴笺",
+  "moki.nameDark": "Moki / 夜读",
   "moki.caption": "陪你记录，也陪你思考。",
   "moki.settingsTitle": "Moki · 主题与形象",
   "moki.display": "人物显示",

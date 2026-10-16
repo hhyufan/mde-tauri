@@ -8,6 +8,7 @@ import {
   ArrowRightOutlined,
 } from '@ant-design/icons';
 import useConfigStore from '@store/useConfigStore';
+import useThemeStore from '@store/useThemeStore';
 import useEditorStore from '@store/useEditorStore';
 import useFileStore, { getScopedRecentFiles } from '@store/useFileStore';
 import useAuthStore from '@store/useAuthStore';
@@ -19,6 +20,8 @@ import MokiAmbient from './MokiAmbient';
 export default function WelcomeScreen() {
   const { t } = useTranslation();
   const display = useConfigStore((state) => state.mokiDisplay);
+  // 中文名随主题变（浅色晴笺 / 深色夜读），与 MokiSprite 取同一份主题状态。
+  const theme = useThemeStore((state) => state.theme);
   const recentEntries = useFileStore((state) => state.recentFiles);
   const userId = useAuthStore((state) => state.user?.id || GUEST_USER_SCOPE);
   const { openFileDialog, openFolderDialog, openFileFromPath } = useFileManager();
@@ -91,7 +94,7 @@ export default function WelcomeScreen() {
           <MokiAmbient />
           <MokiSprite />
           <div className="moki-welcome__caption">
-            <strong>Moki / 墨笺</strong>
+            <strong>{t(theme === 'dark' ? 'moki.nameDark' : 'moki.nameLight')}</strong>
           </div>
         </div>
       )}

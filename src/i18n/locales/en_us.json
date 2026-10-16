@@ -545,6 +545,8 @@
   "moki.openFile": "Open file",
   "moki.recent": "Pick up where you left off",
   "moki.noRecent": "Documents you open show up here.",
+  "moki.nameLight": "Moki / Sunlit Notes",
+  "moki.nameDark": "Moki / Night Reading",
   "moki.caption": "A little company for your thoughts.",
   "moki.settingsTitle": "Moki · Theme & mascot",
   "moki.display": "Show character",
