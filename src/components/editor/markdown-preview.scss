@@ -1182,3 +1182,11 @@ html[data-theme='dark'] .md-preview {
   overflow-x: auto;
   overflow-y: hidden;
 }
+
+// Milkdown 还给没有显式宽度的单元格一个最小宽度
+// （.ProseMirror td:not([data-colwidth]) { min-width: var(--default-cell-min-width); }），
+// 列一多就顶破 width: 100%，于是"放得下"的表格也出现横向滚动。这里把它归零：
+// 列宽交给 table-layout 去分，只有真的放不下时才横滚。
+.md-preview .ProseMirror table {
+  --default-cell-min-width: 0;
+}
