@@ -1199,7 +1199,9 @@ html[data-theme='dark'] .md-preview {
 // 这 10px 被算进可滚区域，导致表格明明放得下也会出现横向滚动条。
 // 横滚只交给内层 __scroll：外层用 clip（它不产生滚动容器），
 // 再留 14px 的溢出余量，让探出的按钮依旧可见、不被裁掉。
-.md-preview .moki-table {
+.md-preview .ProseMirror .moki-table {
+  // 权重必须高于 Milkdown 的 .ProseMirror .tableWrapper（同为两个类，(0,3,0) > (0,2,0)），
+  // 否则它在另一个 CSS chunk 里排到后面就会把这条压掉。
   overflow-x: clip;
   overflow-y: visible;
   overflow-clip-margin: 14px;
