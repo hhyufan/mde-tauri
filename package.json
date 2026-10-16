@@ -9,7 +9,7 @@
     "build": "vite build",
     "lint": "eslint .",
     "format:check": "prettier --check eslint.config.js vitest.config.js vitest.setup.js scripts/check-bundle-budget.mjs scripts/sync-version.mjs",
-    "test": "vitest run",
+    "test": "vitest run && node --test \"scripts/*.test.mjs\"",
     "test:watch": "vitest",
     "check:bundle": "node scripts/check-bundle-budget.mjs",
     "version:sync": "node scripts/sync-version.mjs",
