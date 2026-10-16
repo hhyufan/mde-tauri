@@ -225,7 +225,6 @@ body.moki-has-background {
   //
   // 这里**不含** .ant-select-dropdown：设置里的下拉框要求不透背景，而应用里的
   // antd 下拉基本都出自设置（其余下拉各有自己的类名），所以让它不参与这套。
-  // 两套 toast（右上 .notif、居中 .toast）反过来要求透背景，因此加进来。
   .footer__dropdown,
   .sort-dropdown,
   .ft,
@@ -233,13 +232,19 @@ body.moki-has-background {
   .ft__table-panel,
   .monaco-context-menu,
   .task-panel,
-  .notif,
-  .toast,
   .md-preview--milkdown .milkdown-media-tools,
   .milkdown-media-preview-editor,
   .ant-dropdown .ant-dropdown-menu,
   .ant-picker-dropdown .ant-picker-panel-container {
     @include background-popup.image-surface;
+  }
+
+  // 两套 toast（右上 .notif、居中 .toast）要的是"透背景但有一点白"，
+  // 与「运行」「查看并处理」这类按钮同一档浓度，所以走玻璃表面：
+  // image-surface 是整块重绘壁纸，太实；纯 transparent 又只剩底色、太白不够。
+  .notif,
+  .toast {
+    background: var(--moki-glass-surface);
   }
 
   // 轮廓沿用轻边框与阴影。
