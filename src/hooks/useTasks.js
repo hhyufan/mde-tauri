@@ -60,6 +60,9 @@ export default function useTasks() {
         status: t(`update.${stage}`, { version }),
         percent: TRANSFER_STAGES.has(stage) ? percent : undefined,
         showBar: TRANSFER_STAGES.has(stage),
+        // 正在下载/安装/重启的更新中止不了（Tauri 的 downloadAndInstall 没有暴露
+        // 中止入口），所以这些阶段不给关闭按钮；其余阶段关闭即回到空闲。
+        close: ['available', 'error', 'up-to-date'].includes(stage) ? 'reset' : null,
         meta:
           stage === 'downloading'
             ? `${(downloaded / MB).toFixed(1)}${total > 0 ? ` / ${(total / MB).toFixed(1)}` : ''} MB`
@@ -82,9 +85,14 @@ export default function useTasks() {
         id,
         stage: operation.phase,
         name: names.get(id) || id,
-        status: busy ? t(`languageServices.phase.${operation.phase}`) : t('languageServices.install'),
+        // 失败态不能沿用"安装"这种动作文案，否则"安装"和下面的报错自相矛盾。
+        status: busy
+          ? t(`languageServices.phase.${operation.phase}`)
+          : t('tasks.pluginFailed'),
         percent: busy && Number.isFinite(operation.percent) ? operation.percent : undefined,
         showBar: busy,
+        // 进行中的安装可以真的取消；已经失败的只是把这条记录去掉。
+        close: busy ? 'cancel' : 'dismiss',
         meta: busy ? operation.text || '' : '',
         error: operation.phase === 'error' ? operation.text || '' : '',
       });

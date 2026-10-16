@@ -75,6 +75,12 @@ const useUpdateStore = create((set, get) => ({
     set({ open: false });
     // Keep the available update usable when the task list is reopened.
   },
+  // 关掉更新这条任务：回到空闲并释放已经拿到的更新资源。
+  // 面板是否展开由用户控制，这里不动 open。
+  reset: async () => {
+    set({ stage: 'idle', version: '', body: '', error: '', downloaded: 0, total: 0 });
+    await releaseResource();
+  },
   showTasks: () => set({ open: true }),
   install: async () => {
     if (get().stage !== 'available' || !updateResource) return;

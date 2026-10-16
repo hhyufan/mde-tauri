@@ -52,8 +52,32 @@
     max-height: min(360px, 60vh);
     overflow-y: auto;
   }
+  // 每条任务用一条分割线分开；关闭按钮贴着分割线的右上角，
+  // 像关标签页一样一条一条关掉，比在下面放一整行"取消"省空间。
   .task-item {
-    padding: 8px 0 0;
+    position: relative;
+    padding: 8px 0 12px;
+    border-bottom: 1px solid var(--border-light);
+    &:last-child {
+      border-bottom: 0;
+    }
+  }
+  .task-close {
+    position: absolute;
+    right: 0;
+    bottom: 2px;
+    width: 18px;
+    height: 18px;
+    padding: 0;
+    font-size: 14px;
+    line-height: 1;
+    border-radius: 50%;
+    background: transparent;
+    color: var(--text-dim);
+    &:hover {
+      background: var(--hover);
+      color: var(--text);
+    }
   }
   .ti-row {
     display: flex;

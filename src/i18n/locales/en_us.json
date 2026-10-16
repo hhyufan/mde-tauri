@@ -579,6 +579,8 @@
   "settings.about.installer": "Download installer",
   "tasks.title": "Task List",
   "tasks.empty": "No tasks in progress",
+  "tasks.closeTask": "Close this task",
+  "tasks.pluginFailed": "Installation failed",
   "tasks.checking": "Checking for updates",
   "tasks.downloading": "Downloading",
   "tasks.installing": "Installing",

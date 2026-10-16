@@ -579,6 +579,8 @@
   "settings.about.installer": "下载安装包",
   "tasks.title": "任务列表",
   "tasks.empty": "没有进行中的任务",
+  "tasks.closeTask": "关闭此任务",
+  "tasks.pluginFailed": "安装失败",
   "tasks.checking": "正在检测更新",
   "tasks.downloading": "正在下载",
   "tasks.installing": "正在安装",

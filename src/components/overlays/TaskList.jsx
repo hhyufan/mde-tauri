@@ -4,14 +4,21 @@ import { useTranslation } from 'react-i18next';
 import useUpdateStore from '@store/useUpdateStore';
 import useLspStore from '@store/useLspStore';
 import useEditorStore from '@store/useEditorStore';
-import useTasks, { BUSY_PHASES } from '@hooks/useTasks';
+import useTasks from '@hooks/useTasks';
 import './task-list.scss';
+
+// 关闭一条任务：进行中的安装是真取消，失败的只是把记录去掉，
+// 更新则回到空闲并释放已拿到的更新资源。
+function closeTask(task) {
+  if (task.close === 'cancel') void useLspStore.getState().cancelInstall(task.id);
+  else if (task.close === 'dismiss') useLspStore.getState().dismissOperation(task.id);
+  else if (task.close === 'reset') void useUpdateStore.getState().reset();
+}
 
 // Non-modal Task List, following UI/md-editor.html's task-panel component.
 export default function TaskList() {
   const { t } = useTranslation();
   const update = useUpdateStore();
-  const operations = useLspStore((s) => s.operations);
   const { tasks } = useTasks();
   const hasUnsaved = useEditorStore((s) => s.tabRenderList.some((tab) => tab.modified));
   const [currentVersion, setCurrentVersion] = useState('');
@@ -86,9 +93,6 @@ export default function TaskList() {
                   </p>
                 )}
                 <div className="task-actions">
-                  <button type="button" onClick={update.dismiss}>
-                    {t('update.later')}
-                  </button>
                   <button
                     type="button"
                     className="task-primary"
@@ -115,12 +119,15 @@ export default function TaskList() {
               </div>
             )}
 
-            {task.kind === 'plugin' && BUSY_PHASES.has(operations?.[task.id]?.phase) && (
-              <div className="task-actions">
-                <button type="button" onClick={() => useLspStore.getState().cancelInstall(task.id)}>
-                  {t('languageServices.cancel')}
-                </button>
-              </div>
+            {task.close && (
+              <button
+                type="button"
+                className="task-close"
+                aria-label={`${t('tasks.closeTask')}：${task.name}`}
+                onClick={() => closeTask(task)}
+              >
+                &times;
+              </button>
             )}
           </div>
         ))}

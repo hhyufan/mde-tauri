@@ -83,6 +83,15 @@ const useLspStore = create(persist((set, get) => ({
     } catch (error) { set((state) => ({ operations: { ...state.operations, [id]: { phase: 'error', text: String(error?.message || error) } } })); }
   },
   cancelInstall: async (id) => invoke('cancel_language_plugin_install', { id }),
+  // 关掉一条任务：把该操作记录从 store 里去掉。失败态的任务靠它从任务列表消失
+  // （失败的任务没有"取消"可言，用关闭更自然）。
+  dismissOperation: (id) =>
+    set((state) => {
+      if (!state.operations?.[id]) return {};
+      const operations = { ...state.operations };
+      delete operations[id];
+      return { operations };
+    }),
   togglePlugin: async (id, enabled) => {
     if (toggling.has(id)) return;
     toggling.add(id);
