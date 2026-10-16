@@ -20,6 +20,19 @@ mermaid.initialize({
  * 负责接收 Markdown 中提取出的 Mermaid 源码，并根据当前明暗主题异步生成 SVG 预览；
  * 当渲染失败时，改为展示本地化错误提示，避免预览区域直接空白。
  */
+/**
+ * 去掉 mermaid 生成在 SVG 里的 <title> 元素。
+ *
+ * 那些 title 是 mermaid 自己加的，作用只有一个：hover 时弹浏览器的原生提示，
+ * 内容与节点上可见的文字重复。它位于 SVG 内部，应用的 antd Tooltip 换不进去，
+ * 因此在这里按 SVG 源码去掉。
+ *
+ * @param {string} svg mermaid 渲染出的 SVG 源码
+ * @returns {string} 去掉 title 之后的 SVG 源码
+ */
+function stripMermaidTitles(svg) {
+  return typeof svg === 'string' ? svg.replace(/<title\b[^>]*>[\s\S]*?<\/title>/gi, '') : svg;
+}
 function MermaidRenderer({ code, isDark }) {
   const { t } = useTranslation();
   const ref = useRef(null);
@@ -87,7 +100,7 @@ function MermaidRenderer({ code, isDark }) {
     <div
       ref={ref}
       className="md-preview__mermaid"
-      dangerouslySetInnerHTML={{ __html: svg }}
+      dangerouslySetInnerHTML={{ __html: stripMermaidTitles(svg) }}
     />
   );
 }
