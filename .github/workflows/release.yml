@@ -146,7 +146,11 @@ jobs:
           # exists），而 --clobber 也救不了：它会先删掉旧资产、随后那一次重传仍然
           # 撞名失败，结果是本来好好的资产被删掉。所以先查再传，已存在就跳过。
           $existing = gh release view "v$version" --json assets --jq '.assets[].name' --repo '${{ github.repository }}'
-          if (@($existing) -contains $name) {
+          # 必须用 -ccontains（区分大小写）。React 安装器叫 MokiDown_*，NSIS 包叫
+          # mokidown_*，两者只差一个大小写；而 PowerShell 的 -contains 默认不区分
+          # 大小写，会把小写的 NSIS 名字当成大写资产已存在，于是永远跳过上传，
+          # 而且这一步还会报成功——v0.1.3 就是这么漏掉 React 安装器的。
+          if (@($existing) -ccontains $name) {
             Write-Output "$name 已在 Release 上（tauri-action 已上传），跳过。"
             exit 0
           }
