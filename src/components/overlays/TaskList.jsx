@@ -37,6 +37,13 @@ export default function TaskList() {
     [update.stage, update.version, currentVersion],
   );
 
+  // 最后一条任务被关掉（或被取消）后面板自己收起，不留一个"没有进行中的任务"的空壳。
+  // 必须放在下面的提前 return 之前，否则 Hooks 调用顺序会随 open 变化。
+  const { open, dismiss } = update;
+  useEffect(() => {
+    if (open && tasks.length === 0) dismiss();
+  }, [open, tasks.length, dismiss]);
+
   // 面板的展开只由用户点击状态栏触发（showTasks），没有任何"自动弹出来"的路径。
   if (!update.open) return null;
 

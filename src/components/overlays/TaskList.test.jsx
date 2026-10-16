@@ -144,3 +144,18 @@ it('安装完成后该任务不再出现在列表里', () => {
   rerender(<TaskList />);
   expect(screen.queryByText('Markdown · Marksman')).not.toBeInTheDocument();
 });
+
+it('最后一条任务消失后面板自动收起，不留空壳', async () => {
+  useUpdateStore.setState({ stage: 'idle', open: true });
+  useLspStore.setState({
+    operations: { 'mde.kotlin': { phase: 'downloading', percent: 10, text: '1.2 MB' } },
+  });
+  const { rerender } = render(<TaskList />);
+  expect(screen.getByText('Kotlin')).toBeVisible();
+  expect(useUpdateStore.getState().open).toBe(true);
+
+  // 用户点关闭：取消后记录被摘掉，任务清零
+  useLspStore.setState({ operations: {} });
+  rerender(<TaskList />);
+  await vi.waitFor(() => expect(useUpdateStore.getState().open).toBe(false));
+});
