@@ -53,12 +53,19 @@ static RUNS: Lazy<Mutex<HashMap<String, Arc<RunControl>>>> =
 /// 「不弹控制台黑框」这件事统一交给 [`crate::process::hidden`]，这里只再补一层
 /// 脚本运行特有的需求：Unix 下自成进程组，便于整棵进程树一起结束。
 pub(super) fn command(program: impl AsRef<std::ffi::OsStr>) -> Command {
-    let mut command = crate::process::hidden(program);
+    let command = crate::process::hidden(program);
+    // Unix 下自成进程组，便于整棵进程树一起结束。
+    //
+    // 这里用 cfg 遮蔽出一个新绑定，而不是在上面的 let 上加 mut：Windows 上这个分支
+    // 根本不参与编译，mut 会变成"多余的可变性"，clippy 的 -D warnings 会直接判死；
+    // 把它写在真正需要的分支里，两个平台都能过。
     #[cfg(unix)]
-    {
+    let command = {
         use std::os::unix::process::CommandExt;
+        let mut command = command;
         command.process_group(0);
-    }
+        command
+    };
     command
 }
 
