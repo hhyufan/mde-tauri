@@ -299,7 +299,8 @@ body.moki-has-background {
   // 只加图层不同步后两项，壁纸那层就会去用属于白雾那一层的位置与尺寸，整块铺歪。
   // 因此这里三处都写全，依序是：白雾、mixin 原本的 wash、壁纸。
   .notif,
-  .toast {
+  .toast,
+  .editor-content__run {
     @include background-popup.image-surface;
 
     background-image:
@@ -359,24 +360,15 @@ html body.moki-has-background {
   }
 }
 
-// 源码运行按钮：与两套 toast 完全同一套——重绘壁纸打底，再叠一层白雾，
-// 于是既"只透背景"（不会把下面的代码透出来）又带一点白。
-// 三层必须同层数：image / size / position 各三项，少一项壁纸那层就会用错尺寸与落点。
-html body.moki-has-background .editor-content__run {
-  background-image:
-    linear-gradient(var(--moki-glass-surface), var(--moki-glass-surface)),
-    linear-gradient(var(--moki-background-wash), var(--moki-background-wash)),
-    var(--moki-background-image, none);
-  background-size: auto, auto, var(--moki-background-size, cover);
-  background-position: center, center,
-    calc(var(--moki-background-x, 0px) - var(--moki-popup-x, 0px))
-      calc(var(--moki-background-y, 0px) - var(--moki-popup-y, 0px));
-
-  // hover 同样只动白雾这一层：写成 background 简写会把壁纸那层清掉，
-  // 一 hover 就露出下面的代码。这里只重声明 background-image，其余层沿用上面的。
-  &:hover {
+// 深色模式：这组表面重绘的是"你的底图"，而底图本身可能是浅色的；wash 又只按背景
+// 透明度给一点点，压不住它，于是深色模式下看着还是白的。这里补一层黑，把它压下去。
+// 只重声明 background-image（层数不变，尺寸与落点沿用上面那条），并把权重抬高一档。
+html[data-theme='dark'] body.moki-has-background {
+  .notif,
+  .toast,
+  .editor-content__run {
     background-image:
-      linear-gradient(color-mix(in srgb, var(--surface) 56%, transparent), color-mix(in srgb, var(--surface) 56%, transparent)),
+      linear-gradient(color-mix(in srgb, #000 42%, transparent), color-mix(in srgb, #000 42%, transparent)),
       linear-gradient(var(--moki-background-wash), var(--moki-background-wash)),
       var(--moki-background-image, none);
   }
