@@ -306,6 +306,9 @@
     margin: 1em 0;
     padding: 16px;
     overflow-x: auto;
+    // 只想横向滚（宽表格）：CSS 里一侧 auto、另一侧 visible 时，visible 会被算成 auto，
+    // 于是纵向也长出滚动条，表格再矮都出。这里显式关掉纵向。
+    overflow-y: hidden;
     font-family: var(--font-editor);
     font-size: 0.9em;
     line-height: 1.6;
@@ -840,6 +843,9 @@
     .preview-panel {
       padding: 16px;
       overflow-x: auto;
+      // 只想横向滚（宽表格）：CSS 里一侧 auto、另一侧 visible 时，visible 会被算成 auto，
+      // 于是纵向也长出滚动条，表格再矮都出。这里显式关掉纵向。
+      overflow-y: hidden;
     }
 
     .preview-divider,
@@ -868,6 +874,9 @@
 
   .tableWrapper {
     overflow-x: auto;
+    // 只想横向滚（宽表格）：CSS 里一侧 auto、另一侧 visible 时，visible 会被算成 auto，
+    // 于是纵向也长出滚动条，表格再矮都出。这里显式关掉纵向。
+    overflow-y: hidden;
     // 表格间距统一由 table 自身承担，相邻表格之间才有一致的上下留白。
     margin: 0;
   }
@@ -879,6 +888,9 @@
 
 .md-preview__table-wrap {
   overflow-x: auto;
+  // 只想横向滚（宽表格）：CSS 里一侧 auto、另一侧 visible 时，visible 会被算成 auto，
+  // 于是纵向也长出滚动条，表格再矮都出。这里显式关掉纵向。
+  overflow-y: hidden;
   // 同上：间距交给 table，避免包裹层与表格两道外边距叠加。
   margin: 0;
 }
@@ -995,6 +1007,9 @@
   border: 1px solid var(--border-light);
   border-radius: var(--radius-sm);
   overflow-x: auto;
+  // 只想横向滚（宽表格）：CSS 里一侧 auto、另一侧 visible 时，visible 会被算成 auto，
+  // 于是纵向也长出滚动条，表格再矮都出。这里显式关掉纵向。
+  overflow-y: hidden;
 
   svg {
     max-width: 100%;
@@ -1128,6 +1143,9 @@
 
 .katex-display {
   overflow-x: auto;
+  // 只想横向滚（宽表格）：CSS 里一侧 auto、另一侧 visible 时，visible 会被算成 auto，
+  // 于是纵向也长出滚动条，表格再矮都出。这里显式关掉纵向。
+  overflow-y: hidden;
   padding: 0.5em 0;
 }
 
