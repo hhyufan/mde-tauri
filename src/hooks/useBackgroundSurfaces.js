@@ -49,14 +49,35 @@ export function useBackgroundSurfaces({ enabled, imageUrl, opacity }) {
         writtenStyles.set(popup, popup.getAttribute('style'));
       }
     };
+    // 逐帧跟随：transform 动画不触发布局，ResizeObserver 收不到，而壁纸锚在
+    // 世界坐标上——卡片滑到哪，窗口就该跟到哪；否则动画期间看起来是背景在滑，
+    // 而不是卡片从静止的壁纸上滑过去。只在确有动画在跑时开这个小循环，停下即收。
+    const anyRunning = () => {
+      for (const popup of popups) {
+        if (popup.isConnected && popup.getAnimations().some((a) => a.playState === 'running')) return true;
+      }
+      return false;
+    };
+    let following = false;
+    const follow = () => {
+      if (!anyRunning()) { following = false; return; }
+      following = true;
+      sync();
+      schedule();
+    };
     const schedule = () => {
       if (frame !== null) return;
-      frame = requestAnimationFrame(() => { frame = null; sync(); });
+      frame = requestAnimationFrame(() => {
+        frame = null;
+        sync();
+        if (following) follow();
+      });
     };
     const resize = new ResizeObserver((entries) => {
       if (entries.some(({ target }) => target === app)) workspaceDirty = true;
       // ResizeObserver runs before paint; keep the first visible frame aligned.
       sync();
+      if (!following) follow();
     });
     const positionObserver = new MutationObserver((records) => {
       if (records.some((record) => record.attributeName !== 'style'
@@ -104,7 +125,10 @@ export function useBackgroundSurfaces({ enabled, imageUrl, opacity }) {
         }
       }
       // Discover synchronously before paint, not one animation frame later.
-      if (changed) sync();
+      // 移除同样要同步：上面那条消失后，剩下的卡片位置变了但尺寸没变，
+      // ResizeObserver 不会响，不同步它们就会带着旧切片一起上移。
+      if (changed || removed) sync();
+      if (!following) follow();
     });
     observer.observe(document.body, { childList: true, subtree: true });
     resize.observe(app);
