@@ -1193,3 +1193,14 @@ html[data-theme='dark'] .md-preview {
 .md-preview .ProseMirror table {
   --default-cell-min-width: 0;
 }
+
+// 表格编辑的实现里，外层 div 同时带着 moki-table 与 Milkdown 的 tableWrapper 两个类，
+// 于是它自己也成了横向滚动容器；而插入按钮故意探出 10px（right: -10px），
+// 这 10px 被算进可滚区域，导致表格明明放得下也会出现横向滚动条。
+// 横滚只交给内层 __scroll：外层用 clip（它不产生滚动容器），
+// 再留 14px 的溢出余量，让探出的按钮依旧可见、不被裁掉。
+.md-preview .moki-table {
+  overflow-x: clip;
+  overflow-y: visible;
+  overflow-clip-margin: 14px;
+}
