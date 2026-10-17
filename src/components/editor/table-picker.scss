@@ -4,6 +4,8 @@
   left: 50%;
   transform: translateX(-50%);
   width: 236px;
+  max-width: calc(100vw - 16px);
+  box-sizing: border-box;
   padding: 12px;
   border: 1px solid var(--border-light);
   border-radius: var(--radius);
@@ -12,33 +14,91 @@
   z-index: 510;
   color: var(--text);
   font: 12px/1.5 var(--font-app);
-  .ft__table-size { margin-bottom: 8px; color: var(--text-sec); }
+  .ft__table-size {
+    margin-bottom: 8px;
+    color: var(--text-sec);
+  }
   .ft__table-grid {
-    display: grid; grid-template-columns: repeat(6, 1fr); gap: 4px; margin-bottom: 12px;
-    button { height: 25px; border: 1px solid color-mix(in srgb, var(--text) 24%, transparent); border-radius: 3px; background: transparent; cursor: pointer;
-      &.is-selected, &:hover { background: transparent; border-color: var(--accent); }
-      &:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+    display: grid;
+    grid-template-columns: repeat(6, 1fr);
+    gap: 4px;
+    margin-bottom: 12px;
+    button {
+      height: 25px;
+      border: 1px solid color-mix(in srgb, var(--text) 24%, transparent);
+      border-radius: 3px;
+      background: transparent;
+      cursor: pointer;
+      &.is-selected,
+      &:hover {
+        background: transparent;
+        border-color: var(--accent);
+      }
+      &:focus-visible {
+        outline: 2px solid var(--accent);
+        outline-offset: 1px;
+      }
     }
   }
-  form { display: flex; align-items: flex-end; gap: 8px; }
-  label { display: flex; flex-direction: column; gap: 3px; }
+  form {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto;
+    align-items: end;
+    gap: 6px;
+  }
+  label {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    min-width: 0;
+  }
+  form > .ant-btn {
+    min-width: 0;
+    padding-inline: 8px;
+    background: color-mix(in srgb, var(--accent) 14%, transparent);
+    border-color: color-mix(in srgb, var(--accent) 40%, transparent);
+    color: var(--accent);
+    &:hover {
+      background: color-mix(in srgb, var(--accent) 22%, transparent);
+      border-color: var(--accent);
+      color: var(--accent);
+    }
+  }
   .ant-input-number {
-    width: 72px;
+    width: 100%;
+    min-width: 0;
     background: transparent;
     border-color: var(--border);
     color: var(--text);
-    &:hover, &.ant-input-number-focused { background: transparent; border-color: var(--accent); }
+    &:hover,
+    &.ant-input-number-focused {
+      background: transparent;
+      border-color: var(--accent);
+    }
     .ant-input-number-input {
       background: transparent;
       color: var(--text);
       -webkit-text-fill-color: var(--text);
       caret-color: var(--accent);
-      &::placeholder { color: var(--text-dim); -webkit-text-fill-color: var(--text-dim); }
+      &::placeholder {
+        color: var(--text-dim);
+        -webkit-text-fill-color: var(--text-dim);
+      }
     }
-    .ant-input-number-handler-wrap { background: var(--surface); }
-    .ant-input-number-handler { color: var(--text-sec); }
-    .ant-input-number-handler-up-inner, .ant-input-number-handler-down-inner { color: inherit; }
+    .ant-input-number-handler-wrap {
+      background: var(--surface);
+    }
+    .ant-input-number-handler {
+      color: var(--text-sec);
+    }
+    .ant-input-number-handler-up-inner,
+    .ant-input-number-handler-down-inner {
+      color: inherit;
+    }
   }
-  p { color: var(--text-sec); margin: 10px 0 0; font-size: 11px; }
+  p {
+    color: var(--text-sec);
+    margin: 10px 0 0;
+    font-size: 11px;
+  }
 }
-

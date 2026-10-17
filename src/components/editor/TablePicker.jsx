@@ -62,7 +62,7 @@ export default function TablePicker({ onInsert, onClose, initialRows = 3, initia
             onChange={(value) => setColumns(clamp(value, MAX_TABLE_COLUMNS))} />
         </label>
       </Tooltip>
-      <Button type="primary" size="small" htmlType="submit">{t(resize ? 'table.resize' : 'table.insert')}</Button>
+      <Button size="small" htmlType="submit">{t(resize ? 'table.resize' : 'table.insert')}</Button>
     </form>
     <p>{t('table.wheelHint')}</p>
     <p>{t('table.quickHint')}</p>
