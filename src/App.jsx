@@ -26,6 +26,7 @@ import { useBackgroundImage } from '@hooks/useBackgroundImage';
 import { useBackgroundSurfaces } from '@hooks/useBackgroundSurfaces';
 import { getBackgroundTransparency } from '@utils/backgroundImage';
 import { disableNativeContextMenu } from '@utils/nativeContextMenu';
+import { createFullscreenController } from '@utils/windowFullscreen';
 import { syncEngine } from '@/services/syncEngine';
 import { restoreEditorSession, startEditorSessionTracking, flushEditorSession } from '@/services/editorSession';
 import {
@@ -76,6 +77,7 @@ const UnsavedChangesModal = lazy(() => import('@components/overlays/UnsavedChang
 const RecoveryModal = lazy(() => import('@components/overlays/RecoveryModal'));
 
 const ASSOCIATED_MARKDOWN_EXTENSIONS = new Set(['md', 'markdown', 'mdown', 'mdwn', 'mkd', 'mkdn']);
+const fullscreenController = createFullscreenController(appWindow);
 
 /**
  * 判断命令行参数里的路径是否应当被当作 Markdown 关联文件打开。
@@ -391,10 +393,7 @@ function App() {
       togglePreview: toggleEditPreview,
       toggleFullscreen: () => {
         if (!isDesktopWindow) return;
-        appWindow
-          .isFullscreen()
-          .then((isFullscreen) => appWindow.setFullscreen(!isFullscreen))
-          .catch(console.error);
+        fullscreenController.toggle().catch(console.error);
       },
     };
     const handler = handlers[actionId];
