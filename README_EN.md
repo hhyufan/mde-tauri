@@ -31,30 +31,38 @@ MokiDown is an open-source Markdown editor built with Tauri 2, React, Monaco, an
 
 ## Features
 
-- **Three editing modes**: source, WYSIWYG, and split view, with GFM, LaTeX math, and Mermaid diagrams.
-- **Runnable code blocks**: on desktop, run C#, JavaScript, Python, Java, Kotlin, and Rust with output, interactive input, and stop; the matching language runtime must be installed.
-- **Language services**: install LSP plugins on demand for completion, hover info, and diagnostics.
-- **Knowledge trees**: organize note hierarchy with `.mgtree` files, with node editing and jumps to document code blocks.
-- **Files and workspace**: multiple tabs, directory browsing, outline, global search, bookmarks, and auto-save.
-- **Optional cloud sync**: sync documents and settings, and compare versions side by side when conflicts occur.
-- **Personalization**: light and dark themes plus a Chinese/English interface.
+* **Three editing modes**: source, WYSIWYG, and split view, with GFM, LaTeX math, and Mermaid diagrams.
+
+* **Runnable code blocks**: on desktop, run C#, JavaScript, Python, Java, Kotlin, and Rust with output, interactive input, and stop; the matching language runtime must be installed.
+
+* **Language services**: install LSP plugins on demand for completion, hover info, and diagnostics.
+
+* **Knowledge trees**: organize note hierarchy with `.mgtree` files, with node editing and jumps to document code blocks.
+
+* **Files and workspace**: multiple tabs, directory browsing, outline, global search, bookmarks, and auto-save.
+
+* **Optional cloud sync**: sync documents and settings, and compare versions side by side when conflicts occur.
+
+* **Personalization**: light and dark themes plus a Chinese/English interface.
+
+
 
 ## 📸 Screenshots
 
-| Sunny note · Light welcome | Night read · Dark welcome |
-| :---: | :---: |
+|            Sunny note · Light welcome           |           Night read · Dark welcome           |
+| :---------------------------------------------: | :-------------------------------------------: |
 | ![Light welcome](screenshots/welcome-light.png) | ![Dark welcome](screenshots/welcome-dark.png) |
 
-| Three editing modes (source / WYSIWYG / split) | Tree editor (mgtree) |
-| :---: | :---: |
+| Three editing modes (source / WYSIWYG / split) |               Tree editor (mgtree)               |
+| :--------------------------------------------: | :----------------------------------------------: |
 | ![Three editing modes](screenshots/editor.png) | ![Running code blocks](screenshots/code-run.png) |
 
-| Cloud sync | Running code blocks |
-| :---: | :---: |
+|                   Cloud sync                   |          Running code blocks         |
+| :--------------------------------------------: | :----------------------------------: |
 | ![Sync conflict](screenshots/sync-display.png) | ![Tree editor](screenshots/tree.png) |
 
-| Dark editing | Appearance and character settings |
-| :---: | :---: |
+|                 Dark editing                 |           Appearance and character settings          |
+| :------------------------------------------: | :--------------------------------------------------: |
 | ![Dark editing](screenshots/editor-dark.png) | ![Character settings](screenshots/moki-settings.png) |
 
 Captured from the running application with sample documents. Code output and sync conflicts use demonstration data in the real components; these images do not indicate browser access to the desktop execution engine or a connected sync service. [Mobile welcome](screenshots/welcome-mobile.png) · [Design and capture notes](docs/character-design/moki-integration.md)
@@ -80,11 +88,11 @@ npm run tauri:dev
 
 To debug the frontend only, run `npm run dev`. Common commands:
 
-| Command | Purpose |
-| --- | --- |
-| `npm run build` | Build the frontend and the live-showcase entry |
-| `npm run tauri:build` | Package the Windows desktop app (NSIS + MSI) |
-| `npm run check` | Run lint, tests, build, and the bundle check |
+| Command               | Purpose                                        |
+| --------------------- | ---------------------------------------------- |
+| `npm run build`       | Build the frontend and the live-showcase entry |
+| `npm run tauri:build` | Package the Windows desktop app (NSIS + MSI)   |
+| `npm run check`       | Run lint, tests, build, and the bundle check   |
 
 Desktop installers are written to `src-tauri/target/release/bundle/`. Sample documents and code live in [examples](examples/README.md).
 
@@ -103,8 +111,10 @@ Deploy the server by following the [mde-server](https://github.com/hhyufan/mde-s
 
 ## Docs and contributing
 
-- [Feature docs](docs/Function/README.md) · [Language services](docs/语言服务.md) · [Local script execution](docs/本地脚本运行.md)
-- [Sample workspace](examples/README.md) · [Shortcuts](examples/notes/shortcuts.md) · [More screenshots](screenshots/)
-- Report problems or open a Pull Request via [Issues](https://github.com/hhyufan/mde-tauri/issues).
+* [Feature docs](docs/Function/README.md) · [Language services](docs/语言服务.md) · [Local script execution](docs/本地脚本运行.md)
+
+* [Sample workspace](examples/README.md) · [Shortcuts](examples/notes/shortcuts.md) · [More screenshots](screenshots/)
+
+* Report problems or open a Pull Request via [Issues](https://github.com/hhyufan/mde-tauri/issues).
 
 Licensed under the [MIT License](LICENSE).
