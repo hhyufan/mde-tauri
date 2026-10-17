@@ -129,6 +129,7 @@ import { configureEditingWhitespace, initialEditingSelection } from './milkdownW
 import { configureEditingTables, milkdownTableKeys, milkdownTableView } from './milkdownTables';
 import { isAndroidRuntime } from '@utils/platform';
 import MilkdownMediaTools from './MilkdownMediaTools';
+import MilkdownTooltips from './MilkdownTooltips';
 import { milkdownMediaEditor, milkdownMediaImageView } from './milkdownMedia';
 import { openExternal } from '@utils/tauriApi';
 import './markdown-preview.scss';
@@ -1283,7 +1284,7 @@ function enhanceCodeBlocks(container, { readOnly, mermaidRoots }) {
     const tag = document.createElement('button');
     tag.className = 'lang-tag';
     tag.textContent = getLangDisplay(rawLang);
-    tag.title = i18n.t('preview.copiedToClipboard');
+    tag.dataset.mokiTooltip = i18n.t('editor.copyCode');
     tag.addEventListener('click', () => {
       navigator.clipboard.writeText(code.textContent || '').then(() => {
         toast(i18n.t('preview.copiedToClipboard'));
@@ -1855,6 +1856,7 @@ function MilkdownInner({
       }}
     >
       <Milkdown />
+      <MilkdownTooltips rootRef={wrapperRef} readOnly={readOnly} />
       <MilkdownMediaTools key={activeTabId} ref={mediaToolsRef} rootRef={wrapperRef} getView={getMediaView}
         ready={!editorInfo.loading} readOnly={readOnly} />
       <EditorContextMenu menu={menu} onClose={closeMenu} />

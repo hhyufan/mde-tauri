@@ -647,5 +647,11 @@
   "media.imageFallback": "Image",
   "media.fileError": "Cannot open the file picker. Enter an image path instead.",
   "media.editDescription": "Edit image description",
-  "media.editSource": "Edit image source"
+  "media.editSource": "Edit image source",
+  "editor.copyCode": "Copy code",
+  "editor.chooseCodeLanguage": "Choose code language",
+  "editor.showCode": "Edit code",
+  "editor.showPreview": "Preview code",
+  "editor.editHtmlHint": "Double-click to edit HTML · Ctrl / ⌘ + Enter to finish",
+  "editor.editMathHint": "Select the formula and press Backspace to edit its source"
 }

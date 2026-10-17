@@ -190,7 +190,7 @@ export const milkdownTableView = $view(tableSchema.node, () => (initialNode, vie
   const outside = (event) => { if (!controls.contains(event.target)) closePicker(); };
   const button = (label, className, action) => {
     const button = document.createElement('button'); button.type = 'button'; button.className = className;
-    button.title = label; button.setAttribute('aria-label', label);
+    button.dataset.mokiTooltip = label; button.setAttribute('aria-label', label);
     button.addEventListener('mousedown', (event) => event.preventDefault());
     button.addEventListener('click', action); return button;
   };

@@ -4,6 +4,7 @@
 import React from 'react';
 import { createRoot } from 'react-dom/client';
 import Editor from '/src/components/editor/MilkdownMarkdownEditor.jsx';
+import FloatingToolbar from '/src/components/editor/FloatingToolbar.jsx';
 import editorStore from '/src/store/useEditorStore.js';
 import { setBuffer, getBuffer } from '/src/utils/editorBuffer.js';
 import { editorViewCtx } from '@milkdown/kit/core';
@@ -13,16 +14,18 @@ import '/src/i18n/index.js';
 import '/src/assets/styles/index.scss';
 import '/src/assets/styles/prism-theme.scss';
 import '/src/assets/styles/App.scss';
+import '/src/assets/styles/antd-overrides.scss';
 const params = new URLSearchParams(location.search);
 const content = params.get('content') ?? '# 标题\n\n正文\n';
 setBuffer('flow.md', content);
-editorStore.setState({ activeTabId: 'flow.md', tabs: [{ id: 'flow.md', name: 'flow.md', content }],
+editorStore.setState({ toolbarVisible: params.has('toolbar'), activeTabId: 'flow.md', tabs: [{ id: 'flow.md', name: 'flow.md', content }],
   tabRenderList: [{ id: 'flow.md', name: 'flow.md', modified: false }] });
 const ref = React.createRef();
 const root = createRoot(document.getElementById('root'));
 let saves = 0;
 root.render(React.createElement('div',
-  { className: 'app', style: { height: '100vh', display: 'flex' } }, React.createElement(Editor, { ref, readOnly: params.has('readonly'), onAutoSave: () => saves++ })));
+  { className: 'app', style: { height: '100vh', display: 'flex' } }, React.createElement(Editor, { ref, readOnly: params.has('readonly'), onAutoSave: () => saves++ }),
+  params.has('toolbar') && React.createElement(FloatingToolbar, { onInsert: (action) => ref.current.handleToolbarAction(action) })));
 const view = () => ref.current.getEditor().action((ctx) => ctx.get(editorViewCtx));
 window.trial = {
   toolbar: (command) => ref.current.handleToolbarAction({ command }),

@@ -131,6 +131,7 @@ export const milkdownMediaImageView = $view(imageSchema.node, () => (initialNode
     dom.disabled = !view.editable;
     dom.textContent = `＋ ${i18n.t('media.imageAddress')}`;
     dom.setAttribute('aria-label', i18n.t('media.imageAddress'));
+    dom.dataset.mokiTooltip = i18n.t('media.imageAddress');
   }
   const updateAttrs = () => {
     if (!empty) {

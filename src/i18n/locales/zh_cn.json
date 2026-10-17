@@ -647,5 +647,11 @@
   "media.imageFallback": "图片",
   "media.fileError": "无法打开文件选择器，请直接输入图片路径。",
   "media.editDescription": "修改图片说明",
-  "media.editSource": "修改图源"
+  "media.editSource": "修改图源",
+  "editor.copyCode": "复制代码",
+  "editor.chooseCodeLanguage": "选择代码语言",
+  "editor.showCode": "编辑代码",
+  "editor.showPreview": "预览代码",
+  "editor.editHtmlHint": "双击编辑 HTML · Ctrl / ⌘ + Enter 完成",
+  "editor.editMathHint": "选中公式后按 Backspace 编辑源码"
 }
