@@ -1,7 +1,7 @@
 {
   "name": "mokidown",
   "private": true,
-  "version": "0.1.4",
+  "version": "0.1.5",
   "description": "A cross-platform Markdown editor based on Tauri",
   "type": "module",
   "scripts": {
@@ -25,7 +25,7 @@
     "test:build-tools": "node --test scripts/windows-msvc.test.mjs scripts/startup-splash.test.mjs scripts/create-update-manifest.test.mjs",
     "tauri": "node scripts/tauri.mjs",
     "tauri:dev": "node scripts/tauri.mjs dev",
-    "tauri:build": "node scripts/build-react-installer.mjs --with-msi",
+    "tauri:build": "node scripts/build-react-installer.mjs",
     "tauri:build:nsis": "node scripts/build-react-installer.mjs",
     "installer:dev": "vite --config installer/vite.config.mjs",
     "installer:build": "vite build --config installer/vite.config.mjs",

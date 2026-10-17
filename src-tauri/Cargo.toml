@@ -1,6 +1,6 @@
 [package]
 name = "mokidown"
-version = "0.1.4"
+version = "0.1.5"
 description = "A cross-platform Markdown editor based on Tauri"
 authors = ["hhyufan"]
 edition = "2021"

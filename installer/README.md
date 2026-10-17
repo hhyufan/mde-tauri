@@ -19,9 +19,9 @@ npm run installer:build       # React production build
 npm run installer:bundle      # build application, silent payload and standalone EXE
 ```
 
-`npm run tauri:build` also builds the React installer and the MSI for deployment.
-`npm run tauri:build:nsis` builds the app plus React installer without MSI.
-The result is `src-tauri/target/release/bundle/react/MokiDown_<version>_x64-setup.exe`.
+`npm run tauri:build` builds the branded React installer only; no MSI is built.
+`npm run tauri:build:nsis` and `npm run installer:bundle` run the same build.
+The result is `src-tauri/target/release/react/MokiDown_<version>_x64-setup.exe`.
 The payload is embedded into one executable; no adjacent files are needed.
 Every package rebuilds the application so its version and updater settings match
 the installer. Reusing an older application binary is intentionally rejected.

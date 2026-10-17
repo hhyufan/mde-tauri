@@ -90,10 +90,10 @@ npm run tauri:dev
 | 命令                    | 用途                         |
 | --------------------- | -------------------------- |
 | `npm run build`       | 构建前端与在线展示入口                |
-| `npm run tauri:build` | 打包 Windows 桌面端（NSIS + MSI） |
+| `npm run tauri:build` | 打包 Windows 桌面端（React 安装器）  |
 | `npm run check`       | 执行 lint、测试、构建与体积检查         |
 
-桌面安装包输出到 `src-tauri/target/release/bundle/`。示例文档与代码见 [examples](examples/README.md)。
+桌面安装包输出到 `src-tauri/target/release/react/`。示例文档与代码见 [examples](examples/README.md)。
 
 ### Android 构建
 

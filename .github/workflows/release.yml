@@ -96,7 +96,7 @@ jobs:
             Where-Object { $_.Directory.Name -eq 'x64' } | Sort-Object FullName -Descending | Select-Object -First 1
           if (!$signTool) { throw 'signtool.exe not found.' }
           $version = (Get-Content -LiteralPath src-tauri/tauri.conf.json -Raw | ConvertFrom-Json).version
-          $installer = Get-Item -LiteralPath "src-tauri/target/release/bundle/react/MokiDown_${version}_x64-setup.exe"
+          $installer = Get-Item -LiteralPath "src-tauri/target/release/react/MokiDown_${version}_x64-setup.exe"
           if (@($installer).Count -ne 1) { throw 'Expected one React installer.' }
           & $signTool.FullName sign /sha1 $thumbprint /fd SHA256 /tr http://timestamp.digicert.com /td SHA256 $installer.FullName
           if ($LASTEXITCODE -ne 0) { throw 'React installer signing failed.' }
@@ -110,7 +110,7 @@ jobs:
           # 先算 minisign 的话哈希就对不上，客户端下载完会验签失败。
           if ([string]::IsNullOrWhiteSpace($env:TAURI_SIGNING_PRIVATE_KEY)) { throw '缺少 TAURI_SIGNING_PRIVATE_KEY，无法产出更新签名。' }
           $version = (Get-Content -LiteralPath src-tauri/tauri.conf.json -Raw | ConvertFrom-Json).version
-          $installer = Get-Item -LiteralPath "src-tauri/target/release/bundle/react/MokiDown_${version}_x64-setup.exe"
+          $installer = Get-Item -LiteralPath "src-tauri/target/release/react/MokiDown_${version}_x64-setup.exe"
           if (@($installer).Count -ne 1) { throw "Expected exactly one React installer, found $(@($installer).Count)." }
           npm run tauri -- signer sign $installer.FullName
           if ($LASTEXITCODE -ne 0) { throw 'React installer minisign signing failed.' }
@@ -123,7 +123,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: signed-react-installer
-          path: src-tauri/target/release/bundle/react/
+          path: src-tauri/target/release/react/
           if-no-files-found: error
       - name: Publish the installer and update manifest together
         shell: pwsh
@@ -132,7 +132,7 @@ jobs:
         run: |
           $version = (Get-Content -LiteralPath src-tauri/tauri.conf.json -Raw | ConvertFrom-Json).version
           $tag = "v$version"
-          $directory = 'src-tauri/target/release/bundle/react'
+          $directory = 'src-tauri/target/release/react'
           $setup = Join-Path $directory "MokiDown_${version}_x64-setup.exe"
           $signature = "$setup.sig"
           $manifest = Join-Path $directory 'latest.json'

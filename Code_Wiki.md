@@ -168,7 +168,7 @@ npm run start:dev
 cd ..
 
 # 构建 Windows / macOS / Linux 桌面端安装包
-# 产物输出于: src-tauri/target/release/bundle/
+# 产物输出于: src-tauri/target/release/react/
 npm run tauri:build
 
 # 构建 Android APK

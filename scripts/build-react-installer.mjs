@@ -37,7 +37,10 @@ run('node_modules/vite/bin/vite.js', ['build', '--config', 'installer/vite.confi
 run(path.join(root, 'scripts/react-installer.mjs'), ['build', '--no-bundle'], {
   env: { ...process.env, MOKI_INSTALLER_PAYLOAD: payload },
 });
-const output = path.join(root, 'src-tauri/target/release/bundle/react');
+// The branded React installer is the only release artifact. The NSIS bundle
+// above is merely the payload embedded into it, so it stays where the bundler
+// writes it.
+const output = path.join(root, 'src-tauri/target/release/react');
 await mkdir(output, { recursive: true });
 const destination = path.join(output, `MokiDown_${version}_x64-setup.exe`);
 // Rebuilding changes the signed bytes. Never leave an older signature/manifest

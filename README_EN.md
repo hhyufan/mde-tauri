@@ -91,10 +91,10 @@ To debug the frontend only, run `npm run dev`. Common commands:
 | Command               | Purpose                                        |
 | --------------------- | ---------------------------------------------- |
 | `npm run build`       | Build the frontend and the live-showcase entry |
-| `npm run tauri:build` | Package the Windows desktop app (NSIS + MSI)   |
+| `npm run tauri:build` | Build the Windows React installer              |
 | `npm run check`       | Run lint, tests, build, and the bundle check   |
 
-Desktop installers are written to `src-tauri/target/release/bundle/`. Sample documents and code live in [examples](examples/README.md).
+Desktop installers are written to `src-tauri/target/release/react/`. Sample documents and code live in [examples](examples/README.md).
 
 ### Android build
 

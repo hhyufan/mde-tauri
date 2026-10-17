@@ -40,7 +40,7 @@ if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.me
   const { version } = JSON.parse(
     await readFile(path.join(root, 'src-tauri/tauri.conf.json'), 'utf8'),
   );
-  const directory = path.join(root, 'src-tauri/target/release/bundle/react');
+  const directory = path.join(root, 'src-tauri/target/release/react');
   const flag = (name) => {
     const prefix = `--${name}=`;
     const hit = process.argv.slice(2).find((arg) => arg.startsWith(prefix));
