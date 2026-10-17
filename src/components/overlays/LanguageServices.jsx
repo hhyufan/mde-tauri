@@ -1,5 +1,6 @@
+import AppDialog from './AppDialog';
 import { useEffect, useMemo, useState } from 'react';
-import { Button, Input, Modal, Select, Switch, Tooltip } from 'antd';
+import { Button, Input, Select, Switch, Tooltip } from 'antd';
 import { AppstoreOutlined, ArrowLeftOutlined, CheckOutlined, CloudDownloadOutlined, PlusOutlined, ReloadOutlined,
   SearchOutlined, StopOutlined, DeleteOutlined, GlobalOutlined, LinkOutlined } from '@ant-design/icons';
 import { useTranslation } from 'react-i18next';
@@ -221,7 +222,7 @@ export default function LanguageServices() {
         {state.operations[selected.id]?.text || state.statuses[selected.id]?.message}
       </pre>}
     </div>}
-    <Modal open={adding} title={t('languageServices.add')} onCancel={() => setAdding(false)}
+    <AppDialog open={adding} title={t('languageServices.add')} onCancel={() => setAdding(false)}
       onOk={add} okText={t('languageServices.add')} cancelText={t('languageServices.cancel')} confirmLoading={addBusy} width={560}>
       <div className="language-services__add">
         <Select value={addMode} onChange={setAddMode} options={[
@@ -232,6 +233,6 @@ export default function LanguageServices() {
           : <><p>{t('languageServices.manifestHint')}</p><Input.TextArea value={manifestText} onChange={(event) => setManifestText(event.target.value)} rows={12} aria-label={t('languageServices.manifest')} /></>}
         {error && <p className="language-services__error" role="alert">{error}</p>}
       </div>
-    </Modal>
+    </AppDialog>
   </section>;
 }

@@ -1,11 +1,12 @@
-import { Button, Modal, Tooltip } from 'antd';
+import AppDialog from './AppDialog';
+import { Button, Tooltip } from 'antd';
 import { useTranslation } from 'react-i18next';
 import FileTypeIcon from '@components/ui/FileTypeIcon';
 import './delete-file-modal.scss';
 
 export default function DeleteFileModal({ file, loading = false, onConfirm, onCancel }) {
   const { t } = useTranslation();
-  return <Modal
+  return <AppDialog
     open={Boolean(file)}
     title={t('sidebar.explorer.deleteTitle')}
     onCancel={onCancel}
@@ -16,7 +17,6 @@ export default function DeleteFileModal({ file, loading = false, onConfirm, onCa
     closable={!loading}
     keyboard={!loading}
     rootClassName="moki-delete-modal-root"
-    styles={{ content: { padding: 20 }, header: { paddingBottom: 16 }, footer: { marginTop: 20 } }}
     footer={[
       <Button key="cancel" autoFocus disabled={loading} onClick={onCancel}>{t('sidebar.explorer.cancelDelete')}</Button>,
       <Button key="delete" danger type="primary" loading={loading} onClick={onConfirm}>{t('sidebar.explorer.confirmDelete')}</Button>,
@@ -31,5 +31,5 @@ export default function DeleteFileModal({ file, loading = false, onConfirm, onCa
       </div>
       <p>{t('sidebar.explorer.deleteFileConfirm', { name: file.name })}</p>
     </div>}
-  </Modal>;
+  </AppDialog>;
 }

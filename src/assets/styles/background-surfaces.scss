@@ -205,7 +205,7 @@ html[data-theme='dark'] .app--background .md-preview {
 // antd 浮层 portal 到 body：变量与底色都必须在 body 级适配，
 // 否则下拉/菜单会是一块与背景模式割裂的实色面板。
 body.moki-has-background {
-  // 设置弹窗：本体重绘壁纸（即所谓透背景），内部组件改半透明。
+  // 所有弹窗重绘壁纸，遮住正文；内部组件沿用设置的半透明表面。
   // 它是 portal 到 body 的，所以只能写在 body 级这块里——挂在 .app 上对它无效。
   // antd 开关：底色同样出自它运行时注入的样式，普通选择器压不稳，所以用 !important。
   // 未开启走玻璃面；开启态用强调色的半透明版——保留"开着"的语义，但不做成实色块。
@@ -216,13 +216,16 @@ body.moki-has-background {
       background: color-mix(in srgb, var(--accent) 42%, transparent) !important;
     }
   }
-  .moki-settings-modal-root .ant-modal-content {
+  .ant-modal-root .ant-modal-content {
     @include background-popup.image-surface;
   }
   // 内部组件一律半透明：设置面板的底色都出自 --surface / --bg / --hover 三个令牌，
   // 在这里把它们重绑一次，所有控件（卡片、输入框、下拉、分段、开关、按钮）一起跟随，
   // 不必逐个补规则。用 --moki-background-base 而非自身，避免自定义属性自引用成环。
-  .moki-settings-modal-root .settings-modal {
+  .moki-settings-modal-root .settings-modal,
+  .moki-dialog-root .ant-modal-header,
+  .moki-dialog-root .ant-modal-body,
+  .moki-dialog-root .ant-modal-footer {
     --bg: color-mix(in srgb, var(--moki-background-base) 38%, transparent);
     --surface: color-mix(in srgb, var(--moki-background-base) 38%, transparent);
     --hover: var(--moki-glass-hover);

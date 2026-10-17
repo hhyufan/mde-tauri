@@ -1,5 +1,6 @@
+import AppDialog from './AppDialog';
 import { useEffect, useState } from 'react';
-import { Alert, Button, Modal, Space, Typography } from 'antd';
+import { Alert, Button, Space, Typography } from 'antd';
 import useEditorStore from '@store/useEditorStore';
 import useThemeStore from '@store/useThemeStore';
 import useConfigStore from '@store/useConfigStore';
@@ -31,17 +32,12 @@ function ExternalFileConflictModal({ conflict, onKeep, onUseDisk, onSaveAs, onCl
    */
   const width = unavailable ? 'min(520px, 94vw)' : 'min(1180px, 94vw)';
   return (
-    <Modal
+    <AppDialog
       open
       width={width}
       centered
       destroyOnHidden
       rootClassName="moki-external-file-conflict-root"
-      styles={{
-        content: { padding: '20px 24px' },
-        header: { padding: '0 32px 16px 0' },
-        footer: { marginTop: 16 },
-      }}
       onCancel={onClose}
       title={i18n.t('sync.conflict.changedTitle')}
       footer={(
@@ -78,7 +74,7 @@ function ExternalFileConflictModal({ conflict, onKeep, onUseDisk, onSaveAs, onCl
           />
         </div>
       )}
-    </Modal>
+    </AppDialog>
   );
 }
 

@@ -1,0 +1,61 @@
+.moki-dialog-root .ant-modal {
+  .ant-modal-content {
+    padding: 0;
+    overflow: hidden;
+    border: 1px solid var(--border);
+  }
+
+  .ant-modal-header {
+    margin: 0;
+    padding: 14px 48px 14px 20px;
+    background: var(--bg);
+    border-bottom: 1px solid var(--border);
+  }
+
+  .ant-modal-title { font-size: 14px; line-height: 22px; font-weight: 600; }
+  .ant-modal-close { top: 10px; right: 12px; }
+  .ant-modal-body { padding: 18px 20px; max-height: 70vh; overflow: auto; }
+
+  .ant-modal-footer {
+    margin: 0;
+    padding: 12px 20px;
+    background: var(--bg);
+    border-top: 1px solid var(--border);
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    gap: 8px;
+
+    > .ant-btn + .ant-btn { margin-inline-start: 0; }
+    .ant-space { flex-wrap: wrap; justify-content: flex-end; }
+  }
+
+  .ant-alert-warning {
+    background: color-mix(in srgb, var(--warning, #e7a33e) 9%, transparent);
+    border-color: color-mix(in srgb, var(--warning, #e7a33e) 30%, transparent);
+  }
+  .ant-alert-message, .ant-alert-description { color: var(--text); }
+}
+
+.recovery-modal__list { margin-top: 16px; }
+.recovery-modal__draft {
+  padding: 12px 0;
+  border-bottom: 1px solid var(--border);
+  &:last-child { border-bottom: 0; padding-bottom: 0; }
+  .ant-checkbox-wrapper { max-width: 100%; align-items: flex-start; font-weight: 600; }
+  .ant-checkbox + span { min-width: 0; overflow-wrap: anywhere; }
+}
+.moki-dialog-root .recovery-modal__path { margin: 6px 0; font-size: 12px; color: var(--text-sec); }
+.recovery-modal__preview {
+  margin: 0;
+  padding: 10px 12px;
+  max-height: 104px;
+  overflow: auto;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  font: 12px/1.6 var(--font-mono, monospace);
+  color: var(--text-sec);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+}

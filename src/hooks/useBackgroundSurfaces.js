@@ -5,7 +5,7 @@ import { useLayoutEffect } from 'react';
 // 任务列表面板同理：它与面包屑下拉保持一致。条目上的关闭按钮在标题行里、
 // 背景透明，不压线，所以不需要对位底图。
 // 两套 toast 也走同一套重绘壁纸（叠加一层淡白），因此同样需要这里的坐标。
-const POPUPS = '.footer__dropdown, .sort-dropdown, .search-dropdown__panel,  .search-dropdown__scope-menu, .titlebar__search .ant-select-dropdown, .ant-dropdown-menu, .ant-picker-panel-container, .ft, .ft__heading-panel, .ft__table-panel, .moki-settings-modal-root .ant-modal-content, .editor-content__run, .monaco-context-menu, .moki-tree__chevron, .task-panel, .milkdown-media-tools, .milkdown-media-preview-editor, .notif, .toast';
+const POPUPS = '.footer__dropdown, .sort-dropdown, .search-dropdown__panel,  .search-dropdown__scope-menu, .titlebar__search .ant-select-dropdown, .ant-dropdown-menu, .ant-picker-panel-container, .ft, .ft__heading-panel, .ft__table-panel, .ant-modal-content, .editor-content__run, .monaco-context-menu, .moki-tree__chevron, .task-panel, .milkdown-media-tools, .milkdown-media-preview-editor, .notif, .toast';
 const POSITIONERS = '.ant-dropdown, .ant-picker-dropdown';
 
 // Portal popups need the same image, cover dimensions and viewport coordinates

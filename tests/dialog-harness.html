@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="zh"><head><meta charset="UTF-8"><title>Dialog surfaces</title></head>
+<body><div id="root"></div><script type="module">
+import React from 'react';
+import { createRoot } from 'react-dom/client';
+import RecoveryModal from '/src/components/overlays/RecoveryModal.jsx';
+import UnsavedChangesModal from '/src/components/overlays/UnsavedChangesModal.jsx';
+import DeleteFileModal from '/src/components/overlays/DeleteFileModal.jsx';
+import ThemedConfigProvider from '/src/antd/ThemedConfigProvider.jsx';
+import themeStore from '/src/store/useThemeStore.js';
+import configStore from '/src/store/useConfigStore.js';
+import { useBackgroundSurfaces } from '/src/hooks/useBackgroundSurfaces.js';
+import i18n from '/src/i18n/index.js';
+import '/src/assets/styles/index.scss';
+import '/src/assets/styles/App.scss';
+import '/src/assets/styles/antd-overrides.scss';
+await i18n.changeLanguage('zh');
+const imageUrl = `data:image/svg+xml,${encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="900" height="600"><rect width="900" height="600" fill="#739bb8"/><circle cx="650" cy="280" r="180" fill="#c7a1c5"/></svg>')}`;
+const drafts = [{ recoveryId: 'draft', name: '灵感笔记.md', path: 'C:/Documents/notes/灵感笔记.md', diskState: 'unchanged', content: '# 今天的灵感\n\n把新的故事记录在这里。\n- [ ] 继续写作' }];
+window.events = [];
+let configure;
+function Harness() {
+ const [options, set] = React.useState({ theme: 'light', background: true, kind: 'recovery' });
+ const [selected, setSelected] = React.useState(['draft']);
+ configure = set;
+ useBackgroundSurfaces({ enabled: options.background, imageUrl, opacity: 0.28 });
+ const event = (name) => () => window.events.push(name);
+ const modal = options.kind === 'recovery' ? React.createElement(RecoveryModal, { open: true, drafts, onRestore: (items) => window.events.push(items.length), onDiscard: event('discard') })
+ : options.kind === 'unsaved' ? React.createElement(UnsavedChangesModal, { open: true, tabs: [{id: 'draft', name: '灵感笔记.md'}], selectedTabIds: selected, onToggleTab: (_, checked) => setSelected(checked ? ['draft'] : []), onSaveSelected: event('save'), onDiscard: event('discard'), onCancel: event('cancel') })
+ : React.createElement(DeleteFileModal, { file: {name:'灵感笔记.md', path: 'C:/Documents/notes/灵感笔记.md'}, onConfirm: event('delete'), onCancel: event('cancel') });
+ return React.createElement(ThemedConfigProvider, null, React.createElement('div', { className: `app ${options.background ? 'app--background' : ''}`, style: {fontSize: 52, padding: 40} }, '底层正文不应该穿过弹窗 '.repeat(100), modal));
+}
+createRoot(document.getElementById('root')).render(React.createElement(Harness));
+window.trial = { apply(options) {
+ document.documentElement.dataset.theme = options.theme;
+ document.body.classList.toggle('moki-has-background', options.background);
+ themeStore.setState({theme: options.theme});
+ configStore.setState({ backgroundEnabled: options.background, backgroundImage: options.background ? 'test' : '' });
+ configure(options);
+}};
+</script></body></html>

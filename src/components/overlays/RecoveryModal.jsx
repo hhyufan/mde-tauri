@@ -1,8 +1,9 @@
+import AppDialog from './AppDialog';
 import { useMemo, useState } from 'react';
-import { Alert, Button, Checkbox, Modal, Space, Typography } from 'antd';
+import { Alert, Button, Checkbox, Space, Typography } from 'antd';
 import i18n from '@/i18n';
 
-const { Paragraph, Text, Title } = Typography;
+const { Paragraph } = Typography;
 
 function RecoveryModal({ open, drafts, onRestore, onDiscard }) {
   const [selected, setSelected] = useState(() => new Set(drafts.map((draft) => draft.recoveryId)));
@@ -21,7 +22,7 @@ function RecoveryModal({ open, drafts, onRestore, onDiscard }) {
   };
 
   return (
-    <Modal
+    <AppDialog
       open={open}
       closable={false}
       maskClosable={false}
@@ -47,25 +48,25 @@ function RecoveryModal({ open, drafts, onRestore, onDiscard }) {
         message={i18n.t('unsaved.recoveryMessage')}
         description={i18n.t('unsaved.recoveryHint')}
       />
-      <div style={{ maxHeight: 420, overflow: 'auto', marginTop: 16 }}>
+      <div className="recovery-modal__list">
         {drafts.map((draft) => (
-          <div key={draft.recoveryId} style={{ padding: '12px 0', borderBottom: '1px solid var(--border-color)' }}>
+          <div key={draft.recoveryId} className="recovery-modal__draft">
             <Checkbox
               checked={selected.has(draft.recoveryId)}
               onChange={(event) => toggle(draft.recoveryId, event.target.checked)}
             >
-              <Title level={5} style={{ display: 'inline', margin: 0 }}>{draft.name}</Title>
+              {draft.name}
             </Checkbox>
-            <Paragraph type="secondary" ellipsis={{ rows: 1 }} style={{ margin: '6px 0' }}>
+            <Paragraph className="recovery-modal__path" type="secondary" ellipsis={{ rows: 1 }}>
               {draft.path || i18n.t('unsaved.untitled')} · {draft.diskState === 'changed' ? i18n.t('unsaved.diskChanged') : draft.diskState === 'missing' ? i18n.t('unsaved.diskMissing') : i18n.t('unsaved.diskUnchanged')}
             </Paragraph>
-            <Text code style={{ whiteSpace: 'pre-wrap' }}>
+            <pre className="recovery-modal__preview">
               {(draft.content || '').slice(0, 320) || i18n.t('unsaved.emptyDraft')}
-            </Text>
+            </pre>
           </div>
         ))}
       </div>
-    </Modal>
+    </AppDialog>
   );
 }
 

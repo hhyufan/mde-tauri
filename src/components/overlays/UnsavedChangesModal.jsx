@@ -1,4 +1,5 @@
-import { Modal, Button, Checkbox } from 'antd';
+import AppDialog from './AppDialog';
+import { Button, Checkbox } from 'antd';
 import { FileAddOutlined } from '@ant-design/icons';
 import { useTranslation } from 'react-i18next';
 import './unsaved-changes-modal.scss';
@@ -22,7 +23,7 @@ function UnsavedChangesModal({
   const selectedCount = selectedTabIds.length;
 
   return (
-    <Modal
+    <AppDialog
       open={open}
       onCancel={onCancel}
       title={t('unsaved.title')}
@@ -75,7 +76,7 @@ function UnsavedChangesModal({
           ))}
         </div>
       </div>
-    </Modal>
+    </AppDialog>
   );
 }
 
